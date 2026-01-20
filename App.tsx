@@ -23,7 +23,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('dreamclass_user');
     if (saved) {
       setCurrentUser(JSON.parse(saved));
-      // Even if saved, we ask for mode again for a fresh session
       setCurrentView('mode-selection');
     }
   }, []);
@@ -52,15 +51,27 @@ const App: React.FC = () => {
 
   const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
     if (!currentUser) return;
-    const updated = { 
+    
+    // Update local state
+    const updatedUser = { 
       ...currentUser, 
       classroomDesigns: {
         ...currentUser.classroomDesigns,
         [subjectId]: design
       } 
     };
-    setCurrentUser(updated);
-    localStorage.setItem('dreamclass_user', JSON.stringify(updated));
+    setCurrentUser(updatedUser);
+    localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
+
+    // Update persisted accounts list
+    const accountsData = localStorage.getItem('dreamclass_accounts');
+    if (accountsData) {
+      const accounts: User[] = JSON.parse(accountsData);
+      const updatedAccounts = accounts.map(acc => 
+        acc.id === currentUser.id ? updatedUser : acc
+      );
+      localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+    }
   };
 
   const navigateToSubject = (subjectId: SubjectId) => {
@@ -97,7 +108,7 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* DreamClass Brand Logo */}
+              {/* DreamClass Brand Logo - PERMITTED HERE */}
               <div className="mb-8 flex flex-col items-center gap-4 animate-fade-in">
                 <div className="w-20 h-20 bg-yellow-400 rounded-[2rem] flex items-center justify-center shadow-xl border-b-8 border-yellow-600">
                   <span className="text-4xl">🎒</span>

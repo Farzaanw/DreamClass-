@@ -31,6 +31,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             title="Return to Mode Select"
             className="group flex items-center gap-3 hover:scale-105 transition-transform"
           >
+            {/* DreamClass Brand Logo - PERMITTED HERE */}
             <div className="w-14 h-14 bg-yellow-400 rounded-3xl flex items-center justify-center shadow-xl border-b-4 border-yellow-600 group-hover:rotate-12 transition-transform">
               <span className="text-3xl">🎒</span>
             </div>

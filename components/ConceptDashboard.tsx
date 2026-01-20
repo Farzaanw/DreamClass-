@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { Concept, ClassroomDesign, Message } from '../types';
-import { decodeBase64, decodeAudioData, createPcmBlob } from '../audioUtils';
+// Fixed: Imported encodeBase64 which was missing from the import list
+import { decodeBase64, encodeBase64, decodeAudioData, createPcmBlob } from '../audioUtils';
 
 interface ConceptDashboardProps {
   concept: Concept;
@@ -118,7 +119,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   const getOrCreateSession = async (useMic: boolean = false) => {
     if (sessionPromiseRef.current) return sessionPromiseRef.current;
 
-    // Create a new GoogleGenAI instance right before making an API call.
+    // Always create a new instance right before making an API call to ensure it always uses the most up-to-date API key.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     if (useMic) {

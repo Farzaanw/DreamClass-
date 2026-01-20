@@ -27,6 +27,8 @@ export interface ClassroomDesign {
 export interface User {
   id: string;
   username: string;
+  email: string;
+  password?: string; // Optional because we don't send it back to the state in the same way
   classroomDesigns: Record<SubjectId, ClassroomDesign>;
   progress: Record<string, number>;
 }
