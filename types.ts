@@ -1,5 +1,5 @@
 
-export type SubjectId = 'phonics' | 'math' | 'science';
+export type SubjectId = string;
 export type AppMode = 'classroom' | 'teacher';
 
 export interface Concept {
@@ -13,22 +13,28 @@ export interface Concept {
 export interface Subject {
   id: SubjectId;
   title: string;
+  description?: string;
   color: string;
   concepts: Concept[];
 }
 
 export interface ClassroomDesign {
   wallColor: string;
+  wallTheme?: 'plain' | 'stripes' | 'dots';
   floorColor: string;
+  floorTheme?: 'plain' | 'wood' | 'tile';
   posterUrls: string[];
   ambientMusic: string;
+  mascot?: string; // 'none', 'cat', 'dog', 'owl', 'robot'
+  shelves?: string[]; // list of object emojis/ids
 }
 
 export interface User {
   id: string;
   username: string;
   email: string;
-  password?: string; // Optional because we don't send it back to the state in the same way
+  password?: string;
+  customSubjects: Subject[];
   classroomDesigns: Record<SubjectId, ClassroomDesign>;
   progress: Record<string, number>;
 }

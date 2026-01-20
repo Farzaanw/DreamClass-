@@ -67,6 +67,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       username,
       email: email.toLowerCase(),
       password, // In a real app, this would be hashed
+      customSubjects: [], // Start with no custom subjects
       classroomDesigns: initialDesigns,
       progress: {}
     };

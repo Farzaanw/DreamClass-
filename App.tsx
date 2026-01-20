@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode } from './types';
-import { SUBJECTS } from './constants';
+import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import ClassroomView from './components/ClassroomView';
@@ -10,6 +10,21 @@ import ClassroomDesigner from './components/ClassroomDesigner';
 
 type View = 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept';
 
+const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-4xl" }) => {
+  const letters = "DreamClass".split("");
+  const colors = [
+    "text-blue-500", "text-green-500", "text-yellow-500", "text-orange-500", "text-red-500",
+    "text-purple-500", "text-indigo-500", "text-pink-500", "text-teal-500", "text-cyan-500"
+  ];
+  return (
+    <h1 className={`${size} font-bold tracking-tight flex items-center gap-0.5 drop-shadow-md select-none`}>
+      {letters.map((l, i) => (
+        <span key={i} className={colors[i % colors.length]}>{l}</span>
+      ))}
+    </h1>
+  );
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('auth');
@@ -17,6 +32,12 @@ const App: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [designingSubjectId, setDesigningSubjectId] = useState<SubjectId | null>(null);
+
+  // Combine fixed subjects with user-created ones
+  const getAllSubjects = (): Subject[] => {
+    if (!currentUser) return SUBJECTS;
+    return [...SUBJECTS, ...(currentUser.customSubjects || [])];
+  };
 
   // Load from local storage on mount
   useEffect(() => {
@@ -49,17 +70,7 @@ const App: React.FC = () => {
     localStorage.removeItem('dreamclass_user');
   };
 
-  const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
-    if (!currentUser) return;
-    
-    // Update local state
-    const updatedUser = { 
-      ...currentUser, 
-      classroomDesigns: {
-        ...currentUser.classroomDesigns,
-        [subjectId]: design
-      } 
-    };
+  const persistUser = (updatedUser: User) => {
     setCurrentUser(updatedUser);
     localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
 
@@ -68,14 +79,77 @@ const App: React.FC = () => {
     if (accountsData) {
       const accounts: User[] = JSON.parse(accountsData);
       const updatedAccounts = accounts.map(acc => 
-        acc.id === currentUser.id ? updatedUser : acc
+        acc.id === updatedUser.id ? updatedUser : acc
       );
       localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
     }
   };
 
+  const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
+    if (!currentUser) return;
+    const updatedUser = { 
+      ...currentUser, 
+      classroomDesigns: {
+        ...currentUser.classroomDesigns,
+        [subjectId]: design
+      } 
+    };
+    persistUser(updatedUser);
+  };
+
+  const handleAddSubject = (subjectData: { name: string, description: string, concepts: Concept[] }) => {
+    if (!currentUser || !subjectData.name.trim()) return;
+
+    const newId = `custom-${Date.now()}`;
+    const colors = ['bg-pink-400', 'bg-orange-400', 'bg-indigo-400', 'bg-teal-400', 'bg-rose-400'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    const newSubject: Subject = {
+      id: newId,
+      title: subjectData.name,
+      description: subjectData.description,
+      color: randomColor,
+      concepts: subjectData.concepts
+    };
+
+    const updatedUser = {
+      ...currentUser,
+      customSubjects: [...(currentUser.customSubjects || []), newSubject],
+      classroomDesigns: {
+        ...currentUser.classroomDesigns,
+        [newId]: {
+          wallColor: WALL_COLORS[0],
+          floorColor: FLOOR_COLORS[0],
+          posterUrls: [],
+          ambientMusic: 'none'
+        }
+      }
+    };
+
+    persistUser(updatedUser);
+  };
+
+  const handleDeleteSubject = (subjectId: SubjectId) => {
+    if (!currentUser) return;
+    
+    // Only allow deleting custom subjects for now to protect core curricula
+    const updatedCustomSubjects = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
+    
+    // Clean up associated classroom designs
+    const updatedDesigns = { ...currentUser.classroomDesigns };
+    delete updatedDesigns[subjectId];
+
+    const updatedUser = {
+      ...currentUser,
+      customSubjects: updatedCustomSubjects,
+      classroomDesigns: updatedDesigns
+    };
+
+    persistUser(updatedUser);
+  };
+
   const navigateToSubject = (subjectId: SubjectId) => {
-    const subject = SUBJECTS.find(s => s.id === subjectId) || null;
+    const subject = getAllSubjects().find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
     setCurrentView('classroom');
   };
@@ -90,6 +164,8 @@ const App: React.FC = () => {
     setCurrentView('concept');
   };
 
+  const allSubjects = getAllSubjects();
+
   return (
     <div className="min-h-screen">
       {currentView === 'auth' && <Auth onLogin={handleLogin} />}
@@ -98,7 +174,6 @@ const App: React.FC = () => {
         <div className="relative">
           {currentView === 'mode-selection' && (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F9FF] p-6 font-['Fredoka'] relative">
-              {/* Logout Button in Top Right */}
               <div className="absolute top-8 right-8">
                 <button 
                   onClick={handleLogout}
@@ -108,12 +183,11 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* DreamClass Brand Logo - PERMITTED HERE */}
               <div className="mb-8 flex flex-col items-center gap-4 animate-fade-in">
-                <div className="w-20 h-20 bg-yellow-400 rounded-[2rem] flex items-center justify-center shadow-xl border-b-8 border-yellow-600">
-                  <span className="text-4xl">🎒</span>
+                <div className="w-24 h-24 bg-yellow-400 rounded-[2.5rem] flex items-center justify-center shadow-2xl border-b-8 border-yellow-600">
+                  <span className="text-5xl">🎒</span>
                 </div>
-                <h1 className="text-4xl font-bold text-blue-600 tracking-tight">DreamClass</h1>
+                <RainbowLogo size="text-7xl" />
               </div>
 
               <div className="text-center mb-12 animate-fade-in" style={{ animationDelay: '0.1s' }}>
@@ -160,6 +234,8 @@ const App: React.FC = () => {
               onBackToMode={handleBackToModeSelect}
               onNavigateDesigner={() => setCurrentView('designer-select')}
               onNavigateSubject={navigateToSubject}
+              onAddSubject={handleAddSubject}
+              onDeleteSubject={handleDeleteSubject}
             />
           )}
 
@@ -167,7 +243,7 @@ const App: React.FC = () => {
             <div className="p-8 max-w-4xl mx-auto text-center font-['Fredoka']">
               <h2 className="text-4xl font-bold text-gray-800 mb-12 mt-12">Which classroom would you like to decorate? 🎨</h2>
               <div className="grid md:grid-cols-3 gap-8">
-                {SUBJECTS.map(s => (
+                {allSubjects.map(s => (
                   <button
                     key={s.id}
                     onClick={() => startDesigning(s.id)}
@@ -188,7 +264,7 @@ const App: React.FC = () => {
 
           {currentView === 'designer' && designingSubjectId && (
             <ClassroomDesigner 
-              subjectTitle={SUBJECTS.find(s => s.id === designingSubjectId)?.title || ''}
+              subjectTitle={allSubjects.find(s => s.id === designingSubjectId)?.title || ''}
               design={currentUser.classroomDesigns[designingSubjectId]} 
               onSave={(design) => {
                 updateClassroom(designingSubjectId, design);

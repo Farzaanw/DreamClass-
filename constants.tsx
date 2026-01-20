@@ -7,9 +7,9 @@ export const SUBJECTS: Subject[] = [
     title: 'Phonics Fun',
     color: 'bg-yellow-400',
     concepts: [
-      { id: 'abc-lower', title: 'ABC Lowercase', icon: 'abc', description: 'Mastering small letters.', suggestedItems: ['a', 'b', 'c', 'apple', 'ball'] },
-      { id: 'abc-upper', title: 'ABC Uppercase', icon: 'ABC', description: 'Mastering BIG letters.', suggestedItems: ['A', 'B', 'C', 'APPLE', 'BALL'] },
-      { id: 'vowels', title: 'Vibrant Vowels', icon: 'aeiou', description: 'The glue that holds words together.', suggestedItems: ['A', 'E', 'I', 'O', 'U'] },
+      { id: 'abc-lower', title: 'ABC Lowercase', icon: '🔤', description: 'Mastering small letters.', suggestedItems: ['a', 'b', 'c', 'apple', 'ball'] },
+      { id: 'abc-upper', title: 'ABC Uppercase', icon: '🅰️', description: 'Mastering BIG letters.', suggestedItems: ['A', 'B', 'C', 'APPLE', 'BALL'] },
+      { id: 'vowels', title: 'Vibrant Vowels', icon: '🗣️', description: 'The glue that holds words together.', suggestedItems: ['A', 'E', 'I', 'O', 'U'] },
     ]
   },
   {
@@ -17,9 +17,9 @@ export const SUBJECTS: Subject[] = [
     title: 'Magic Math',
     color: 'bg-blue-400',
     concepts: [
-      { id: 'addition', title: 'Add It Up!', icon: '+', description: 'Combining things together.', suggestedItems: ['1', '2', '3', '+', '='] },
-      { id: 'subtraction', title: 'Take Away', icon: '-', description: 'Removing things from a group.', suggestedItems: ['5', '2', '3', '-', '='] },
-      { id: 'counting', title: 'Counting 1-20', icon: '123', description: 'Learning our numbers.', suggestedItems: ['1', '2', '3', '4', '5'] },
+      { id: 'addition', title: 'Add It Up!', icon: '➕', description: 'Combining things together.', suggestedItems: ['1', '2', '3', '+', '='] },
+      { id: 'subtraction', title: 'Take Away', icon: '➖', description: 'Removing things from a group.', suggestedItems: ['5', '2', '3', '-', '='] },
+      { id: 'counting', title: 'Counting 1-20', icon: '🔢', description: 'Learning our numbers.', suggestedItems: ['1', '2', '3', '4', '5'] },
     ]
   },
   {
@@ -27,15 +27,30 @@ export const SUBJECTS: Subject[] = [
     title: 'Super Science',
     color: 'bg-green-400',
     concepts: [
-      { id: 'life-science', title: 'Life Sciences', icon: '🌱', description: 'Plants, animals, and us!', suggestedItems: ['Seed', 'Water', 'Sun', 'Flower'] },
-      { id: 'physical-science', title: 'Forces & Motion', icon: '⚡', description: 'How things move and work.', suggestedItems: ['Push', 'Pull', 'Magnet', 'Spring'] },
-      { id: 'earth-science', title: 'Planet Earth', icon: '🌍', description: 'Rocks, space, and weather.', suggestedItems: ['Sun', 'Cloud', 'Rain', 'Earth'] },
+      { id: 'life-science', title: 'Life Sciences', icon: '🌿', description: 'Plants, animals, and us!', suggestedItems: ['Seed', 'Water', 'Sun', 'Flower'] },
+      { id: 'physical-science', title: 'Forces & Motion', icon: '🧲', description: 'How things move and work.', suggestedItems: ['Push', 'Pull', 'Magnet', 'Spring'] },
+      { id: 'earth-science', title: 'Planet Earth', icon: '🪐', description: 'Rocks, space, and weather.', suggestedItems: ['Sun', 'Cloud', 'Rain', 'Earth'] },
     ]
   }
 ];
 
 export const WALL_COLORS = ['#FEF3C7', '#DBEAFE', '#D1FAE5', '#F3E8FF', '#FFEDD5', '#FFFFFF', '#FFD1DC', '#E0FFFE', '#F1F5F9', '#ECFDF5'];
 export const FLOOR_COLORS = ['#D97706', '#2563EB', '#059669', '#7C3AED', '#EA580C', '#4B5563', '#92400E', '#1E293B'];
+
+export const MASCOTS = [
+  { id: 'none', label: 'No Pet', emoji: '🚫' },
+  { id: 'cat', label: 'Whiskers', emoji: '🐱' },
+  { id: 'dog', label: 'Buddy', emoji: '🐶' },
+  { id: 'owl', label: 'Sage', emoji: '🦉' },
+  { id: 'robot', label: 'Beep', emoji: '🤖' },
+  { id: 'unicorn', label: 'Sparkle', emoji: '🦄' },
+  { id: 'dino', label: 'Rex', emoji: '🦖' },
+  { id: 'bunny', label: 'Hops', emoji: '🐰' },
+  { id: 'dragon', label: 'Puff', emoji: '🐲' },
+  { id: 'monkey', label: 'Nana', emoji: '🐒' },
+];
+
+export const SHELF_OBJECTS = ['📚', '🪴', '🌍', '🏆', '🔬', '🎨', '🧸', '🔭', '🧪', '🦴', '🍎', '💎'];
 
 export const STICKERS = [
   { id: 'star', emoji: '⭐', url: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png' },
@@ -76,11 +91,4 @@ export const MUSIC_OPTIONS: MusicOption[] = [
   { id: 'nature', label: 'Birdies', icon: '🐦', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', artist: 'Mother Nature', lyrics: ['Tweet tweet in the trees.', 'Listen to the gentle breeze.'] },
   { id: 'bounce', label: 'Fun Bounce', icon: '🦘', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', artist: 'Boing Boing', lyrics: ['Jump up high!', 'Touch the sky!', 'Bounce around!'] },
   { id: 'ukulele', label: 'Island Fun', icon: '🏝️', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', artist: 'Aloha Waves', lyrics: ['Sway with the palms.', 'Ocean is so calm.', 'Island vibes are here.'] },
-];
-
-export const POSTER_THEMES = [
-  'https://picsum.photos/seed/abc/200/300',
-  'https://picsum.photos/seed/math/200/300',
-  'https://picsum.photos/seed/space/200/300',
-  'https://picsum.photos/seed/forest/200/300'
 ];
