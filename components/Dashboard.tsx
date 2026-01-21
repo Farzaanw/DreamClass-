@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { User, SubjectId, AppMode, Subject, Concept } from '../types';
-import { SUBJECTS } from '../constants';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "DreamClass".split("");
@@ -21,59 +20,93 @@ const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
 interface DashboardProps {
   user: User;
   appMode: AppMode;
+  allSubjects: Subject[];
   onModeChange: (mode: AppMode) => void;
   onLogout: () => void;
   onBackToMode: () => void;
   onNavigateDesigner: () => void;
   onNavigateSubject: (id: SubjectId) => void;
-  onAddSubject: (subjectData: { name: string, description: string, concepts: Concept[] }) => void;
+  onAddSubject: (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
+  onEditSubject: (id: string, subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
   onDeleteSubject: (id: SubjectId) => void;
 }
+
+const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
 
 const Dashboard: React.FC<DashboardProps> = ({ 
   user, 
   appMode, 
+  allSubjects,
   onModeChange, 
   onLogout, 
   onBackToMode, 
   onNavigateDesigner, 
   onNavigateSubject,
   onAddSubject,
+  onEditSubject,
   onDeleteSubject
 }) => {
   const [showModal, setShowModal] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newIcon, setNewIcon] = useState('⭐');
   const [concepts, setConcepts] = useState<{ title: string; icon: string; description: string }[]>([
     { title: '', icon: '✨', description: '' }
   ]);
 
-  const allSubjects = [...SUBJECTS, ...(user.customSubjects || [])];
+  const handleOpenEdit = (subject: Subject) => {
+    setEditingSubjectId(subject.id);
+    setNewName(subject.title);
+    setNewDesc(subject.description || '');
+    setNewIcon(subject.icon || '⭐');
+    setConcepts(subject.concepts.map(c => ({
+      title: c.title,
+      icon: c.icon,
+      description: c.description
+    })));
+    setShowModal(true);
+  };
 
-  const handleCreateSubject = (e: React.FormEvent) => {
+  const handleCreateOrUpdateSubject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
 
     const formattedConcepts: Concept[] = concepts
       .filter(c => c.title.trim() !== '')
       .map((c, i) => ({
-        id: `custom-concept-${Date.now()}-${i}`,
+        id: `concept-${Date.now()}-${i}`,
         title: c.title,
         icon: c.icon || '📚',
         description: c.description || `Learning about ${c.title}`,
         suggestedItems: [c.title, c.icon]
       }));
 
-    onAddSubject({
-      name: newName,
-      description: newDesc,
-      concepts: formattedConcepts
-    });
+    if (editingSubjectId) {
+      onEditSubject(editingSubjectId, {
+        name: newName,
+        description: newDesc,
+        concepts: formattedConcepts,
+        icon: newIcon
+      });
+    } else {
+      onAddSubject({
+        name: newName,
+        description: newDesc,
+        concepts: formattedConcepts,
+        icon: newIcon
+      });
+    }
 
-    // Reset and close
+    handleCloseModal();
+  };
+
+  const handleCloseModal = () => {
     setNewName('');
     setNewDesc('');
+    setNewIcon('⭐');
     setConcepts([{ title: '', icon: '✨', description: '' }]);
+    setEditingSubjectId(null);
     setShowModal(false);
   };
 
@@ -145,14 +178,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
         
         <div className="flex gap-4">
-          {appMode === 'teacher' && (
-            <button 
-              onClick={onNavigateDesigner}
-              className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-6 py-3 rounded-full font-bold flex items-center gap-2 transition-colors border-b-4 border-purple-300 shadow-sm hover:scale-105"
-            >
-              🎨 Designer
-            </button>
-          )}
           <button 
             onClick={onLogout}
             className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-medium transition-colors border-b-4 border-gray-300"
@@ -190,44 +215,58 @@ const Dashboard: React.FC<DashboardProps> = ({
           {appMode === 'classroom' ? 'Select a Subject' : 'Manage Subject Material'}
         </h3>
 
-        {allSubjects.map((subject) => {
-          const isCustom = !['phonics', 'math', 'science'].includes(subject.id);
-          return (
-            <div key={subject.id} className="relative group">
-              {appMode === 'teacher' && isCustom && (
+        {allSubjects.map((subject) => (
+          <div key={subject.id} className="relative group">
+            {appMode === 'teacher' && (
+              <div className="absolute -top-3 -right-3 flex gap-2 z-10">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    if(confirm(`Are you sure you want to remove ${subject.title}?`)) {
+                    handleOpenEdit(subject);
+                  }}
+                  className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                  title="Edit Subject"
+                >
+                  ✏️
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    // EXACT confirmation message requested
+                    if(window.confirm(`Are you sure you want to delete ${subject.title} from your classroom?`)) {
                       onDeleteSubject(subject.id);
                     }
                   }}
-                  className="absolute -top-3 -right-3 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 z-10 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                  className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
                   title="Remove Subject"
                 >
                   🗑️
                 </button>
-              )}
-              <div 
-                onClick={() => onNavigateSubject(subject.id)}
-                className={`${subject.color} p-8 rounded-[2.5rem] shadow-lg cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center text-center border-b-8 border-black/10`}
-              >
-                <div className="bg-white/30 w-24 h-24 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner group-hover:scale-110 transition-transform">
-                  {subject.id === 'phonics' ? '🔤' : subject.id === 'math' ? '➕' : subject.id === 'science' ? '🔬' : '⭐'}
-                </div>
-                <h4 className="text-2xl font-bold text-white mb-2">{subject.title}</h4>
-                <p className="text-white/80 text-sm font-medium">
-                  {appMode === 'classroom' ? 'Start interactive lesson.' : 'Edit concepts and games.'}
-                </p>
               </div>
+            )}
+            <div 
+              onClick={() => onNavigateSubject(subject.id)}
+              className={`${subject.color} p-8 rounded-[2.5rem] shadow-lg cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center text-center border-b-8 border-black/10 h-full`}
+            >
+              <div className="bg-white/30 w-24 h-24 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner group-hover:scale-110 transition-transform">
+                {subject.icon || (subject.id === 'phonics' ? '🔤' : subject.id === 'math' ? '➕' : subject.id === 'science' ? '🔬' : '⭐')}
+              </div>
+              <h4 className="text-2xl font-bold text-white mb-2">{subject.title}</h4>
+              <p className="text-white/80 text-sm font-medium line-clamp-3">
+                {subject.description || (appMode === 'classroom' ? 'Start interactive lesson.' : 'Edit concepts and games.')}
+              </p>
             </div>
-          );
-        })}
+          </div>
+        ))}
 
         {appMode === 'teacher' && (
           <div 
-            onClick={() => setShowModal(true)}
-            className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group"
+            onClick={() => {
+              handleCloseModal();
+              setShowModal(true);
+            }}
+            className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]"
           >
             <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-blue-100 transition-all">
               ➕
@@ -238,25 +277,43 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Add Subject Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto relative animate-zoom-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={handleCloseModal}>
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto relative animate-zoom-in" onClick={e => e.stopPropagation()}>
             <button 
-              onClick={() => setShowModal(false)}
+              onClick={handleCloseModal}
               className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500 transition-colors"
             >
               ✕
             </button>
             
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">✨</div>
-              <h3 className="text-3xl font-bold text-gray-800">Create New Subject</h3>
-              <p className="text-gray-400">Add a new topic to your curriculum</p>
+              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+                {editingSubjectId ? '✏️' : '✨'}
+              </div>
+              <h3 className="text-3xl font-bold text-gray-800">
+                {editingSubjectId ? 'Edit Subject Room' : 'New Subject Room'}
+              </h3>
             </div>
 
-            <form onSubmit={handleCreateSubject} className="space-y-8">
+            <form onSubmit={handleCreateOrUpdateSubject} className="space-y-8">
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-500 ml-4 uppercase tracking-wider">Choose an Emoji Icon</label>
+                  <div className="flex flex-wrap gap-2 p-4 bg-blue-50/50 rounded-3xl border-2 border-blue-100 justify-center">
+                    {EMOJI_OPTIONS.map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setNewIcon(emoji)}
+                        className={`text-2xl sm:text-3xl p-2 rounded-xl transition-all ${newIcon === emoji ? 'bg-white shadow-md scale-125 border-2 border-blue-400' : 'hover:bg-white/50 opacity-50 hover:opacity-100'}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-sm font-bold text-gray-500 ml-4 uppercase tracking-wider">Subject Name</label>
                   <input
@@ -304,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       />
                       <input
                         type="text"
-                        placeholder="Concept Title (e.g., The Moon)"
+                        placeholder="Concept Title"
                         className="flex-1 px-6 py-4 rounded-2xl border-4 border-gray-50 bg-gray-50/30 focus:border-blue-200 text-lg font-bold text-gray-700"
                         value={concept.title}
                         onChange={(e) => updateConcept(idx, 'title', e.target.value)}
@@ -328,7 +385,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 type="submit"
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-6 rounded-[2.5rem] text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0"
               >
-                Create Subject Room 🚀
+                {editingSubjectId ? 'Update Room 🚀' : 'Create Subject Room 🚀'}
               </button>
             </form>
           </div>

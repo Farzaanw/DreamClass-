@@ -16,6 +16,7 @@ export interface Subject {
   description?: string;
   color: string;
   concepts: Concept[];
+  icon?: string;
 }
 
 export interface ClassroomDesign {
@@ -35,6 +36,7 @@ export interface User {
   email: string;
   password?: string;
   customSubjects: Subject[];
+  hiddenSubjectIds: string[];
   classroomDesigns: Record<SubjectId, ClassroomDesign>;
   progress: Record<string, number>;
 }
