@@ -13,7 +13,6 @@ interface ClassroomDesignerProps {
 type EditTarget = 'wall' | 'floor' | 'stickers' | 'music' | 'mascot' | 'shelves' | null;
 
 const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, design, onSave, onCancel }) => {
-  const initialDesign = useRef<ClassroomDesign>({ ...design });
   const [localDesign, setLocalDesign] = useState<ClassroomDesign>({ 
     ...design, 
     posterUrls: design.posterUrls || [],
@@ -23,6 +22,9 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
     wallTheme: design.wallTheme || 'plain',
     floorTheme: design.floorTheme || 'plain'
   });
+  
+  // History stack for undo functionality
+  const [history, setHistory] = useState<ClassroomDesign[]>([]);
   const [activeTarget, setActiveTarget] = useState<EditTarget>(null);
   const [previewingMusic, setPreviewingMusic] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -35,6 +37,11 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
       }
     };
   }, []);
+
+  const pushHistory = (newState: ClassroomDesign) => {
+    setHistory(prev => [...prev, localDesign].slice(-20)); // Limit history to 20 steps
+    setLocalDesign(newState);
+  };
 
   const handlePreviewMusic = (url: string) => {
     if (previewingMusic === url) {
@@ -52,27 +59,36 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
 
   const toggleSticker = (url: string) => {
     const exists = localDesign.posterUrls.includes(url);
+    let newUrls: string[];
     if (exists) {
-      setLocalDesign({ ...localDesign, posterUrls: localDesign.posterUrls.filter(u => u !== url) });
+      newUrls = localDesign.posterUrls.filter(u => u !== url);
     } else if (localDesign.posterUrls.length < 12) {
-      setLocalDesign({ ...localDesign, posterUrls: [...localDesign.posterUrls, url] });
+      newUrls = [...localDesign.posterUrls, url];
+    } else {
+      return;
     }
+    pushHistory({ ...localDesign, posterUrls: newUrls });
   };
 
   const toggleShelfObject = (emoji: string) => {
     const shelves = localDesign.shelves || [];
     const exists = shelves.includes(emoji);
+    let newShelves: string[];
     if (exists) {
-      setLocalDesign({ ...localDesign, shelves: shelves.filter(e => e !== emoji) });
+      newShelves = shelves.filter(e => e !== emoji);
     } else if (shelves.length < 8) {
-      setLocalDesign({ ...localDesign, shelves: [...shelves, emoji] });
+      newShelves = [...shelves, emoji];
+    } else {
+      return;
     }
+    pushHistory({ ...localDesign, shelves: newShelves });
   };
 
-  const handleReset = () => {
-    if (confirm("Revert all changes to previous design? 🧹")) {
-      setLocalDesign({ ...initialDesign.current });
-    }
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const previousState = history[history.length - 1];
+    setLocalDesign(previousState);
+    setHistory(prev => prev.slice(0, -1));
   };
 
   const getWallPattern = () => {
@@ -98,10 +114,11 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
             ⬅️ Exit
           </button>
           <button 
-            onClick={handleReset}
-            className="bg-white hover:bg-orange-50 text-orange-500 font-bold px-6 py-3 rounded-2xl border-b-4 border-orange-200 active:translate-y-1 transition-all text-lg"
+            onClick={handleUndo}
+            disabled={history.length === 0}
+            className={`font-bold px-6 py-3 rounded-2xl border-b-4 transition-all text-lg active:translate-y-1 ${history.length === 0 ? 'bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white hover:bg-orange-50 text-orange-500 border-orange-200'}`}
           >
-            🧹 Reset
+            ↩️ Undo
           </button>
         </div>
         
@@ -183,7 +200,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
           </div>
         </div>
 
-        {/* Sidebar Controls - Simplified as requested */}
+        {/* Sidebar Controls */}
         <div className="absolute right-12 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-50">
            {[
              { id: 'stickers', icon: '🌈', color: 'bg-yellow-400', label: 'Stickers' },
@@ -230,7 +247,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                       {WALL_COLORS.map(color => (
                         <button
                           key={color}
-                          onClick={() => setLocalDesign({ ...localDesign, wallColor: color })}
+                          onClick={() => pushHistory({ ...localDesign, wallColor: color })}
                           className={`aspect-square rounded-2xl border-4 transition-all hover:scale-110 ${localDesign.wallColor === color ? 'border-blue-500 shadow-xl ring-4 ring-blue-100' : 'border-gray-100'}`}
                           style={{ backgroundColor: color }}
                         />
@@ -242,7 +259,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                         {['plain', 'stripes', 'dots'].map(theme => (
                           <button
                             key={theme}
-                            onClick={() => setLocalDesign({ ...localDesign, wallTheme: theme as any })}
+                            onClick={() => pushHistory({ ...localDesign, wallTheme: theme as any })}
                             className={`flex-1 py-5 rounded-2xl border-4 font-bold capitalize transition-all text-lg ${localDesign.wallTheme === theme ? 'bg-blue-50 border-blue-400 text-blue-600 shadow-inner' : 'bg-gray-50 border-gray-100 text-gray-400 hover:bg-white'}`}
                           >
                             {theme}
@@ -258,7 +275,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                       {FLOOR_COLORS.map(color => (
                         <button
                           key={color}
-                          onClick={() => setLocalDesign({ ...localDesign, floorColor: color })}
+                          onClick={() => pushHistory({ ...localDesign, floorColor: color })}
                           className={`aspect-square rounded-2xl border-4 transition-all hover:scale-110 ${localDesign.floorColor === color ? 'border-orange-500 shadow-xl ring-4 ring-orange-100' : 'border-gray-100'}`}
                           style={{ backgroundColor: color }}
                         />
@@ -270,7 +287,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                         {['plain', 'wood', 'tile'].map(theme => (
                           <button
                             key={theme}
-                            onClick={() => setLocalDesign({ ...localDesign, floorTheme: theme as any })}
+                            onClick={() => pushHistory({ ...localDesign, floorTheme: theme as any })}
                             className={`flex-1 py-5 rounded-2xl border-4 font-bold capitalize transition-all text-lg ${localDesign.floorTheme === theme ? 'bg-orange-50 border-orange-400 text-orange-600 shadow-inner' : 'bg-gray-50 border-gray-100 text-gray-400 hover:bg-white'}`}
                           >
                             {theme}
@@ -299,7 +316,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                     {MASCOTS.map(m => (
                       <button
                         key={m.id}
-                        onClick={() => setLocalDesign({ ...localDesign, mascot: m.id })}
+                        onClick={() => pushHistory({ ...localDesign, mascot: m.id })}
                         className={`p-6 rounded-[2.5rem] border-4 transition-all flex flex-col items-center gap-3 ${localDesign.mascot === m.id ? 'bg-rose-50 border-rose-400 shadow-xl scale-105' : 'bg-gray-50 border-gray-100 hover:bg-white'}`}
                       >
                         <span className="text-7xl">{m.emoji}</span>
@@ -326,7 +343,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                     {MUSIC_OPTIONS.map(opt => (
                       <div key={opt.id} className="flex gap-4">
                         <button
-                          onClick={() => setLocalDesign({ ...localDesign, ambientMusic: opt.id })}
+                          onClick={() => pushHistory({ ...localDesign, ambientMusic: opt.id })}
                           className={`flex-1 p-6 rounded-[2.5rem] border-4 flex flex-col transition-all ${localDesign.ambientMusic === opt.id ? 'bg-purple-50 border-purple-400 shadow-xl' : 'bg-gray-50 border-gray-100 hover:bg-white'}`}
                         >
                           <div className="flex items-center gap-6 w-full">

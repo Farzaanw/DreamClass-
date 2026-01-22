@@ -162,9 +162,9 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           )}
         </div>
 
-        {/* Concept Cards - Smaller and rounder for better UI fit */}
-        <div className="absolute top-[48%] bottom-[10%] left-0 right-0 z-20 overflow-x-auto custom-scrollbar snap-x snap-mandatory flex items-center">
-          <div className="flex items-center justify-center min-w-full gap-6 sm:gap-10 px-12 sm:px-24">
+        {/* Concept Cards - Larger and easier to read */}
+        <div className="absolute top-[45%] bottom-[10%] left-0 right-0 z-20 overflow-x-auto custom-scrollbar snap-x snap-mandatory flex items-center">
+          <div className="flex items-center justify-center min-w-full gap-8 sm:gap-14 px-12 sm:px-24">
             {subject.concepts.map((concept, idx) => (
               <div 
                 key={concept.id}
@@ -172,19 +172,19 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
                 className="group cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
               >
                 <div 
-                  className="w-32 h-44 sm:w-40 sm:h-56 bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl flex flex-col items-center p-4 sm:p-5 text-center border-b-[6px] border-gray-100 group-hover:border-blue-400 animate-float-card transition-all" 
+                  className="w-44 h-64 sm:w-56 sm:h-80 bg-white rounded-[3rem] shadow-2xl flex flex-col items-center p-6 sm:p-8 text-center border-b-[8px] border-gray-100 group-hover:border-blue-400 animate-float-card transition-all" 
                   style={{ animationDelay: `${idx * 0.6}s` }}
                 >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-700 rounded-xl flex items-center justify-center text-xl sm:text-2xl mb-2 group-hover:bg-gray-800 group-hover:rotate-12 transition-all shadow-xl ring-2 ring-black/5">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-700 rounded-3xl flex items-center justify-center text-4xl sm:text-5xl mb-4 group-hover:bg-gray-800 group-hover:rotate-12 transition-all shadow-xl ring-4 ring-black/5">
                     {concept.icon || '📚'}
                   </div>
-                  <h3 className="text-[10px] sm:text-sm font-bold text-gray-800 mb-1 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
                     {concept.title}
                   </h3>
-                  <p className="text-[7px] sm:text-[9px] text-gray-400 font-semibold leading-relaxed line-clamp-2">
+                  <p className="text-sm sm:text-base text-gray-400 font-semibold leading-relaxed line-clamp-3">
                     {concept.description}
                   </p>
-                  <div className="mt-auto bg-blue-500 text-white text-[6px] sm:text-[7px] px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-3 group-hover:translate-y-0 uppercase tracking-tighter">
+                  <div className="mt-auto bg-blue-500 text-white text-xs sm:text-sm px-6 sm:px-8 py-2 sm:py-3 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-3 group-hover:translate-y-0 uppercase tracking-tighter">
                     Play Now 🚀
                   </div>
                 </div>
@@ -196,7 +196,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
       <style>{`
         @keyframes float-card { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        @keyframes float-slow { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-15px) rotate(4deg); } }
+        @keyframes float-slow { 0%, 100% { transform: translateY(0 rotate(-4deg); } 50% { transform: translateY(-15px) rotate(4deg); } }
         @keyframes bounce-slow { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.05); } }
         @keyframes bounce-pet { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
         @keyframes celebrate { 0%, 100% { transform: scale(1) rotate(0); } 25% { transform: scale(1.4) rotate(-15deg); } 75% { transform: scale(1.4) rotate(15deg); } }
@@ -209,7 +209,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         .animate-celebrate { animation: celebrate 0.5s ease-in-out 4; }
         .animate-wiggle { animation: wiggle 3s ease-in-out infinite; }
 
-        .custom-scrollbar::-webkit-scrollbar { height: 6px; sm:height: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; sm:height: 12px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); border-radius: 20px; margin: 0 60px; sm:margin: 0 120px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.4); border-radius: 20px; border: 3px solid rgba(255, 255, 255, 0.8); }
         .glow { filter: drop-shadow(0 0 30px rgba(255,255,255,0.95)); }

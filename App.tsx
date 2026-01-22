@@ -46,13 +46,12 @@ const StepCard: React.FC<{ num: string, title: string, desc: string, color: stri
   </div>
 );
 
-const ExampleCard: React.FC<{ emoji: string, title: string, teacher: string, color: string }> = ({ emoji, title, teacher, color }) => (
-  <div className="flex-shrink-0 w-64 snap-center p-6 bg-white rounded-[2.5rem] shadow-xl border-b-8 border-slate-100 flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-300">
-    <div className={`w-24 h-24 ${color} rounded-full flex items-center justify-center text-5xl mb-4 shadow-inner`}>
+const ExampleCard: React.FC<{ emoji: string, title: string, color: string }> = ({ emoji, title, color }) => (
+  <div className="flex-shrink-0 w-64 snap-center p-8 bg-white rounded-[2.5rem] shadow-xl border-b-8 border-slate-100 flex flex-col items-center justify-center text-center transform hover:scale-105 transition-transform duration-300 min-h-[220px]">
+    <div className={`w-28 h-28 ${color} rounded-full flex items-center justify-center text-6xl mb-6 shadow-inner`}>
       {emoji}
     </div>
-    <h4 className="text-xl font-bold text-slate-800 mb-1">{title}</h4>
-    <p className="text-sm font-bold text-blue-500 uppercase tracking-tighter">By {teacher}</p>
+    <h4 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h4>
   </div>
 );
 
@@ -432,13 +431,13 @@ const App: React.FC = () => {
               {/* Carousel container */}
               <div className="relative group">
                 <div className="flex overflow-x-auto gap-8 pb-12 snap-x snap-mandatory scroll-smooth hide-scrollbar px-4">
-                  <ExampleCard emoji="🍪" title="Counting Cookies" teacher="Mr. Baker" color="bg-orange-100" />
-                  <ExampleCard emoji="🦁" title="Phonics Jungle" teacher="Ms. Wild" color="bg-green-100" />
-                  <ExampleCard emoji="🚀" title="Space Math Hub" teacher="Mrs. Galaxy" color="bg-blue-100" />
-                  <ExampleCard emoji="🌋" title="Lava Science" teacher="Mr. Heat" color="bg-red-100" />
-                  <ExampleCard emoji="🏰" title="Medieval Phonics" teacher="Sir Readalot" color="bg-indigo-100" />
-                  <ExampleCard emoji="🐳" title="Ocean Explorers" teacher="Ms. Wave" color="bg-cyan-100" />
-                  <ExampleCard emoji="🧪" title="Chemistry Kids" teacher="Dr. Mixit" color="bg-purple-100" />
+                  <ExampleCard emoji="🍪" title="Counting Cookies" color="bg-orange-100" />
+                  <ExampleCard emoji="🦁" title="Phonics Jungle" color="bg-green-100" />
+                  <ExampleCard emoji="🚀" title="Space Math Hub" color="bg-blue-100" />
+                  <ExampleCard emoji="🌋" title="Lava Science" color="bg-red-100" />
+                  <ExampleCard emoji="🏰" title="Medieval Phonics" color="bg-indigo-100" />
+                  <ExampleCard emoji="🐳" title="Ocean Explorers" color="bg-cyan-100" />
+                  <ExampleCard emoji="🧪" title="Chemistry Kids" color="bg-purple-100" />
                 </div>
                 {/* Visual fade indicators for mobile/desktop */}
                 <div className="absolute left-0 top-0 bottom-12 w-20 bg-gradient-to-r from-slate-50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
