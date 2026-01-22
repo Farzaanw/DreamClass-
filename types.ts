@@ -30,6 +30,15 @@ export interface BoardItem {
   color?: string;
 }
 
+export interface Whiteboard {
+  id: string;
+  name: string;
+  timestamp: number;
+  items: BoardItem[];
+  bg: 'plain' | 'lined' | 'grid';
+  drawingData?: string; // DataURL of the canvas layer
+}
+
 export interface ClassroomDesign {
   wallColor: string;
   wallTheme?: 'plain' | 'stripes' | 'dots';
@@ -39,6 +48,7 @@ export interface ClassroomDesign {
   ambientMusic: string;
   mascot?: string; // 'none', 'cat', 'dog', 'owl', 'robot'
   shelves?: string[]; // list of object emojis/ids
+  whiteboards?: Whiteboard[];
 }
 
 export interface User {

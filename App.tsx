@@ -11,10 +11,10 @@ import ClassroomDesigner from './components/ClassroomDesigner';
 type View = 'landing' | 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-4xl" }) => {
-  const letters = "DreamClass".split("");
+  const letters = "Teachly".split("");
   const colors = [
     "text-blue-500", "text-green-500", "text-yellow-500", "text-orange-500", "text-red-500",
-    "text-purple-500", "text-indigo-500", "text-pink-500", "text-teal-500", "text-cyan-500"
+    "text-purple-500", "text-indigo-500"
   ];
   return (
     <h1 className={`${size} font-bold tracking-tight flex items-center gap-0.5 drop-shadow-md select-none whitespace-nowrap`}>
@@ -25,6 +25,37 @@ const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-4xl" }) => {
   );
 };
 
+const FeatureCard: React.FC<{ icon: string, title: string, desc: string, color: string }> = ({ icon, title, desc, color }) => (
+  <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-b-8 border-slate-100 hover:-translate-y-2 transition-all flex flex-col items-center text-center">
+    <div className={`w-20 h-20 ${color} rounded-3xl flex items-center justify-center text-4xl mb-6 shadow-inner`}>
+      {icon}
+    </div>
+    <h3 className="text-2xl font-bold text-slate-800 mb-3">{title}</h3>
+    <p className="text-slate-500 leading-relaxed">{desc}</p>
+  </div>
+);
+
+const StepCard: React.FC<{ num: string, title: string, desc: string, color: string, icon: string }> = ({ num, title, desc, color, icon }) => (
+  <div className={`relative p-8 pt-12 bg-white rounded-[3rem] shadow-xl border-b-[12px] ${color} text-center transform hover:scale-105 transition-all`}>
+    <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full flex items-center justify-center font-bold text-2xl shadow-lg ring-4 ring-slate-50">
+      {icon}
+    </div>
+    <div className="mb-2 text-xs font-black uppercase tracking-widest opacity-30">Step {num}</div>
+    <h3 className="text-2xl font-bold text-slate-800 mb-4">{title}</h3>
+    <p className="text-slate-600 font-medium leading-relaxed">{desc}</p>
+  </div>
+);
+
+const ExampleCard: React.FC<{ emoji: string, title: string, teacher: string, color: string }> = ({ emoji, title, teacher, color }) => (
+  <div className="flex-shrink-0 w-64 snap-center p-6 bg-white rounded-[2.5rem] shadow-xl border-b-8 border-slate-100 flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-300">
+    <div className={`w-24 h-24 ${color} rounded-full flex items-center justify-center text-5xl mb-4 shadow-inner`}>
+      {emoji}
+    </div>
+    <h4 className="text-xl font-bold text-slate-800 mb-1">{title}</h4>
+    <p className="text-sm font-bold text-blue-500 uppercase tracking-tighter">By {teacher}</p>
+  </div>
+);
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('landing');
@@ -34,19 +65,13 @@ const App: React.FC = () => {
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [designingSubjectId, setDesigningSubjectId] = useState<SubjectId | null>(null);
 
-  // Derived subject list - Single source of truth
   const allSubjects = useMemo(() => {
     if (!currentUser) return SUBJECTS;
     const custom = currentUser.customSubjects || [];
     const hidden = currentUser.hiddenSubjectIds || [];
-    
     const subjectMap = new Map<string, Subject>();
-    // Start with default subjects
     SUBJECTS.forEach(s => subjectMap.set(s.id, s));
-    // Override or add with custom subjects
     custom.forEach(s => subjectMap.set(s.id, s));
-    
-    // Filter out hidden ones
     return Array.from(subjectMap.values()).filter(s => !hidden.includes(s.id));
   }, [currentUser]);
 
@@ -83,7 +108,6 @@ const App: React.FC = () => {
   const persistUser = (updatedUser: User) => {
     setCurrentUser(updatedUser);
     localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
-
     const accountsData = localStorage.getItem('dreamclass_accounts');
     if (accountsData) {
       const accounts: User[] = JSON.parse(accountsData);
@@ -108,11 +132,9 @@ const App: React.FC = () => {
 
   const handleAddSubject = (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser || !subjectData.name.trim()) return;
-
     const newId = `custom-${Date.now()}`;
     const colors = ['bg-pink-400', 'bg-orange-400', 'bg-indigo-400', 'bg-teal-400', 'bg-rose-400'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
     const newSubject: Subject = {
       id: newId,
       title: subjectData.name,
@@ -121,7 +143,6 @@ const App: React.FC = () => {
       concepts: subjectData.concepts,
       icon: subjectData.icon
     };
-
     const updatedUser = {
       ...currentUser,
       customSubjects: [...(currentUser.customSubjects || []), newSubject],
@@ -131,20 +152,18 @@ const App: React.FC = () => {
           wallColor: WALL_COLORS[0],
           floorColor: FLOOR_COLORS[0],
           posterUrls: [],
-          ambientMusic: 'none'
+          ambientMusic: 'none',
+          whiteboards: []
         }
       }
     };
-
     persistUser(updatedUser);
   };
 
   const handleEditSubject = (subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser) return;
-    
     const existing = allSubjects.find(s => s.id === subjectId);
     if (!existing) return;
-
     const updatedSubject: Subject = {
       ...existing,
       title: updatedData.name,
@@ -152,7 +171,6 @@ const App: React.FC = () => {
       concepts: updatedData.concepts,
       icon: updatedData.icon
     };
-
     const otherCustom = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
     persistUser({
       ...currentUser,
@@ -163,22 +181,16 @@ const App: React.FC = () => {
   const handleDeleteSubject = (subjectId: SubjectId) => {
     setCurrentUser(prev => {
       if (!prev) return prev;
-
-      // Immutably remove from custom and add to hidden
       const updatedHidden = Array.from(new Set([...(prev.hiddenSubjectIds || []), subjectId]));
       const updatedCustomSubjects = (prev.customSubjects || []).filter(s => s.id !== subjectId);
-      
       const updatedDesigns = { ...prev.classroomDesigns };
       delete updatedDesigns[subjectId];
-
       const newUser = {
         ...prev,
         customSubjects: updatedCustomSubjects,
         hiddenSubjectIds: updatedHidden,
         classroomDesigns: updatedDesigns
       };
-
-      // Force persistence immediately within the state update cycle
       localStorage.setItem('dreamclass_user', JSON.stringify(newUser));
       const accountsData = localStorage.getItem('dreamclass_accounts');
       if (accountsData) {
@@ -186,7 +198,6 @@ const App: React.FC = () => {
         const updatedAccounts = accounts.map(acc => acc.id === newUser.id ? newUser : acc);
         localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
       }
-
       return newUser;
     });
   };
@@ -221,7 +232,6 @@ const App: React.FC = () => {
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
       const offsetPosition = elementPosition - offset;
-
       window.scrollTo({
         top: offsetPosition,
         behavior: 'smooth'
@@ -229,21 +239,11 @@ const App: React.FC = () => {
     }
   };
 
-  const customizationCards = [
-    { color: 'bg-yellow-100', emoji: '🍎', text: 'Preschool Phonics' },
-    { color: 'bg-green-100', emoji: '🦖', text: 'Dino Science' },
-    { color: 'bg-rose-100', emoji: '💖', text: 'Social-Emotional Room' },
-    { color: 'bg-blue-100', emoji: '🚀', text: 'Space Explorers' },
-    { color: 'bg-orange-100', emoji: '➕', text: 'Magic Math' },
-    { color: 'bg-purple-100', emoji: '🎭', text: 'Creative Arts' },
-    { color: 'bg-teal-100', emoji: '🌿', text: 'Nature Studies' },
-    { color: 'bg-indigo-100', emoji: '🔭', text: 'Night Sky Lab' }
-  ];
-
   return (
     <div className="min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900">
       {currentView === 'landing' && (
         <div className="flex flex-col">
+          {/* Landing Header */}
           <header className="fixed top-0 left-0 right-0 z-[100] bg-white/70 backdrop-blur-lg border-b border-gray-100 py-4 px-6 sm:px-12 flex items-center justify-between">
             <div className="flex items-center gap-10">
               <div onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="cursor-pointer">
@@ -254,193 +254,257 @@ const App: React.FC = () => {
                 <button onClick={() => scrollToSection('features-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Features</button>
                 <button onClick={() => scrollToSection('how-it-works-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">How it Works</button>
                 <button onClick={() => scrollToSection('ai-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">AI & Tools</button>
-                <button onClick={() => scrollToSection('custom-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Customization</button>
+                <button onClick={() => scrollToSection('customization-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Customization</button>
               </nav>
             </div>
-            
             <div className="flex items-center gap-3 sm:gap-4">
               <button onClick={() => goToAuth('login')} className="text-blue-600 px-4 sm:px-6 py-2 rounded-full font-bold transition-all hover:bg-blue-50 text-sm sm:text-base">Log In</button>
               <button onClick={() => goToAuth('signup')} className="bg-blue-500 text-white px-5 sm:px-8 py-2 rounded-full font-bold transition-all shadow-md border-b-4 border-blue-700 hover:bg-blue-600 active:translate-y-1 active:border-b-0 text-sm sm:text-base">Sign Up</button>
             </div>
           </header>
 
-          <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden pt-20">
-            <div className="absolute inset-0 pointer-events-none select-none">
-              <span className="absolute top-[15%] left-[10%] text-4xl sm:text-6xl animate-float opacity-20">✏️</span>
-              <span className="absolute top-[25%] right-[15%] text-5xl sm:text-7xl animate-float-slow opacity-20">📚</span>
-              <span className="absolute bottom-[20%] left-[20%] text-6xl sm:text-8xl animate-float-slow opacity-20" style={{ animationDelay: '1s' }}>🎨</span>
-              <span className="absolute bottom-[15%] right-[10%] text-4xl sm:text-6xl animate-float opacity-20" style={{ animationDelay: '0.5s' }}>🔬</span>
+          {/* Hero Section */}
+          <section className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden pt-20">
+            <div className="absolute inset-0 pointer-events-none select-none text-center">
+              <span className="absolute top-[15%] left-[10%] text-4xl animate-float opacity-20">✏️</span>
+              <span className="absolute top-[25%] right-[15%] text-5xl animate-float-slow opacity-20">📚</span>
+              <span className="absolute bottom-[20%] left-[20%] text-6xl animate-float opacity-20">🎨</span>
+              <span className="absolute top-[40%] left-[5%] text-4xl animate-float-slow opacity-10">🎒</span>
+              <span className="absolute bottom-[30%] right-[10%] text-5xl animate-float opacity-20">🧩</span>
             </div>
-
-            <div className="text-center z-10 animate-fade-in-up px-4">
-              <div className="mb-4 sm:mb-6 flex justify-center">
-                <div className="w-20 h-20 sm:w-28 sm:h-28 bg-yellow-400 rounded-[1.5rem] sm:rounded-[2.5rem] flex items-center justify-center shadow-2xl border-b-8 border-yellow-600 animate-bounce-gentle">
-                  <span className="text-4xl sm:text-6xl">🎒</span>
+            
+            <div className="text-center z-10 animate-fade-in-up px-4 max-w-5xl">
+              <div className="mb-8 flex justify-center">
+                <div className="w-24 h-24 bg-yellow-400 rounded-[2rem] flex items-center justify-center shadow-2xl border-b-8 border-yellow-600 animate-bounce-gentle">
+                  <span className="text-5xl">🎒</span>
                 </div>
               </div>
-              <RainbowLogo size="text-5xl sm:text-7xl lg:text-8xl" />
-              <p className="mt-4 sm:mt-6 text-lg sm:text-2xl font-medium text-gray-500 italic">For teachers, made by teachers <span className="text-rose-500 not-italic">❤️</span></p>
-              <div className="mt-8 sm:mt-12 flex flex-col items-center gap-6">
-                <button onClick={() => goToAuth('signup')} className="bg-blue-500 text-white px-8 sm:px-12 py-4 sm:py-5 rounded-[1.5rem] sm:rounded-[2rem] text-xl sm:text-2xl font-bold transition-all shadow-2xl border-b-8 border-blue-700 hover:scale-105 active:translate-y-2 active:border-b-0">Get Started ✨</button>
-                <div className="animate-bounce mt-4 sm:mt-8"><span className="text-gray-300 text-3xl sm:text-4xl">↓</span></div>
-              </div>
-            </div>
-          </div>
-
-          <section id="features-section" className="py-16 sm:py-24 px-6 bg-white flex flex-col items-center text-center">
-            <div className="max-w-4xl">
-              <h2 className="text-3xl sm:text-5xl font-bold text-gray-800 mb-6 sm:mb-8 tracking-tight">Turning Every Lesson Into an Adventure 🚀</h2>
-              <p className="text-base sm:text-xl text-gray-500 leading-relaxed mb-8 sm:mb-12">DreamClass is the first interactive teaching platform designed specifically for the unique energy of the elementary classroom. We bridge the gap between traditional instruction and immersive digital play, helping teachers build <b>Magic Rooms</b> that breathe life into Phonics, Math, Science, and beyond.</p>
-              <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-                <div className="p-6 sm:p-8 bg-blue-50 rounded-[2rem] sm:rounded-[3rem] border-b-8 border-blue-100">
-                  <div className="text-4xl sm:text-5xl mb-4">🧠</div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-blue-600 mb-2">Engage</h3>
-                  <p className="text-gray-600 text-xs sm:text-sm">Visual, auditory, and kinesthetic learning combined.</p>
-                </div>
-                <div className="p-8 bg-purple-50 rounded-[2rem] sm:rounded-[3rem] border-b-8 border-purple-100">
-                  <div className="text-5xl mb-4">🛠️</div>
-                  <h3 className="text-2xl font-bold text-purple-600 mb-2">Customize</h3>
-                  <p className="text-gray-600 text-sm">Every classroom is as unique as your teaching style.</p>
-                </div>
-                <div className="p-8 bg-green-50 rounded-[2rem] sm:rounded-[3rem] border-b-8 border-green-100">
-                  <div className="text-5xl mb-4">✨</div>
-                  <h3 className="text-2xl font-bold text-green-600 mb-2">Empower</h3>
-                  <p className="text-gray-600 text-sm">AI-assisted pedagogy to save hours of lesson planning.</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section id="how-it-works-section" className="py-16 sm:py-24 px-6 bg-[#F8FAFC]">
-            <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-12 sm:mb-16 px-4">Designed for Teachers, Loved by Students</h2>
+              <RainbowLogo size="text-6xl sm:text-8xl lg:text-9xl" />
+              <p className="mt-8 text-xl sm:text-3xl font-medium text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                For teachers, made by teachers ❤️
+              </p>
               
-              <div id="classroom-mode" className="grid lg:grid-cols-2 gap-12 sm:gap-16 items-center mb-16 sm:mb-24">
-                <div className="px-4">
-                  <span className="text-blue-500 font-bold uppercase tracking-widest text-xs sm:text-sm">Classroom Mode</span>
-                  <h3 className="text-3xl sm:text-4xl font-bold text-gray-800 mt-2 mb-4 sm:mb-6">Real-Time Interaction</h3>
-                  <p className="text-base sm:text-lg text-gray-500 mb-6 sm:mb-8">Step into an immersive 3D environment where learning happens through discovery. Use the multi-modal whiteboard to interact with the AI assistant who knows exactly what you're teaching.</p>
-                  <ul className="space-y-3 sm:space-y-4">
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-500">✓</span> Interactive Whiteboard Tools</li>
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-500">✓</span> Voice-Activated AI Assistant</li>
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-500">✓</span> Subject-Specific Learning Environments</li>
-                  </ul>
-                </div>
-                <div className="bg-white p-4 rounded-[2rem] sm:rounded-[4rem] shadow-2xl border-8 border-blue-50">
-                   <div className="aspect-video bg-blue-400 rounded-[1.5rem] sm:rounded-[3rem] flex items-center justify-center text-white overflow-hidden relative">
-                      <div className="z-10 text-center px-4">
-                         <div className="text-5xl sm:text-8xl mb-2 sm:mb-4">👨‍🏫</div>
-                         <div className="font-bold text-lg sm:text-2xl uppercase tracking-widest">Interactive Lab</div>
-                      </div>
-                   </div>
-                </div>
+              <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
+                <button onClick={() => goToAuth('signup')} className="w-full sm:w-auto bg-blue-500 text-white px-10 py-5 rounded-[2rem] text-2xl font-bold transition-all shadow-2xl border-b-8 border-blue-700 hover:scale-105 active:translate-y-2 active:border-b-0">
+                  Join the Schoolhouse ✨
+                </button>
               </div>
+              
+              <div className="mt-16 flex items-center justify-center gap-8 text-slate-400 font-bold uppercase tracking-widest text-sm opacity-60">
+                <span>Safe for Kids</span>
+                <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
+                <span>AI Enhanced</span>
+                <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
+                <span>Free for Teachers</span>
+              </div>
+            </div>
+          </section>
 
-              <div id="teacher-mode" className="grid lg:grid-cols-2 gap-12 sm:gap-16 items-center">
-                <div className="bg-white p-4 rounded-[2rem] sm:rounded-[4rem] shadow-2xl border-8 border-purple-50">
-                   <div className="aspect-video bg-purple-400 rounded-[1.5rem] sm:rounded-[3rem] flex items-center justify-center text-white overflow-hidden relative">
-                      <div className="z-10 flex gap-2 sm:gap-4">
-                         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl">🐱</div>
-                         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl">🌈</div>
-                         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl">🎵</div>
-                      </div>
-                   </div>
+          {/* Features Section */}
+          <section id="features-section" className="py-32 px-6 sm:px-12 bg-white">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-20">
+                <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-6 tracking-tight">Everything a Magic Classroom Needs</h2>
+                <p className="text-xl text-slate-500 max-w-2xl mx-auto">Teachly is more than just a whiteboard for teachers. It's a space that encourages engagement and fosters classroom collaboration.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                <FeatureCard 
+                  icon="🎨" 
+                  title="Classroom Designer" 
+                  desc="Pick your wall colors, carpet textures, and even class pets. Create an environment that feels like home."
+                  color="bg-orange-100 text-orange-600"
+                />
+                <FeatureCard 
+                  icon="🪄" 
+                  title="Magic Whiteboard" 
+                  desc="Drag assets, draw with glow-markers, and manage multiple saved lesson states with the interactive board."
+                  color="bg-blue-100 text-blue-600"
+                />
+                <FeatureCard 
+                  icon="🤖" 
+                  title="AI Teaching Assistant" 
+                  desc="Powered by Gemini, your assistant helps come up with games, activity ideas, and even sings along to lyrics."
+                  color="bg-purple-100 text-purple-600"
+                />
+                <FeatureCard 
+                  icon="🎵" 
+                  title="Classroom Jams" 
+                  desc="Set the mood with ambient music and interactive sing-along lyrics to keep the energy high and fun."
+                  color="bg-pink-100 text-pink-600"
+                />
+                <FeatureCard 
+                  icon="📦" 
+                  title="Magic Asset Drawer" 
+                  desc="A bottomless box of letters, numbers, and stickers. Simply drag them onto the board for instant learning."
+                  color="bg-green-100 text-green-600"
+                />
+                <FeatureCard 
+                  icon="🏫" 
+                  title="Teacher-Mode Control" 
+                  desc="Easily add custom subjects and concepts to tailor the curriculum to your students' specific needs."
+                  color="bg-yellow-100 text-yellow-600"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* How It Works */}
+          <section id="how-it-works-section" className="py-32 px-6 sm:px-12 bg-gradient-to-b from-slate-50 to-blue-50">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-20">
+                <span className="text-blue-500 font-bold uppercase tracking-widest text-sm mb-2 block">Playful Learning Journey</span>
+                <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-6 tracking-tight">How Your Classroom Comes to Life 🌈</h2>
+                <p className="text-lg text-slate-500 font-medium">Teachly offers three powerful ways to interact with your magical space.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <StepCard 
+                  num="1" 
+                  icon="🛠️"
+                  title="Teacher Mode" 
+                  color="border-purple-200"
+                  desc="Create and prepare! Add your own subjects, pick the decorations, and prep your whiteboard tools before the bell rings." 
+                />
+                <StepCard 
+                  num="2" 
+                  icon="🎨"
+                  title="Design Your Space" 
+                  color="border-yellow-200"
+                  desc="Start by building your dream classroom. Choose colors, wall patterns, and the perfect mascot to greet your students." 
+                />
+                <StepCard 
+                  num="3" 
+                  icon="👨‍🏫"
+                  title="Classroom Mode" 
+                  color="border-blue-200"
+                  desc="Play and learn! Switch to the immersive full-screen view where students interact with your lessons, music, and AI pet." 
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* AI Section */}
+          <section id="ai-section" className="py-32 px-6 sm:px-12 bg-white relative overflow-hidden">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-2/3 bg-blue-50 rounded-l-[10rem] opacity-40 -z-10"></div>
+            <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-16">
+              <div className="flex-1">
+                <div className="w-20 h-20 bg-blue-500 rounded-3xl flex items-center justify-center text-4xl mb-8 shadow-xl text-white">🤖</div>
+                <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-8 tracking-tight">Meet Your New Teaching Assistant</h2>
+                <p className="text-xl text-slate-600 leading-relaxed mb-8">
+                  Never run out of ideas again! Our built-in Assistant, powered by Gemini 3 Flash, can suggest interactive games based on what's currently on your board.
+                </p>
+                <ul className="space-y-4">
+                  {['"Can you give me 3 games for counting apples?"', '"Help me teach the letter B with a story."', '"Let\'s sing a song about the solar system!"'].map((quote, i) => (
+                    <li key={i} className="flex items-center gap-4 text-blue-600 font-bold italic">
+                      <span className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs">✨</span>
+                      {quote}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex-1 bg-slate-900 p-8 rounded-[3rem] shadow-2xl border-t-[12px] border-slate-800 w-full">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
                 </div>
-                <div className="px-4">
-                  <span className="text-purple-500 font-bold uppercase tracking-widest text-xs sm:text-sm">Teacher Mode</span>
-                  <h3 className="text-3xl sm:text-4xl font-bold text-gray-800 mt-2 mb-4 sm:mb-6">Total Creative Control</h3>
-                  <p className="text-base sm:text-lg text-gray-500 mb-6 sm:mb-8">Become the architect of your own school. Choose colors, mascots, music, and interact with the classroom items to build unforgettable experiences.</p>
-                  <ul className="space-y-3 sm:space-y-4">
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-500">✓</span> 100+ Room Customization Options</li>
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-500">✓</span> Custom Subject Creator</li>
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-500">✓</span> Library of Educational Music</li>
-                    <li className="flex items-center gap-3 font-medium text-gray-700 text-sm sm:text-base"><span className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-500">✓</span> Classroom building and interactive dashboard editing</li>
-                  </ul>
+                <div className="space-y-4">
+                  <div className="bg-slate-800/50 p-4 rounded-2xl text-slate-300 text-sm italic">"I have 5 apples on the board, what game can we play?"</div>
+                  <div className="bg-blue-600 p-4 rounded-2xl text-white text-sm font-bold">"Try the 'Magic Subtraction' game! Ask students to close their eyes while you erase one, then have them guess how many are left!"</div>
+                  <div className="bg-slate-800/50 p-4 rounded-2xl text-slate-300 text-sm italic">"Great idea! Adding a fun sound effect now... 🔔"</div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section id="ai-section" className="py-16 sm:py-24 px-6 bg-white overflow-hidden">
-            <div className="max-w-6xl mx-auto flex flex-col items-center">
-              <div className="text-center mb-12 sm:mb-16 px-4">
-                <span className="bg-blue-100 text-blue-600 px-4 py-2 rounded-full font-bold uppercase tracking-widest text-xs mb-4 inline-block">The Future of Education</span>
-                <h2 className="text-3xl sm:text-5xl font-bold text-gray-800 tracking-tight">Meet Your AI Teaching Assistant 🤖</h2>
-                <p className="mt-4 sm:mt-6 text-lg sm:text-xl text-gray-500 max-w-3xl mx-auto">DreamClass integrates cutting-edge AI to act as a co-teacher, helping you create engaging environments and activities that adapt to your students' needs in real-time.</p>
+          {/* Customization Showroom */}
+          <section id="customization-section" className="py-32 px-6 sm:px-12 bg-slate-50 overflow-hidden">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-20">
+                <span className="text-green-500 font-bold uppercase tracking-widest text-sm mb-2 block">Unlimited Creativity</span>
+                <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-6 tracking-tight">Your Classroom, Your Rules 🎨</h2>
+                <p className="text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed">
+                  Customize every corner of your room with your own themes, mascots, and custom subjects. See how other teachers are bringing their magic to life!
+                </p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6 sm:gap-8 w-full px-4">
-                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 sm:p-10 rounded-[2rem] sm:rounded-[4rem] border-2 border-indigo-100 shadow-sm transition-transform hover:scale-[1.02]">
-                  <h4 className="text-xl sm:text-2xl font-bold text-indigo-700 mb-4 flex items-center gap-3"><span className="text-3xl">🎲</span> Instant Activity Lab</h4>
-                  <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Stuck for ideas? Our AI analyzes the objects on your board and suggests 3 interactive games tailored to your current concept. Whether it's "Emoji Math Tag" or "Phoneme Scavenger Hunt," you're never more than a click away from fun.</p>
+              {/* Carousel container */}
+              <div className="relative group">
+                <div className="flex overflow-x-auto gap-8 pb-12 snap-x snap-mandatory scroll-smooth hide-scrollbar px-4">
+                  <ExampleCard emoji="🍪" title="Counting Cookies" teacher="Mr. Baker" color="bg-orange-100" />
+                  <ExampleCard emoji="🦁" title="Phonics Jungle" teacher="Ms. Wild" color="bg-green-100" />
+                  <ExampleCard emoji="🚀" title="Space Math Hub" teacher="Mrs. Galaxy" color="bg-blue-100" />
+                  <ExampleCard emoji="🌋" title="Lava Science" teacher="Mr. Heat" color="bg-red-100" />
+                  <ExampleCard emoji="🏰" title="Medieval Phonics" teacher="Sir Readalot" color="bg-indigo-100" />
+                  <ExampleCard emoji="🐳" title="Ocean Explorers" teacher="Ms. Wave" color="bg-cyan-100" />
+                  <ExampleCard emoji="🧪" title="Chemistry Kids" teacher="Dr. Mixit" color="bg-purple-100" />
                 </div>
-                <div className="bg-gradient-to-br from-teal-50 to-green-50 p-6 sm:p-10 rounded-[2rem] sm:rounded-[4rem] border-2 border-teal-100 shadow-sm transition-transform hover:scale-[1.02]">
-                  <h4 className="text-xl sm:text-2xl font-bold text-teal-700 mb-4 flex items-center gap-3"><span className="text-3xl">🧩</span> Dynamic Scaffolding</h4>
-                  <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Our AI monitors classroom interaction to provide real-time hints and positive reinforcement. If students struggle with a concept, the AI offers a simpler analogy or visual aid to bridge the gap without teacher intervention.</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 sm:p-10 rounded-[2rem] sm:rounded-[4rem] border-2 border-purple-100 shadow-sm transition-transform hover:scale-[1.02]">
-                  <h4 className="text-xl sm:text-2xl font-bold text-purple-700 mb-4 flex items-center gap-3"><span className="text-3xl">✍️</span> Content Co-Pilot</h4>
-                  <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Creating custom subjects is easier than ever. Simply name your topic, and the AI suggests a full curriculum of concepts, icons, and descriptions that align with elementary standards while staying fun and accessible.</p>
-                </div>
-                <div className="bg-gradient-to-br from-orange-50 to-yellow-50 p-6 sm:p-10 rounded-[2rem] sm:rounded-[4rem] border-2 border-orange-100 shadow-sm transition-transform hover:scale-[1.02]">
-                  <h4 className="text-xl sm:text-2xl font-bold text-orange-700 mb-4 flex items-center gap-3"><span className="text-3xl">🎙️</span> Voice Command Lab</h4>
-                  <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Experience truly hands-free teaching. Use voice commands to add items to the board, change room settings, or ask the AI to explain a complex topic using a "5-year-old friendly" analogy. Perfect for group discussions!</p>
+                {/* Visual fade indicators for mobile/desktop */}
+                <div className="absolute left-0 top-0 bottom-12 w-20 bg-gradient-to-r from-slate-50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute right-0 top-0 bottom-12 w-20 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
+
+              <div className="mt-12 text-center">
+                <div className="inline-flex items-center gap-3 px-8 py-4 bg-white rounded-full shadow-lg border-2 border-slate-100">
+                   <span className="text-2xl">✨</span>
+                   <span className="font-bold text-slate-700">The only limit is your imagination!</span>
                 </div>
               </div>
             </div>
           </section>
 
-          <section id="custom-section" className="py-16 sm:py-24 px-6 bg-[#F8FAFC] text-center overflow-hidden border-b border-gray-100">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Endless Customization 🎨</h2>
-            <p className="text-gray-500 text-lg sm:text-xl mb-12 sm:mb-16">See how other teachers are building their magic rooms.</p>
-            <div className="flex gap-8 animate-scroll whitespace-nowrap">
-               {[...customizationCards, ...customizationCards].map((card, i) => (
-                 <div key={i} className={`${card.color} inline-flex flex-col items-center justify-center w-64 h-80 sm:w-80 sm:h-96 rounded-[2rem] sm:rounded-[3.5rem] p-6 sm:p-10 shadow-lg border-b-8 border-black/5 transform hover:-translate-y-4 transition-transform`}>
-                    <div className="text-6xl sm:text-8xl mb-2 leading-none">{card.emoji}</div>
-                    <div className="font-bold text-lg sm:text-2xl text-black/60 whitespace-normal leading-tight text-center">{card.text}</div>
-                 </div>
-               ))}
+          {/* Customization Quote */}
+          <section id="custom-section" className="py-24 px-6 sm:px-12 bg-blue-600 relative">
+            <div className="max-w-4xl mx-auto text-center">
+              <span className="text-white/60 font-bold uppercase tracking-widest text-sm mb-6 block">The Teacher's Heart</span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-10 leading-tight">
+                "Every child deserves a classroom that feels as magical as their imagination. Teachly helps teachers build that world."
+              </h2>
+              <div className="flex items-center justify-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-full border-2 border-white/30 flex items-center justify-center text-2xl overflow-hidden">🍎</div>
+                <div className="text-left">
+                  <span className="text-white font-bold block text-lg">Amborse Commisariat</span>
+                  <span className="text-white/60 font-medium">Preschool Teacher for Gems Academy</span>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section className="py-16 sm:py-24 px-6 bg-blue-600 text-white text-center">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl sm:text-5xl font-bold mb-6 sm:mb-8">Foster Engagement Every Day</h2>
-              <p className="text-lg sm:text-2xl text-blue-100 leading-relaxed mb-8 sm:mb-12 italic">"Since using DreamClass, my students don't just sit and watch—they interact. The AI Assistant scaffolds their learning in real-time, providing immediate feedback that keeps their confidence high and their curiosity peaked."</p>
-              <div className="font-bold text-base sm:text-xl uppercase tracking-widest">— Ambrose Commissariat, Preschool Teacher @ Gems Academy</div>
-            </div>
-          </section>
-
-          <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 px-6">
+          {/* Footer */}
+          <footer className="bg-slate-900 text-slate-300 py-20 px-6 sm:px-12 border-t border-slate-800">
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-              <div className="col-span-2">
-                <RainbowLogo size="text-3xl sm:text-4xl" />
-                <p className="mt-4 max-w-sm text-sm sm:text-base">The magic lab for elementary learning. Designed to make teaching easier and learning unforgettable.</p>
-                <div className="flex gap-4 mt-6 text-2xl sm:text-3xl">
-                  <button onClick={() => alert('Contact: support@dreamclass.edu')} className="hover:scale-125 transition-transform" title="Email Support">📧</button>
-                  <button onClick={() => alert('Visit our Twitter/X')} className="hover:scale-125 transition-transform" title="Twitter">🐦</button>
-                  <button onClick={() => alert('Chat with us!')} className="hover:scale-125 transition-transform" title="Live Chat">💬</button>
+              <div className="col-span-1 md:col-span-2">
+                <RainbowLogo size="text-3xl" />
+                <p className="mt-6 text-slate-500 max-w-sm">
+                  Empowering the next generation of learners through high-fidelity, interactive digital teaching environments. Built with ❤️ for educators.
+                </p>
+                <div className="mt-8 flex gap-4">
+                  {['🐦', '📸', '👤'].map((icon, i) => (
+                    <button key={i} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-lg">{icon}</button>
+                  ))}
                 </div>
               </div>
               <div>
-                <h4 className="text-white font-bold mb-4 sm:mb-6 uppercase tracking-widest text-xs sm:text-sm">Platform</h4>
-                <ul className="space-y-3 sm:space-y-4 text-sm sm:text-base">
-                  <li onClick={() => scrollToSection('features-section')} className="hover:text-white cursor-pointer transition-colors">Features</li>
-                  <li onClick={() => scrollToSection('how-it-works-section')} className="hover:text-white cursor-pointer transition-colors">How it Works</li>
-                  <li onClick={() => scrollToSection('ai-section')} className="hover:text-white cursor-pointer transition-colors">AI & Tools</li>
-                  <li onClick={() => scrollToSection('custom-section')} className="hover:text-white cursor-pointer transition-colors">Customize</li>
+                <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Resources</h4>
+                <ul className="space-y-4 text-sm font-medium">
+                  <li><button className="hover:text-blue-400">Teacher Guide</button></li>
+                  <li><button className="hover:text-blue-400">Lesson Library</button></li>
+                  <li><button className="hover:text-blue-400">Help Center</button></li>
+                  <li><button className="hover:text-blue-400">Community Forum</button></li>
                 </ul>
               </div>
               <div>
-                <h4 className="text-white font-bold mb-4 sm:mb-6 uppercase tracking-widest text-xs sm:text-sm">Company</h4>
-                <ul className="space-y-3 sm:space-y-4 text-sm sm:text-base">
-                  <li className="hover:text-white cursor-pointer transition-colors">About Us</li>
-                  <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
+                <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Legal</h4>
+                <ul className="space-y-4 text-sm font-medium">
+                  <li><button className="hover:text-blue-400">Privacy Policy</button></li>
+                  <li><button className="hover:text-blue-400">Terms of Service</button></li>
+                  <li><button className="hover:text-blue-400">Cookie Settings</button></li>
                 </ul>
               </div>
             </div>
-            <div className="max-w-6xl mx-auto mt-12 sm:mt-16 pt-8 border-t border-gray-800 text-center text-xs sm:text-sm font-medium">
-              DreamClass © 2025 • Made with ❤️ for Teachers Everywhere
+            <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-slate-800 text-center text-xs text-slate-600 font-bold uppercase tracking-widest">
+              © 2025 Teachly Interactive. All Rights Reserved.
             </div>
           </footer>
         </div>
@@ -449,7 +513,7 @@ const App: React.FC = () => {
       {currentView === 'auth' && (
         <Auth onLogin={handleLogin} initialMode={authInitialMode} onBack={() => setCurrentView('landing')} />
       )}
-      
+
       {currentUser && (
         <div className="relative">
           {currentView === 'mode-selection' && (
@@ -466,31 +530,19 @@ const App: React.FC = () => {
                 <button onClick={() => handleModeSelect('classroom')} className="group bg-white p-10 rounded-[3rem] shadow-xl border-b-[16px] border-blue-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center">
                   <div className="w-32 h-32 bg-blue-50 rounded-full flex items-center justify-center text-6xl mb-6 group-hover:scale-110 transition-transform">👨‍🏫</div>
                   <h3 className="text-3xl font-bold text-blue-600 mb-4">Classroom-Mode</h3>
-                  <p className="text-gray-500 text-lg leading-relaxed">Ready to teach? Jump straight into interactive lessons and games with your students.</p>
                 </button>
                 <button onClick={() => handleModeSelect('teacher')} className="group bg-white p-10 rounded-[3rem] shadow-xl border-b-[16px] border-purple-100 hover:border-purple-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center">
                   <div className="w-32 h-32 bg-purple-50 rounded-full flex items-center justify-center text-6xl mb-6 group-hover:scale-110 transition-transform">🛠️</div>
                   <h3 className="text-3xl font-bold text-purple-600 mb-4">Teacher-Mode</h3>
-                  <p className="text-gray-500 text-lg leading-relaxed">Time to build! Edit your materials, create new subjects, and design interactive activities.</p>
                 </button>
               </div>
             </div>
           )}
+          
           {currentView === 'dashboard' && appMode && (
-            <Dashboard 
-              user={currentUser} 
-              appMode={appMode} 
-              allSubjects={allSubjects} 
-              onModeChange={setAppMode} 
-              onLogout={handleLogout} 
-              onBackToMode={handleBackToModeSelect} 
-              onNavigateDesigner={() => setCurrentView('designer-select')} 
-              onNavigateSubject={navigateToSubject} 
-              onAddSubject={handleAddSubject} 
-              onEditSubject={handleEditSubject} 
-              onDeleteSubject={handleDeleteSubject} 
-            />
+            <Dashboard user={currentUser} appMode={appMode} allSubjects={allSubjects} onModeChange={setAppMode} onLogout={handleLogout} onBackToMode={handleBackToModeSelect} onNavigateDesigner={() => setCurrentView('designer-select')} onNavigateSubject={navigateToSubject} onAddSubject={handleAddSubject} onEditSubject={handleEditSubject} onDeleteSubject={handleDeleteSubject} />
           )}
+          
           {currentView === 'designer-select' && (
             <div className="p-8 max-w-4xl mx-auto text-center font-['Fredoka']">
               <h2 className="text-4xl font-bold text-gray-800 mb-12 mt-12">Which classroom would you like to decorate? 🎨</h2>
@@ -502,31 +554,32 @@ const App: React.FC = () => {
               <button onClick={() => setCurrentView('dashboard')} className="mt-16 text-gray-500 font-bold text-xl hover:text-blue-500 transition-colors">← Back to Dashboard</button>
             </div>
           )}
+          
           {currentView === 'designer' && designingSubjectId && (
             <ClassroomDesigner subjectTitle={allSubjects.find(s => s.id === designingSubjectId)?.title || ''} design={currentUser.classroomDesigns[designingSubjectId]} onSave={(design) => { updateClassroom(designingSubjectId, design); setCurrentView('dashboard'); }} onCancel={() => setCurrentView('dashboard')} />
           )}
+          
           {currentView === 'classroom' && selectedSubject && (
             <ClassroomView subject={selectedSubject} design={currentUser.classroomDesigns[selectedSubject.id]} onBack={() => setCurrentView('dashboard')} onSelectConcept={navigateToConcept} />
           )}
+          
           {currentView === 'concept' && selectedConcept && selectedSubject && (
-            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} onBack={() => setCurrentView('classroom')} />
+            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
           )}
         </div>
       )}
 
       <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fade-in-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-20px) rotate(5deg); } }
-        @keyframes float-slow { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-30px) rotate(-10deg); } }
-        @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-20px) rotate(5deg); } }
+        @keyframes float-slow { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-30px) rotate(-5deg); } }
+        @keyframes fade-in-up { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
-        .animate-fade-in-up { animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
-        .animate-scroll { animation: scroll 40s linear infinite; width: max-content; }
-        .animate-bounce-gentle { animation: bounce-gentle 3s ease-in-out infinite; }
+        .animate-float-slow { animation: float-slow 9s ease-in-out infinite; }
+        .animate-fade-in-up { animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-bounce-gentle { animation: bounce-gentle 2.5s ease-in-out infinite; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );

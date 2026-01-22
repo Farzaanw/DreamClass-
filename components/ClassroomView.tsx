@@ -4,10 +4,10 @@ import { Subject, Concept, ClassroomDesign } from '../types';
 import { MUSIC_OPTIONS, MASCOTS } from '../constants';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-2xl" }) => {
-  const letters = "DreamClass".split("");
+  const letters = "Teachly".split("");
   const colors = [
     "text-blue-500", "text-green-500", "text-yellow-500", "text-orange-500", "text-red-500",
-    "text-purple-500", "text-indigo-500", "text-pink-500", "text-teal-500", "text-cyan-500"
+    "text-purple-500", "text-indigo-500"
   ];
   return (
     <span className={`${size} font-bold tracking-tight flex items-center gap-0.5 filter drop-shadow-md select-none whitespace-nowrap`}>

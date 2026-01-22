@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { User, SubjectId, AppMode, Subject, Concept } from '../types';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
-  const letters = "DreamClass".split("");
+  const letters = "Teachly".split("");
   const colors = [
     "text-blue-500", "text-green-500", "text-yellow-500", "text-orange-500", "text-red-500",
-    "text-purple-500", "text-indigo-500", "text-pink-500", "text-teal-500", "text-cyan-500"
+    "text-purple-500", "text-indigo-500"
   ];
   return (
     <span className={`${size} font-bold tracking-tight flex items-center gap-0.5`}>
@@ -145,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           
           <div className="hidden sm:block">
             <h1 className="text-2xl font-bold text-gray-800">Hi, {user.username}! 🍎</h1>
-            <p className="text-gray-500 text-sm">Welcome to your magic dashboard.</p>
+            <p className="text-gray-500 text-sm">Welcome to your Teachly dashboard.</p>
           </div>
         </div>
 
@@ -233,7 +233,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    // EXACT confirmation message requested
                     if(window.confirm(`Are you sure you want to delete ${subject.title} from your classroom?`)) {
                       onDeleteSubject(subject.id);
                     }
