@@ -1,4 +1,3 @@
-
 import { Subject } from './types';
 
 export const SUBJECTS: Subject[] = [
@@ -86,9 +85,44 @@ export interface MusicOption {
 
 export const MUSIC_OPTIONS: MusicOption[] = [
   { id: 'none', label: 'Quiet', icon: '🔇', preview: '' },
-  { id: 'happy', label: 'Happy Jams', icon: '🎵', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', artist: 'Sunny Side', lyrics: ['Oh what a happy day!', 'We are learning and we play!', 'Sunshine in our hearts today!'] },
-  { id: 'lullaby', label: 'Calm Piano', icon: '🎹', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', artist: 'Soft Keys', lyrics: ['Peaceful and calm...', 'Rest your mind now.', 'Dreams are floating by.'] },
-  { id: 'nature', label: 'Birdies', icon: '🐦', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', artist: 'Mother Nature', lyrics: ['Tweet tweet in the trees.', 'Listen to the gentle breeze.'] },
-  { id: 'bounce', label: 'Fun Bounce', icon: '🦘', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', artist: 'Boing Boing', lyrics: ['Jump up high!', 'Touch the sky!', 'Bounce around!'] },
-  { id: 'ukulele', label: 'Island Fun', icon: '🏝️', preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', artist: 'Aloha Waves', lyrics: ['Sway with the palms.', 'Ocean is so calm.', 'Island vibes are here.'] },
+  { 
+    id: 'abc', 
+    label: 'Alphabet Song', 
+    icon: '🔤', 
+    preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 
+    artist: 'ABCs with Hops', 
+    lyrics: ['A B C D E F G', 'H I J K L M N', 'O P Q R S T U', 'V W X Y and Z', 'Now I know my ABCs', 'Next time won\'t you sing with me?'] 
+  },
+  { 
+    id: 'animal', 
+    label: 'Safari Friends', 
+    icon: '🦁', 
+    preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 
+    artist: 'Jungle Jams', 
+    lyrics: ['The lion goes roar!', 'The monkey goes ooh-ooh!', 'The elephant trumpets!', 'The snake goes hiss!'] 
+  },
+  { 
+    id: 'numbers', 
+    label: 'Counting Fun', 
+    icon: '🔢', 
+    preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 
+    artist: 'Math Magicians', 
+    lyrics: ['One, two, buckle my shoe', 'Three, four, shut the door', 'Five, six, pick up sticks', 'Seven, eight, lay them straight'] 
+  },
+  { 
+    id: 'calm', 
+    label: 'Rest & Relax', 
+    icon: '🧘', 
+    preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 
+    artist: 'Deep Calm', 
+    lyrics: ['Breath in, breath out.', 'Slowly, slowly.', 'Peaceful moments.', 'Ready to learn.'] 
+  },
+  { 
+    id: 'upbeat', 
+    label: 'Upbeat Energy', 
+    icon: '⚡', 
+    preview: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 
+    artist: 'High Energy', 
+    lyrics: ['Hands in the air!', 'Shake them all around!', 'Jump up high!', 'Touch the ground!'] 
+  },
 ];
