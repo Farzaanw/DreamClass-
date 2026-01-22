@@ -30,6 +30,8 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const [showLyrics, setShowLyrics] = useState(false);
   const [currentLyricIdx, setCurrentLyricIdx] = useState(0);
   const [isMascotCelebrating, setIsMascotCelebrating] = useState(false);
+  // Default to false (shown in bold color)
+  const [isMascotPeeking, setIsMascotPeeking] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -64,9 +66,22 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
     }
   }, [activeMusic, showLyrics]);
 
+  // If there are many concepts, they might cover the corner, so we start in peek mode
+  useEffect(() => {
+    if (subject.concepts.length > 8) {
+      setIsMascotPeeking(true);
+    } else {
+      setIsMascotPeeking(false);
+    }
+  }, [subject.concepts.length]);
+
   const handleMascotClick = () => {
-    setIsMascotCelebrating(true);
-    setTimeout(() => setIsMascotCelebrating(false), 2000);
+    if (isMascotPeeking) {
+      setIsMascotPeeking(false);
+    } else {
+      setIsMascotCelebrating(true);
+      setTimeout(() => setIsMascotCelebrating(false), 2000);
+    }
   };
 
   const getWallPattern = () => {
@@ -151,47 +166,47 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         {/* Wall Background Layer */}
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ backgroundImage: getWallPattern(), backgroundSize: design.wallTheme === 'dots' ? '40px 40px' : '100px 100%' }}></div>
 
-        {/* Stickers Area - Top Layer 10 */}
-        <div className="absolute top-4 sm:top-6 w-full flex justify-center gap-6 sm:gap-10 flex-wrap px-8 sm:px-20 pointer-events-none z-10 h-[10%] overflow-hidden">
+        {/* Stickers Area */}
+        <div className="absolute top-[4%] w-full flex justify-center gap-4 sm:gap-8 flex-wrap px-8 sm:px-20 pointer-events-none z-10 h-[8%] overflow-hidden">
           {design.posterUrls.map((url, i) => (
-            <div key={i} className="w-12 h-12 sm:w-20 sm:h-20 animate-float-slow flex items-center justify-center pointer-events-auto" style={{ animationDelay: `${i * 0.7}s` }}>
+            <div key={i} className="w-10 h-10 sm:w-16 sm:h-16 animate-float-slow flex items-center justify-center pointer-events-auto" style={{ animationDelay: `${i * 0.7}s` }}>
               <img src={url} alt="Sticker" className="max-w-full max-h-full drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6" />
             </div>
           ))}
         </div>
 
-        {/* Shelves Area - Lowered slightly to sit between stickers and cards */}
-        <div className="absolute top-[24%] left-0 right-0 flex justify-center z-10 pointer-events-none">
-          <div className="w-[55%] h-3 bg-black/5 rounded-full flex justify-around items-end px-10 border-b border-black/5 shadow-inner">
+        {/* Shelves Area */}
+        <div className="absolute top-[28%] left-0 right-0 flex justify-center z-10 pointer-events-none">
+          <div className="w-[45%] h-3 bg-black/5 rounded-full flex justify-around items-end px-10 border-b border-black/5 shadow-inner">
              {design.shelves?.map((emoji, idx) => (
                <span key={idx} className="text-2xl sm:text-4xl mb-1 animate-wiggle pointer-events-auto cursor-default hover:scale-125 transition-transform" style={{ animationDelay: `${idx * 0.1}s` }}>{emoji}</span>
              ))}
           </div>
         </div>
 
-        {/* Concept Cards Carousel - Shifted downward to sit over the carpet edge */}
+        {/* Concept Cards Carousel */}
         <div 
           ref={scrollRef}
-          className="absolute top-[42%] bottom-[20%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center snap-x snap-mandatory hide-scrollbar"
+          className="absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center snap-x snap-mandatory hide-scrollbar"
         >
-          <div className="flex items-center justify-center min-w-full gap-5 sm:gap-10 py-4 px-12">
+          <div className="flex items-center justify-center min-w-full gap-4 sm:gap-8 py-4 px-12">
             {subject.concepts.map((concept, idx) => (
               <div 
                 key={concept.id}
                 onClick={() => onSelectConcept(concept)}
-                className="group w-36 h-[170px] sm:w-44 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
+                className="group w-28 h-[130px] sm:w-32 sm:h-[160px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
               >
                 <div 
-                  className="w-full h-full bg-white rounded-[3rem] sm:rounded-[4rem] shadow-2xl flex flex-col items-center justify-center p-4 sm:p-5 text-center border-b-[8px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-3 animate-float-card transition-all" 
+                  className="w-full h-full bg-white rounded-[2.5rem] sm:rounded-[3.5rem] shadow-xl flex flex-col items-center justify-center p-3 sm:p-4 text-center border-b-[8px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-3 animate-float-card transition-all" 
                   style={{ animationDelay: `${idx * 0.4}s` }}
                 >
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-50 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-3 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-4 ring-black/5">
+                  <div className="w-10 h-10 sm:w-14 sm:h-14 bg-slate-50 rounded-full flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-3 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-2 ring-black/5">
                     {concept.icon || '📚'}
                   </div>
-                  <h3 className="text-[11px] sm:text-[15px] font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1">
+                  <h3 className="text-[10px] sm:text-[13px] font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1">
                     {concept.title}
                   </h3>
-                  <div className="mt-2 bg-blue-500 text-white text-[8px] sm:text-[9px] px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest">
+                  <div className="mt-1 bg-blue-500 text-white text-[7px] sm:text-[9px] px-3 sm:px-4 py-1 sm:py-1 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-1 group-hover:translate-y-0 uppercase tracking-widest">
                     Play! 🚀
                   </div>
                 </div>
@@ -200,57 +215,76 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           </div>
         </div>
 
-        {/* Navigation Arrows - Placed slightly below the center of the cards for clarity */}
+        {/* Navigation Arrows */}
         {subject.concepts.length > 1 && (
-          <div className="absolute bottom-[16%] left-0 right-0 flex justify-center items-center gap-36 sm:gap-64 z-[40] pointer-events-none">
+          <div className="absolute bottom-[24%] left-0 right-0 flex justify-center items-center gap-48 sm:gap-72 z-[40] pointer-events-none">
             <button 
               onClick={() => scrollBySet('left')}
-              className={`pointer-events-auto w-12 h-12 sm:w-16 sm:h-16 bg-blue-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl sm:text-2xl transition-all border-b-8 border-blue-600 hover:bg-blue-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              className={`pointer-events-auto w-10 h-10 sm:w-14 sm:h-14 bg-blue-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl transition-all border-b-6 border-blue-600 hover:bg-blue-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             >
               ⬅️
             </button>
             <button 
               onClick={() => scrollBySet('right')}
-              className={`pointer-events-auto w-12 h-12 sm:w-16 sm:h-16 bg-yellow-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl sm:text-2xl transition-all border-b-8 border-yellow-600 hover:bg-yellow-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              className={`pointer-events-auto w-10 h-10 sm:w-14 sm:h-14 bg-yellow-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl transition-all border-b-6 border-yellow-600 hover:bg-yellow-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             >
               ➡️
             </button>
           </div>
         )}
 
-        {/* Floor Area - Bottom 30% */}
-        <div className="absolute bottom-0 w-full h-[30%] border-t-8 border-black/5 shadow-[inset_0_10px_10px_rgba(0,0,0,0.05)] z-0" style={{ backgroundColor: design.floorColor }}>
+        {/* Floor Area */}
+        <div className="absolute bottom-0 w-full h-[35%] border-t-8 border-black/5 shadow-[inset_0_10px_10px_rgba(0,0,0,0.05)] z-0" style={{ backgroundColor: design.floorColor }}>
           <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: getFloorPattern() }}></div>
           
-          {/* Mascot - Stay in floor area */}
+          {/* Mascot */}
           {design.mascot && design.mascot !== 'none' && (
             <div 
               onClick={handleMascotClick}
-              className={`absolute bottom-4 sm:bottom-6 left-6 sm:left-12 text-6xl sm:text-9xl cursor-pointer transition-all z-20 ${isMascotCelebrating ? 'animate-celebrate scale-125 glow' : 'animate-bounce-pet'}`}
+              className={`absolute bottom-4 transition-all duration-700 z-20 cursor-pointer ${
+                isMascotPeeking 
+                  ? 'left-[-40px] sm:left-[-60px] opacity-10 scale-90' 
+                  : 'left-8 sm:left-16 opacity-100 scale-100'
+              } ${isMascotCelebrating ? 'animate-celebrate scale-125 glow' : 'animate-bounce-pet'}`}
             >
-              {MASCOTS.find(m => m.id === design.mascot)?.emoji}
-              {isMascotCelebrating && <div className="absolute -top-10 -right-10 text-4xl sm:text-6xl animate-ping">✨</div>}
+              <span className="text-6xl sm:text-[8rem] select-none">
+                {MASCOTS.find(m => m.id === design.mascot)?.emoji}
+              </span>
+              {isMascotPeeking && (
+                <div className="absolute top-1/2 left-[80%] -translate-y-1/2 bg-white px-3 py-1 rounded-full shadow-lg text-[9px] font-bold text-blue-500 animate-pulse whitespace-nowrap">
+                  Peek! ✨
+                </div>
+              )}
+              {isMascotCelebrating && <div className="absolute -top-10 -right-10 text-4xl sm:text-5xl animate-ping">✨</div>}
+              {!isMascotPeeking && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsMascotPeeking(true); }}
+                  className="absolute -top-3 -right-3 w-7 h-7 bg-white/80 rounded-full flex items-center justify-center text-xs shadow hover:bg-white"
+                >
+                  ⬅️
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {/* Scroll Indicator Dots */}
         {subject.concepts.length > 1 && (
-           <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 flex gap-3 z-40 bg-white/40 backdrop-blur-sm p-3 rounded-full">
+           <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 flex gap-3 z-40 bg-white/20 backdrop-blur-sm p-3 rounded-full">
              {subject.concepts.map((_, i) => (
                <div 
                 key={i} 
-                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${activeIndex === i ? 'bg-blue-500 scale-125' : 'bg-blue-200'}`}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${activeIndex === i ? 'bg-blue-500 scale-125' : 'bg-blue-200'}`}
                />
              ))}
            </div>
         )}
 
-        {/* Lyrics Overlay - Top-most layer */}
+        {/* Lyrics Overlay */}
         {showLyrics && activeMusic?.lyrics && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl text-center z-[110] pointer-events-none px-6">
-            <div className="bg-white/90 backdrop-blur-xl p-6 sm:p-12 rounded-[3rem] sm:rounded-[5rem] shadow-2xl border-4 border-white animate-bounce-slow">
-              <h3 className="text-2xl sm:text-6xl font-bold text-gray-800 transition-all duration-500 italic leading-tight">
+            <div className="bg-white/90 backdrop-blur-xl p-6 sm:p-10 rounded-[3rem] sm:rounded-[4rem] shadow-2xl border-4 border-white animate-bounce-slow">
+              <h3 className="text-2xl sm:text-5xl font-bold text-gray-800 transition-all duration-500 italic leading-tight">
                 "{activeMusic.lyrics[currentLyricIdx]}"
               </h3>
             </div>
@@ -259,7 +293,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
       </div>
 
       <style>{`
-        @keyframes float-card { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes float-card { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         @keyframes float-slow { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-12px) rotate(2deg); } }
         @keyframes bounce-slow { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.02); } }
         @keyframes bounce-pet { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
@@ -275,7 +309,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
-        .glow { filter: drop-shadow(0 0 40px rgba(255,255,255,0.95)); }
+        .glow { filter: drop-shadow(0 0 50px rgba(255,255,255,1)); }
       `}</style>
     </div>
   );

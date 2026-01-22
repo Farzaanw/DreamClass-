@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, SubjectId } from '../types';
 import { WALL_COLORS, FLOOR_COLORS, SUBJECTS } from '../constants';
@@ -20,12 +19,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Update view if prop changes
   useEffect(() => {
     setView(initialMode);
   }, [initialMode]);
 
-  // Clear errors and reset password visibility when switching views
   useEffect(() => {
     setError('');
     setSuccess('');
@@ -58,7 +55,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
       return;
     }
 
-    // Initialize default designs
     const initialDesigns: any = {};
     SUBJECTS.forEach(s => {
       initialDesigns[s.id] = {
@@ -73,9 +69,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
       id: Math.random().toString(36).substr(2, 9),
       username,
       email: email.toLowerCase(),
-      password, // In a real app, this would be hashed
-      customSubjects: [], // Start with no custom subjects
-      hiddenSubjectIds: [], // Start with no hidden subjects
+      password,
+      customSubjects: [],
+      hiddenSubjectIds: [],
       classroomDesigns: initialDesigns,
       progress: {}
     };
@@ -83,7 +79,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
     saveAccount(newUser);
     setSuccess('Account created! Now you can log in. 🎉');
     setView('login');
-    // Clear registration fields
     setUsername('');
     setPassword('');
   };
@@ -103,7 +98,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
     );
 
     if (user) {
-      // Remove password from the session user object for safety
       const { password: _, ...sessionUser } = user;
       onLogin(sessionUser as User);
     } else {
@@ -184,7 +178,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/50 rounded-full transition-colors text-xl sm:text-2xl"
-                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? "🙈" : "👁️"}
               </button>

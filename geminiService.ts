@@ -1,8 +1,6 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 export async function getLessonSuggestions(concept: string, currentContent: string[]) {
-  // Always create a new instance right before making an API call to ensure it always uses the most up-to-date API key.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
@@ -21,12 +19,11 @@ export async function getLessonSuggestions(concept: string, currentContent: stri
 }
 
 export async function chatWithAI(concept: string, history: { role: 'user' | 'model', text: string }[]) {
-  // Always create a new instance right before making an API call to ensure it always uses the most up-to-date API key.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: history.map(h => h.text).join('\n'), // Simplified for this demo
+      contents: history.map(h => h.text).join('\n'),
       config: {
         systemInstruction: `You are a friendly classroom assistant for an elementary teacher teaching "${concept}". Provide short, encouraging, and educational responses suitable for children and teachers.`,
       }

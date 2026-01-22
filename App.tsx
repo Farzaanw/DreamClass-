@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';

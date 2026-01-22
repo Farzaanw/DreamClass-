@@ -1,4 +1,3 @@
-
 export type SubjectId = string;
 export type AppMode = 'classroom' | 'teacher';
 
