@@ -1,15 +1,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
-import { Concept, ClassroomDesign, Message } from '../types';
-// Fixed: Imported encodeBase64 which was missing from the import list
+import { Concept, ClassroomDesign, Message, BoardItem } from '../types';
 import { decodeBase64, encodeBase64, decodeAudioData, createPcmBlob } from '../audioUtils';
+import { STICKERS } from '../constants';
 
 interface ConceptDashboardProps {
   concept: Concept;
   design: ClassroomDesign;
   onBack: () => void;
 }
+
+const CATEGORIES = {
+  LETTERS: 'ABC',
+  NUMBERS: '123',
+  STICKERS: '✨',
+  SHAPES: '📐'
+};
 
 const BOARD_TOOLS: FunctionDeclaration[] = [
   {
@@ -18,60 +25,36 @@ const BOARD_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
-        item: { type: Type.STRING, description: 'The text or emoji to add (e.g., "A", "5", "🍎", "Hydrogen")' },
-      },
-      required: ['item'],
-    },
-  },
-  {
-    name: 'removeItemFromBoard',
-    description: 'Removes a specific item from the whiteboard by its text value.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        item: { type: Type.STRING, description: 'The exact text of the item to remove.' },
+        item: { type: Type.STRING, description: 'The text or emoji to add' },
       },
       required: ['item'],
     },
   },
   {
     name: 'clearBoard',
-    description: 'Clears all items from the interactive whiteboard.',
+    description: 'Clears all items and drawings from the whiteboard.',
     parameters: { type: Type.OBJECT, properties: {} },
   },
 ];
 
-const SYSTEM_INSTRUCTION = `You are a world-class, multi-disciplinary elementary pedagogical expert assistant. 
-You are currently helping a teacher and students (ages 5-10) with the concept: "{CONCEPT_TITLE}".
-
-CORE PEDAGOGICAL PHILOSOPHY:
-- Zone of Proximal Development: Always provide the right amount of challenge. Scaffolding is key.
-- Inquiry-Based Learning: Encourage students to ask "Why?" and "What if?".
-- Multimodal Interaction: Use the whiteboard (via tools) to visualize concepts.
-- Positive Reinforcement: Celebrate small wins with high-energy verbal praise.
-
-SUBJECT-SPECIFIC KNOWLEDGE BASE:
-- Phonics: Master of the Science of Reading. Focus on phonemic awareness, grapheme-phoneme mapping, and blending. If teaching vowels, explain their role as 'sound makers'.
-- Math: Concrete-Pictorial-Abstract (CPA) approach. Use emojis on the board as counters. Focus on number sense and logical reasoning.
-- Science: Use the scientific method. Encourage observation, prediction, and experimentation.
-
-TOOL USAGE RULES:
-1. ACT IMMEDIATELY: If a user says "Set up a lesson on {CONCEPT_TITLE}" or "Add 3 apples", use 'addItemToBoard' immediately.
-2. DYNAMIC UPDATES: Use 'removeItemFromBoard' to progress through a game or 'clearBoard' to start fresh.
-3. VISUAL CLARITY: When adding items, use clear symbols or short words.
-
-RESPONSE STYLE:
-- Short, punchy, and energetic. 
-- Use child-friendly analogies (e.g., "Letters are like puzzle pieces that make sound pictures").
-- Always explain what you are doing on the board.`;
-
 const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, onBack }) => {
-  const [boardItems, setBoardItems] = useState<string[]>([]);
+  // Board State
+  const [items, setItems] = useState<BoardItem[]>([]);
+  const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser'>('select');
+  const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
+  const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES.LETTERS);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+
+  // AI & Session State
   const [isLive, setIsLive] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [chatHistory, setChatHistory] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   
+  // Refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const isDrawingRef = useRef(false);
   const audioContextInRef = useRef<AudioContext | null>(null);
   const audioContextOutRef = useRef<AudioContext | null>(null);
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
@@ -80,143 +63,153 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   const chatEndRef = useRef<HTMLDivElement>(null);
   const currentTranscriptionRef = useRef({ user: '', model: '' });
 
-  const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-
+  // --- Canvas Setup ---
   useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory]);
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const rect = canvas.parentElement?.getBoundingClientRect();
+      if (rect) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      }
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.lineCap = 'round';
+        contextRef.current = ctx;
+      }
+    }
+  }, []);
 
-  const cleanupSession = () => {
-    if (sessionPromiseRef.current) {
-      sessionPromiseRef.current.then(session => session.close());
-      sessionPromiseRef.current = null;
-    }
-    if (audioContextInRef.current) {
-      audioContextInRef.current.close();
-      audioContextInRef.current = null;
-    }
-    activeSourcesRef.current.forEach(s => s.stop());
-    activeSourcesRef.current.clear();
-    setIsLive(false);
+  const startDrawing = ({ nativeEvent }: React.MouseEvent | React.TouchEvent) => {
+    if (activeTool === 'select') return;
+    const { offsetX, offsetY } = getCoordinates(nativeEvent);
+    contextRef.current?.beginPath();
+    contextRef.current?.moveTo(offsetX, offsetY);
+    isDrawingRef.current = true;
   };
 
-  const handleAiAction = (name: string, args: any) => {
-    switch (name) {
-      case 'addItemToBoard':
-        setBoardItems(prev => [...prev, args.item]);
-        return "Added " + args.item + " to the board.";
-      case 'removeItemFromBoard':
-        setBoardItems(prev => prev.filter(i => i !== args.item));
-        return "Removed " + args.item + " from the board.";
-      case 'clearBoard':
-        setBoardItems([]);
-        return "Board cleared.";
-      default:
-        return "Tool not found.";
+  const draw = ({ nativeEvent }: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawingRef.current || !contextRef.current || activeTool === 'select') return;
+    const { offsetX, offsetY } = getCoordinates(nativeEvent);
+    
+    const ctx = contextRef.current;
+    if (activeTool === 'marker') {
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 5;
+      ctx.globalCompositeOperation = 'source-over';
+    } else if (activeTool === 'highlighter') {
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+      ctx.lineWidth = 20;
+      ctx.globalCompositeOperation = 'source-over';
+    } else if (activeTool === 'eraser') {
+      ctx.lineWidth = 40;
+      ctx.globalCompositeOperation = 'destination-out';
     }
+
+    ctx.lineTo(offsetX, offsetY);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    contextRef.current?.closePath();
+    isDrawingRef.current = false;
+  };
+
+  const getCoordinates = (event: any) => {
+    if (event.touches) {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      return {
+        offsetX: event.touches[0].clientX - rect.left,
+        offsetY: event.touches[0].clientY - rect.top
+      };
+    }
+    return { offsetX: event.offsetX, offsetY: event.offsetY };
+  };
+
+  // --- Item Logic ---
+  const addItem = (content: string, type: BoardItem['type'] = 'emoji') => {
+    const newItem: BoardItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      content,
+      type,
+      x: 100 + Math.random() * 200,
+      y: 100 + Math.random() * 200,
+      scale: 1,
+      rotation: 0
+    };
+    setItems(prev => [...prev, newItem]);
+    // Small sparkle sound/animation could go here
+  };
+
+  const updateItem = (id: string, updates: Partial<BoardItem>) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+
+  const removeItem = (id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  // --- AI Session Logic ---
+  const handleAiAction = (name: string, args: any) => {
+    if (name === 'addItemToBoard') {
+      addItem(args.item);
+      return `Added ${args.item} to the magic board!`;
+    }
+    if (name === 'clearBoard') {
+      setItems([]);
+      contextRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+      return "The board is shiny and clean!";
+    }
+    return "Action not recognized.";
   };
 
   const getOrCreateSession = async (useMic: boolean = false) => {
     if (sessionPromiseRef.current) return sessionPromiseRef.current;
-
-    // Always create a new instance right before making an API call to ensure it always uses the most up-to-date API key.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     if (useMic) {
-      audioContextInRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      audioContextOutRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      audioContextInRef.current = new AudioContext({ sampleRate: 16000 });
+      audioContextOutRef.current = new AudioContext({ sampleRate: 24000 });
     }
 
     const sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-        },
-        systemInstruction: SYSTEM_INSTRUCTION.replace('{CONCEPT_TITLE}', concept.title),
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+        systemInstruction: `You are a helpful assistant for teaching ${concept.title}. Use tools to add items to the board to help students visualize. Be encouraging!`,
         tools: [{ functionDeclarations: BOARD_TOOLS }],
         inputAudioTranscription: {},
         outputAudioTranscription: {},
       },
       callbacks: {
-        onopen: () => {
-          if (useMic) setIsLive(true);
-        },
+        onopen: () => useMic && setIsLive(true),
         onmessage: async (message: LiveServerMessage) => {
           if (message.toolCall) {
-            const toolResponses = [];
-            for (const fc of message.toolCall.functionCalls) {
-              const result = handleAiAction(fc.name, fc.args);
-              toolResponses.push({ id: fc.id, name: fc.name, response: { result } });
-            }
+            const toolResponses = message.toolCall.functionCalls.map(fc => ({
+              id: fc.id, name: fc.name, response: { result: handleAiAction(fc.name, fc.args) }
+            }));
             sessionPromise.then(s => s.sendToolResponse({ functionResponses: toolResponses }));
           }
-
+          // Audio processing...
           const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio && audioContextOutRef.current) {
-            const ctx = audioContextOutRef.current;
-            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
-            const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), ctx, 24000, 1);
-            const sourceNode = ctx.createBufferSource();
-            sourceNode.buffer = audioBuffer;
-            sourceNode.connect(ctx.destination);
-            sourceNode.start(nextStartTimeRef.current);
-            nextStartTimeRef.current += audioBuffer.duration;
-            activeSourcesRef.current.add(sourceNode);
-            sourceNode.onended = () => activeSourcesRef.current.delete(sourceNode);
+            const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), audioContextOutRef.current, 24000, 1);
+            const source = audioContextOutRef.current.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContextOutRef.current.destination);
+            const start = Math.max(nextStartTimeRef.current, audioContextOutRef.current.currentTime);
+            source.start(start);
+            nextStartTimeRef.current = start + audioBuffer.duration;
           }
-
-          if (message.serverContent?.interrupted) {
-            activeSourcesRef.current.forEach(s => s.stop());
-            activeSourcesRef.current.clear();
-            nextStartTimeRef.current = 0;
-          }
-
-          if (message.serverContent?.inputTranscription) {
-            currentTranscriptionRef.current.user += message.serverContent.inputTranscription.text;
-          }
-          if (message.serverContent?.outputTranscription) {
-            currentTranscriptionRef.current.model += message.serverContent.outputTranscription.text;
-          }
-          
+          // Transcriptions...
           if (message.serverContent?.turnComplete) {
-            const uTrans = currentTranscriptionRef.current.user;
-            const mTrans = currentTranscriptionRef.current.model;
-            if (uTrans || mTrans) {
-              setChatHistory(prev => [
-                ...prev, 
-                ...(uTrans ? [{ role: 'user', text: uTrans } as Message] : []),
-                ...(mTrans ? [{ role: 'model', text: mTrans } as Message] : [])
-              ]);
-            }
-            currentTranscriptionRef.current = { user: '', model: '' };
             setIsAiThinking(false);
           }
         },
-        onerror: (e) => {
-          console.error('Session Error:', e);
-          setIsAiThinking(false);
-        },
-        onclose: () => cleanupSession(),
-      },
+        onclose: () => setIsLive(false),
+      }
     });
-
-    if (useMic && audioContextInRef.current) {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const source = audioContextInRef.current.createMediaStreamSource(stream);
-      const scriptProcessor = audioContextInRef.current.createScriptProcessor(4096, 1, 1);
-      
-      scriptProcessor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        const pcmBlob = createPcmBlob(inputData);
-        sessionPromise.then(s => {
-          if (isLive) s.sendRealtimeInput({ media: pcmBlob });
-        });
-      };
-      source.connect(scriptProcessor);
-      scriptProcessor.connect(audioContextInRef.current.destination);
-    }
 
     sessionPromiseRef.current = sessionPromise;
     return sessionPromise;
@@ -225,177 +218,235 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputMessage.trim()) return;
-
     setIsAiThinking(true);
     const session = await getOrCreateSession();
-    
-    try {
-      // Use the resolved session to send text input via realtimeInput.
-      session.sendRealtimeInput({
-        media: {
-          data: encodeBase64(new TextEncoder().encode(inputMessage)),
-          mimeType: 'text/plain'
-        }
-      });
-      setChatHistory(prev => [...prev, { role: 'user', text: inputMessage }]);
-      setInputMessage('');
-    } catch (err) {
-      console.error("Failed to send message", err);
-      setIsAiThinking(false);
+    session.sendRealtimeInput({ media: { data: encodeBase64(new TextEncoder().encode(inputMessage)), mimeType: 'text/plain' } });
+    setChatHistory(prev => [...prev, { role: 'user', text: inputMessage }]);
+    setInputMessage('');
+  };
+
+  // --- Rendering Helpers ---
+  const renderCategoryContent = () => {
+    if (activeCategory === CATEGORIES.LETTERS) {
+      return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split("").map(l => (
+        <button key={l} onClick={() => addItem(l, 'text')} className="w-12 h-12 bg-white rounded-xl shadow-sm border font-bold text-xl hover:bg-blue-50 transition-colors">{l}</button>
+      ));
+    }
+    if (activeCategory === CATEGORIES.NUMBERS) {
+      return "01234567891011121314151617181920".match(/\d+/g)?.map(n => (
+        <button key={n} onClick={() => addItem(n, 'text')} className="w-12 h-12 bg-white rounded-xl shadow-sm border font-bold text-xl hover:bg-green-50 transition-colors">{n}</button>
+      ));
+    }
+    if (activeCategory === CATEGORIES.STICKERS) {
+      return STICKERS.map(s => (
+        <button key={s.id} onClick={() => addItem(s.emoji, 'sticker')} className="w-12 h-12 bg-white rounded-xl shadow-sm border text-2xl hover:bg-yellow-50 transition-colors">{s.emoji}</button>
+      ));
+    }
+    if (activeCategory === CATEGORIES.SHAPES) {
+      return ['⭕', '⬜', '🔺', '⭐', '❤️', '🟦', '🟡'].map(s => (
+        <button key={s} onClick={() => addItem(s, 'shape')} className="w-12 h-12 bg-white rounded-xl shadow-sm border text-2xl hover:bg-purple-50 transition-colors">{s}</button>
+      ));
     }
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden animate-zoom-in font-['Fredoka']">
-      <header className="bg-white border-b p-4 flex justify-between items-center z-10 shadow-sm">
-        <div className="flex items-center gap-6">
-          <button onClick={onBack} className="text-2xl hover:bg-gray-100 p-2 rounded-full transition-colors">⬅️</button>
-          <div className="hidden sm:block">
-            <h2 className="text-xl font-bold text-gray-800">{concept.title}</h2>
-            <p className="text-xs text-blue-500 font-medium">Interactive Multi-Modal Lab</p>
+    <div className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']">
+      {/* Header */}
+      <header className="h-16 bg-white border-b px-6 flex items-center justify-between z-50">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="text-2xl p-2 hover:bg-slate-100 rounded-full">⬅️</button>
+          <div>
+            <h1 className="font-bold text-slate-800 leading-none">{concept.title}</h1>
+            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Interactive Lab</span>
           </div>
         </div>
-        
-        <button 
-          onClick={isLive ? cleanupSession : () => getOrCreateSession(true)}
-          className={`px-6 py-2 rounded-full font-bold flex items-center gap-2 transition-all shadow-md ${
-            isLive ? 'bg-red-500 text-white animate-pulse' : 'bg-green-500 text-white hover:bg-green-600'
-          }`}
-        >
-          {isLive ? '🛑 Stop Mic' : '🎙️ Start Voice Mode'}
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setBoardBg('plain')}
+            className={`p-2 rounded-lg border-2 ${boardBg === 'plain' ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}`}
+          >⬜</button>
+          <button 
+            onClick={() => setBoardBg('lined')}
+            className={`p-2 rounded-lg border-2 ${boardBg === 'lined' ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}`}
+          >📝</button>
+          <button 
+            onClick={() => setBoardBg('grid')}
+            className={`p-2 rounded-lg border-2 ${boardBg === 'grid' ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}`}
+          >📊</button>
+          <div className="w-px h-8 bg-slate-200 mx-2" />
+          <button 
+            onClick={isLive ? () => setIsLive(false) : () => getOrCreateSession(true)}
+            className={`px-4 py-2 rounded-full font-bold text-sm shadow-md transition-all ${isLive ? 'bg-rose-500 text-white animate-pulse' : 'bg-blue-500 text-white'}`}
+          >
+            {isLive ? '🛑 Stop' : '🎙️ Mic'}
+          </button>
+        </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 p-6 flex flex-col gap-6" style={{ backgroundColor: design.wallColor + '20' }}>
-          <div className="bg-white rounded-[2rem] shadow-2xl flex-1 relative flex items-center justify-center overflow-hidden border-8 border-gray-100">
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
-            
-            {boardItems.length === 0 ? (
-              <div className="text-center">
-                <div className="text-9xl mb-6 animate-bounce" style={{ animationDuration: '3s' }}>🎒</div>
-                <p className="text-3xl font-bold text-gray-300">Ready for Learning!</p>
-                <p className="text-gray-400 mt-2">Speak or type to have the Assistant act on instructions.</p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-6 justify-center p-12 max-w-3xl overflow-y-auto">
-                {boardItems.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    className="w-24 h-24 bg-white border-4 border-blue-100 rounded-3xl flex items-center justify-center text-4xl font-bold text-blue-600 shadow-lg cursor-pointer hover:scale-110 hover:rotate-3 transition-transform"
-                    onClick={() => setBoardItems(boardItems.filter((_, i) => i !== idx))}
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            )}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Asset Drawer */}
+        <div className={`absolute left-0 top-0 bottom-0 z-40 bg-white border-r shadow-2xl transition-transform duration-300 w-72 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="font-bold text-slate-400 uppercase text-xs">Magic Assets</h3>
+            <button onClick={() => setDrawerOpen(false)} className="text-slate-300">✕</button>
           </div>
-
-          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
-            <h4 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-widest">Manual Asset Drawer</h4>
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {concept.suggestedItems.map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setBoardItems([...boardItems, item])}
-                  className="px-8 py-5 bg-blue-50 hover:bg-blue-100 border-2 border-dashed border-blue-200 hover:border-blue-400 rounded-2xl font-bold text-3xl text-blue-700 transition-all flex-shrink-0"
-                >
-                  {item}
-                </button>
-              ))}
+          <div className="flex bg-slate-50 p-1">
+            {Object.values(CATEGORIES).map(cat => (
               <button 
-                onClick={() => {
-                  const val = prompt('Add custom item:');
-                  if(val) setBoardItems([...boardItems, val]);
-                }}
-                className="px-8 py-5 bg-yellow-400 text-white rounded-2xl font-bold text-3xl shadow-lg hover:bg-yellow-500 transition-all"
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`flex-1 py-2 text-xl rounded-lg transition-all ${activeCategory === cat ? 'bg-white shadow-sm' : 'opacity-40'}`}
               >
-                +
+                {cat}
               </button>
-            </div>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 grid grid-cols-4 gap-3 content-start">
+            {renderCategoryContent()}
           </div>
         </div>
+        {!drawerOpen && (
+          <button onClick={() => setDrawerOpen(true)} className="absolute left-0 top-1/2 -translate-y-1/2 bg-white border-y border-r p-3 rounded-r-2xl shadow-xl z-30 font-bold text-slate-400">📦</button>
+        )}
 
-        <div className="w-96 bg-white border-l flex flex-col shadow-2xl">
-          <div className="p-6 border-b bg-gradient-to-br from-blue-50 to-white">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg transition-all ${isLive || isAiThinking ? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-100' : 'bg-gray-100 text-gray-400'}`}>
-                {isAiThinking ? '✨' : (isLive ? '🌈' : '🤖')}
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-800 text-lg">Assistant Pro</h3>
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : (isAiThinking ? 'bg-blue-400 animate-bounce' : 'bg-gray-300')}`}></span>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">
-                    {isLive ? 'Listening Live' : (isAiThinking ? 'Instructing...' : 'Ready to act')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Board Area */}
+        <main className="flex-1 relative overflow-hidden flex flex-col">
+          <div 
+            className={`flex-1 relative cursor-crosshair transition-all duration-500 ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : 'bg-white'}`}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+          >
+            {/* Canvas Layer */}
+            <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none" />
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {chatHistory.length === 0 && (
-              <div className="space-y-4">
-                <div className="bg-blue-50 p-6 rounded-[2rem] text-sm text-blue-700 font-medium text-center border-2 border-dashed border-blue-100">
-                  <p className="mb-4">I'm ready to follow your instructions!</p>
-                  <div className="space-y-2">
-                    <button onClick={() => setInputMessage("Add the vowels A E I O U to the board")} className="block w-full text-xs bg-white py-2 rounded-full border hover:border-blue-400 transition-colors">"Add all vowels"</button>
-                    <button onClick={() => setInputMessage("Clear the board and add 3 numbers for counting")} className="block w-full text-xs bg-white py-2 rounded-full border hover:border-blue-400 transition-colors">"Clear and add counting numbers"</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {chatHistory.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-4 rounded-3xl text-sm shadow-md leading-relaxed ${
-                  msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none' 
-                    : 'bg-gray-100 text-gray-800 rounded-tl-none border border-gray-200'
-                }`}>
-                  {msg.text}
+            {/* Board Items Layer */}
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="absolute z-10 select-none group"
+                style={{ 
+                  left: item.x, 
+                  top: item.y, 
+                  transform: `translate(-50%, -50%) scale(${item.scale}) rotate(${item.rotation}deg)` 
+                }}
+                onMouseDown={(e) => {
+                  if (activeTool !== 'select') return;
+                  e.stopPropagation();
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const handleMove = (moveEvent: MouseEvent) => {
+                    const dx = moveEvent.clientX - startX;
+                    const dy = moveEvent.clientY - startY;
+                    updateItem(item.id, { x: item.x + dx, y: item.y + dy });
+                  };
+                  const handleUp = () => {
+                    window.removeEventListener('mousemove', handleMove);
+                    window.removeEventListener('mouseup', handleUp);
+                  };
+                  window.addEventListener('mousemove', handleMove);
+                  window.addEventListener('mouseup', handleUp);
+                }}
+              >
+                <div className={`relative p-4 rounded-2xl cursor-grab active:cursor-grabbing border-4 border-transparent ${activeTool === 'select' ? 'hover:border-blue-200' : ''}`}>
+                  <span className={`block pointer-events-none ${item.type === 'text' ? 'text-6xl font-black text-slate-800 drop-shadow-sm' : 'text-8xl'}`}>
+                    {item.content}
+                  </span>
+                  
+                  {activeTool === 'select' && (
+                    <div className="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 flex gap-1">
+                      <button onClick={(e) => { e.stopPropagation(); addItem(item.content, item.type); }} className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg">👯</button>
+                      <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg">🗑️</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
-            {isAiThinking && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 p-4 rounded-3xl animate-pulse flex gap-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                  <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
           </div>
 
-          <div className="p-6 border-t bg-gray-50">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
+          {/* Bottom Toolbar */}
+          <div className="h-24 bg-white/80 backdrop-blur-md border-t flex items-center justify-center gap-4 px-6 relative z-50">
+            <div className="flex bg-slate-100 p-1.5 rounded-3xl shadow-inner gap-1">
+              {[
+                { id: 'select', icon: '🖐️', label: 'Move' },
+                { id: 'marker', icon: '✏️', label: 'Marker' },
+                { id: 'highlighter', icon: '🖍️', label: 'Glow' },
+                { id: 'eraser', icon: '🧼', label: 'Eraser' },
+              ].map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => setActiveTool(tool.id as any)}
+                  className={`flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all ${activeTool === tool.id ? 'bg-white shadow-lg scale-110 text-blue-500' : 'opacity-40 hover:opacity-100'}`}
+                >
+                  <span className="text-2xl">{tool.icon}</span>
+                  <span className="text-[9px] font-bold uppercase">{tool.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => { if(confirm("Clear everything? ✨")) handleAiAction('clearBoard', {}); }}
+              className="w-16 h-16 bg-rose-100 text-rose-500 rounded-3xl flex items-center justify-center text-2xl hover:bg-rose-200 transition-colors"
+              title="Clear Board"
+            >
+              🗑️
+            </button>
+          </div>
+        </main>
+
+        {/* AI Chat Sidebar */}
+        <aside className="w-80 border-l bg-white flex flex-col z-40">
+           <div className="p-4 border-b bg-slate-50">
+              <div className="flex items-center gap-3">
+                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-inner ${isAiThinking ? 'bg-blue-500 text-white animate-spin' : 'bg-slate-200 text-slate-400'}`}>🤖</div>
+                 <div>
+                    <h4 className="font-bold text-slate-700 text-sm">Assistant</h4>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{isAiThinking ? 'Thinking...' : 'Ready'}</span>
+                 </div>
+              </div>
+           </div>
+           
+           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-xs shadow-sm ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+           </div>
+
+           <form onSubmit={handleSendMessage} className="p-4 border-t bg-slate-50">
               <input 
                 type="text" 
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Give me an instruction..."
-                className="flex-1 bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-100 shadow-inner"
+                onChange={e => setInputMessage(e.target.value)}
+                placeholder="Ask me to help..."
+                className="w-full px-4 py-2.5 rounded-full border bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 text-sm shadow-inner"
               />
-              <button 
-                type="submit"
-                className="bg-blue-500 text-white w-12 h-12 rounded-full hover:bg-blue-600 shadow-lg flex items-center justify-center transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
-                disabled={!inputMessage.trim()}
-              >
-                🚀
-              </button>
-            </form>
-          </div>
-        </div>
+           </form>
+        </aside>
       </div>
 
       <style>{`
-        @keyframes zoom-in { from { transform: scale(0.98); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .animate-zoom-in { animation: zoom-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .board-lined {
+          background-color: white;
+          background-image: linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+          background-size: 100% 40px;
+        }
+        .board-grid {
+          background-color: white;
+          background-image: linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .animate-bounce-mascot { animation: bounce 2s infinite; }
       `}</style>
     </div>
   );

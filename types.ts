@@ -19,6 +19,17 @@ export interface Subject {
   icon?: string;
 }
 
+export interface BoardItem {
+  id: string;
+  content: string;
+  type: 'text' | 'emoji' | 'sticker' | 'shape';
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  color?: string;
+}
+
 export interface ClassroomDesign {
   wallColor: string;
   wallTheme?: 'plain' | 'stripes' | 'dots';

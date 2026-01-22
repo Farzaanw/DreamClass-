@@ -161,20 +161,33 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSubject = (subjectId: SubjectId) => {
-    if (!currentUser) return;
-    
-    // Explicitly update hidden list and remove from custom list
-    const updatedHidden = Array.from(new Set([...(currentUser.hiddenSubjectIds || []), subjectId]));
-    const updatedCustomSubjects = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
-    
-    const updatedDesigns = { ...currentUser.classroomDesigns };
-    delete updatedDesigns[subjectId];
+    setCurrentUser(prev => {
+      if (!prev) return prev;
 
-    persistUser({
-      ...currentUser,
-      customSubjects: updatedCustomSubjects,
-      hiddenSubjectIds: updatedHidden,
-      classroomDesigns: updatedDesigns
+      // Immutably remove from custom and add to hidden
+      const updatedHidden = Array.from(new Set([...(prev.hiddenSubjectIds || []), subjectId]));
+      const updatedCustomSubjects = (prev.customSubjects || []).filter(s => s.id !== subjectId);
+      
+      const updatedDesigns = { ...prev.classroomDesigns };
+      delete updatedDesigns[subjectId];
+
+      const newUser = {
+        ...prev,
+        customSubjects: updatedCustomSubjects,
+        hiddenSubjectIds: updatedHidden,
+        classroomDesigns: updatedDesigns
+      };
+
+      // Force persistence immediately within the state update cycle
+      localStorage.setItem('dreamclass_user', JSON.stringify(newUser));
+      const accountsData = localStorage.getItem('dreamclass_accounts');
+      if (accountsData) {
+        const accounts: User[] = JSON.parse(accountsData);
+        const updatedAccounts = accounts.map(acc => acc.id === newUser.id ? newUser : acc);
+        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+      }
+
+      return newUser;
     });
   };
 
@@ -203,7 +216,7 @@ const App: React.FC = () => {
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const offset = 80; // Account for sticky header
+      const offset = 80;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -231,7 +244,6 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900">
       {currentView === 'landing' && (
         <div className="flex flex-col">
-          {/* Main Navigation Header */}
           <header className="fixed top-0 left-0 right-0 z-[100] bg-white/70 backdrop-blur-lg border-b border-gray-100 py-4 px-6 sm:px-12 flex items-center justify-between">
             <div className="flex items-center gap-10">
               <div onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="cursor-pointer">
@@ -252,7 +264,6 @@ const App: React.FC = () => {
             </div>
           </header>
 
-          {/* Hero Section */}
           <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden pt-20">
             <div className="absolute inset-0 pointer-events-none select-none">
               <span className="absolute top-[15%] left-[10%] text-4xl sm:text-6xl animate-float opacity-20">✏️</span>
@@ -276,7 +287,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 1: Features (Adventure) */}
           <section id="features-section" className="py-16 sm:py-24 px-6 bg-white flex flex-col items-center text-center">
             <div className="max-w-4xl">
               <h2 className="text-3xl sm:text-5xl font-bold text-gray-800 mb-6 sm:mb-8 tracking-tight">Turning Every Lesson Into an Adventure 🚀</h2>
@@ -301,7 +311,6 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 2: How It Works (Modes) */}
           <section id="how-it-works-section" className="py-16 sm:py-24 px-6 bg-[#F8FAFC]">
             <div className="max-w-6xl mx-auto">
               <h2 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-12 sm:mb-16 px-4">Designed for Teachers, Loved by Students</h2>
@@ -352,7 +361,6 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 3: AI & Tools */}
           <section id="ai-section" className="py-16 sm:py-24 px-6 bg-white overflow-hidden">
             <div className="max-w-6xl mx-auto flex flex-col items-center">
               <div className="text-center mb-12 sm:mb-16 px-4">
@@ -382,21 +390,19 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 4: Customization */}
           <section id="custom-section" className="py-16 sm:py-24 px-6 bg-[#F8FAFC] text-center overflow-hidden border-b border-gray-100">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Endless Customization 🎨</h2>
             <p className="text-gray-500 text-lg sm:text-xl mb-12 sm:mb-16">See how other teachers are building their magic rooms.</p>
             <div className="flex gap-8 animate-scroll whitespace-nowrap">
                {[...customizationCards, ...customizationCards].map((card, i) => (
                  <div key={i} className={`${card.color} inline-flex flex-col items-center justify-center w-64 h-80 sm:w-80 sm:h-96 rounded-[2rem] sm:rounded-[3.5rem] p-6 sm:p-10 shadow-lg border-b-8 border-black/5 transform hover:-translate-y-4 transition-transform`}>
-                    <div className="text-6xl sm:text-8xl mb-4">{card.emoji}</div>
-                    <div className="font-bold text-lg sm:text-2xl text-black/60 whitespace-normal">{card.text}</div>
+                    <div className="text-6xl sm:text-8xl mb-2 leading-none">{card.emoji}</div>
+                    <div className="font-bold text-lg sm:text-2xl text-black/60 whitespace-normal leading-tight text-center">{card.text}</div>
                  </div>
                ))}
             </div>
           </section>
 
-          {/* Quote Section (Ambrose Commissariat) */}
           <section className="py-16 sm:py-24 px-6 bg-blue-600 text-white text-center">
             <div className="max-w-4xl mx-auto">
               <h2 className="text-3xl sm:text-5xl font-bold mb-6 sm:mb-8">Foster Engagement Every Day</h2>
@@ -405,13 +411,11 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Footer */}
           <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 px-6">
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
               <div className="col-span-2">
                 <RainbowLogo size="text-3xl sm:text-4xl" />
                 <p className="mt-4 max-w-sm text-sm sm:text-base">The magic lab for elementary learning. Designed to make teaching easier and learning unforgettable.</p>
-                {/* Contact Emojis */}
                 <div className="flex gap-4 mt-6 text-2xl sm:text-3xl">
                   <button onClick={() => alert('Contact: support@dreamclass.edu')} className="hover:scale-125 transition-transform" title="Email Support">📧</button>
                   <button onClick={() => alert('Visit our Twitter/X')} className="hover:scale-125 transition-transform" title="Twitter">🐦</button>
