@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, SubjectId, AppMode, Subject, Concept } from '../types';
 
@@ -288,8 +289,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   ))}
                 </div>
               </div>
-              <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-blue-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold" value={newName} onChange={(e) => setNewName(e.target.value)} required />
-              <textarea placeholder="Description" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-blue-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold min-h-[100px]" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+              <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={newName} onChange={(e) => setNewName(e.target.value)} required />
+              <textarea placeholder="Description" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold min-h-[100px] text-black" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-4">
                   <label className="text-sm font-bold text-gray-500">CONCEPTS</label>
@@ -297,8 +298,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 {concepts.map((concept, idx) => (
                   <div key={idx} className="flex gap-3">
-                    <input type="text" className="w-16 px-2 py-4 rounded-2xl border-4 border-gray-50 text-center text-xl" value={concept.icon} onChange={(e) => updateConcept(idx, 'icon', e.target.value)} />
-                    <input type="text" placeholder="Concept Title" className="flex-1 px-6 py-4 rounded-2xl border-4 border-gray-50 text-lg font-bold" value={concept.title} onChange={(e) => updateConcept(idx, 'title', e.target.value)} required />
+                    <input type="text" className="w-16 px-2 py-4 rounded-2xl border-4 border-blue-50 bg-white text-center text-xl text-black" value={concept.icon} onChange={(e) => updateConcept(idx, 'icon', e.target.value)} />
+                    <input type="text" placeholder="Concept Title" className="flex-1 px-6 py-4 rounded-2xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={concept.title} onChange={(e) => updateConcept(idx, 'title', e.target.value)} required />
                     {concepts.length > 1 && <button type="button" onClick={() => removeConcept(idx)} className="w-12 bg-red-50 text-red-400 rounded-2xl">✕</button>}
                   </div>
                 ))}

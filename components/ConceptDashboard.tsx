@@ -37,10 +37,12 @@ const HIGHLIGHTER_COLORS = [
 
 const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, onBack, onSaveDesign }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
-  const [history, setHistory] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
+  // Local undo stack for the current editing session
+  const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
+  
   const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser'>('select');
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0].value);
-  const [highlighterColor, setHighlighterColor] = useState(HIGHLIGHTER_COLORS[0].value);
+  const [highlighterColor, setHighlightColor] = useState(HIGHLIGHTER_COLORS[0].value);
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
   
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
@@ -70,7 +72,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
         ctx.lineJoin = 'round';
         contextRef.current = ctx;
 
-        // Load existing state for this concept if available
+        // Restore current session state for this concept if it exists
         const savedState = design.conceptBoards?.[concept.id];
         if (savedState) {
           setItems(savedState.items || []);
@@ -90,22 +92,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     }
   }, [concept.id]);
 
-  const saveToHistoryState = () => {
-    // CRITICAL: Use PNG for history snapshots to prevent black background transparency bug
+  const saveToUndoStack = () => {
     const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : null;
-    setHistory(prev => [...prev, { items: [...items], drawing: drawingSnapshot }].slice(-40));
+    setUndoStack(prev => [...prev, { items: [...items], drawing: drawingSnapshot }].slice(-30));
   };
 
   const handleUndo = () => {
-    if (history.length === 0) return;
+    if (undoStack.length === 0) return;
     
-    // Get the previous state
-    const previousState = history[history.length - 1];
-    
-    // Restore items
+    const previousState = undoStack[undoStack.length - 1];
     setItems(previousState.items);
     
-    // Restore the drawing layer
     if (contextRef.current && canvasRef.current) {
       const ctx = contextRef.current;
       ctx.globalCompositeOperation = 'source-over';
@@ -120,8 +117,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       }
     }
     
-    // Remove the state we just reverted to from the history stack
-    setHistory(prev => prev.slice(0, -1));
+    setUndoStack(prev => prev.slice(0, -1));
     setSelectedItemId(null);
   };
 
@@ -157,7 +153,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       }
     } else {
       if (!contextRef.current) return;
-      saveToHistoryState();
+      saveToUndoStack();
       
       const worldCoords = screenToWorld(coords.sx, coords.sy);
       const ctx = contextRef.current;
@@ -268,7 +264,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   };
 
   const addItem = (content: string, type: BoardItem['type'] = 'emoji', screenX?: number, screenY?: number) => {
-    saveToHistoryState();
+    saveToUndoStack();
     const sx = screenX !== undefined ? screenX : window.innerWidth / 2;
     const sy = screenY !== undefined ? screenY : window.innerHeight / 2;
     const worldPos = screenToWorld(sx, sy);
@@ -287,7 +283,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   };
 
   const removeItem = (id: string) => {
-    saveToHistoryState();
+    saveToUndoStack();
     setItems(prev => prev.filter(item => item.id !== id));
     if (selectedItemId === id) setSelectedItemId(null);
   };
@@ -319,7 +315,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     if (activeTool !== 'select' || isPanningRef.current) return;
     e.stopPropagation();
     setSelectedItemId(item.id);
-    saveToHistoryState();
+    saveToUndoStack();
     const startX = e.clientX;
     const startY = e.clientY;
     const initialX = item.x;
@@ -339,7 +335,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
 
   const handleResizeMouseDown = (e: React.MouseEvent, item: BoardItem) => {
     e.stopPropagation();
-    saveToHistoryState();
+    saveToUndoStack();
     const startX = e.clientX;
     const initialScale = item.scale;
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -360,7 +356,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     const name = prompt("Name this lesson board:", `Lesson ${new Date().toLocaleTimeString()}`);
     if (name === null) return false;
     
-    // Efficient capture for storage - Use PNG here too to avoid black bg in History
+    // Capture the entire state for persistence
     const drawing = canvasRef.current?.toDataURL('image/png');
     const newBoard: Whiteboard = {
       id: Math.random().toString(36).substr(2, 9),
@@ -373,6 +369,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       viewport: { ...viewport }
     };
     
+    // Persist globally and update history
     const currentConceptBoards = design.conceptBoards || {};
     const updatedDesign: ClassroomDesign = { 
       ...design, 
@@ -384,11 +381,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     };
     
     onSaveDesign(updatedDesign);
-    alert("Board saved successfully! Access it anytime from the History drawer. ✨");
+    alert("Board submitted! You can find it in the History sidebar (🕰️) anytime. ✨");
     return true;
   };
 
   const restoreBoardState = (board: Whiteboard) => {
+    // Restore visual local states
     setItems(board.items || []);
     setBoardBg(board.bg || 'plain');
     if (board.viewport) setViewport(board.viewport);
@@ -406,14 +404,26 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
         img.src = board.drawingData;
       }
     }
+
+    // Switch view to materials
     setActiveCategory(CATEGORIES.LETTERS);
     setDrawerOpen(false);
-    setHistory([]); 
+    setUndoStack([]); 
     setSelectedItemId(null);
+
+    // Persist this restoration as the "active session" so it lasts across refreshes
+    const updatedDesign: ClassroomDesign = { 
+      ...design, 
+      conceptBoards: {
+        ...(design.conceptBoards || {}),
+        [concept.id]: board
+      }
+    };
+    onSaveDesign(updatedDesign);
   };
 
   const deleteFromHistory = (boardId: string) => {
-    if (confirm("Permanently delete this board from your records?")) {
+    if (confirm("Permanently delete this board from your history?")) {
       onSaveDesign({
         ...design,
         whiteboards: (design.whiteboards || []).filter(b => b.id !== boardId)
@@ -422,22 +432,28 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   };
 
   const handleClearEverything = () => {
-    const choice = confirm("Do you want to clear your current progress? Click Cancel to save first!");
-    if (!choice) return;
+    const shouldSave = confirm("Do you want to save your current whiteboard before starting a new one?");
+    
+    if (shouldSave) {
+      const saved = handleSaveBoard();
+      if (!saved) return;
+    }
     
     setItems([]);
     if (contextRef.current) {
       contextRef.current.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
     }
     setViewport({ x: 0, y: 0, zoom: 1 });
-    setHistory([]);
+    setUndoStack([]);
     setSelectedItemId(null);
     
     const currentConceptBoards = design.conceptBoards || {};
-    const { [concept.id]: _, ...rest } = currentConceptBoards;
+    const updatedConceptBoards = { ...currentConceptBoards };
+    delete updatedConceptBoards[concept.id];
+    
     onSaveDesign({
       ...design,
-      conceptBoards: rest
+      conceptBoards: updatedConceptBoards
     });
   };
 
@@ -472,7 +488,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       const saved = (design.whiteboards || []).filter(b => b.conceptId === concept.id);
       if (saved.length === 0) return <div className="col-span-4 text-center py-10 text-slate-400 font-bold px-4">No history for this concept. 🕰️</div>;
       
-      return saved.map(board => (
+      return [...saved].reverse().map(board => (
         <div key={board.id} className="col-span-4 flex items-stretch gap-2 group/hist">
           <button onClick={() => restoreBoardState(board)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-400 shadow-sm transition-all overflow-hidden">
             <div className="font-black text-slate-900 truncate group-hover/hist:text-blue-600">{board.name}</div>
@@ -626,7 +642,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
                           key={c.value}
                           onClick={() => {
                             if (tool.id === 'marker') setMarkerColor(c.value);
-                            else setHighlighterColor(c.value);
+                            else setHighlightColor(c.value);
                             setShowColorPicker(null);
                           }}
                           className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${ (tool.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`}
@@ -648,7 +664,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
               <button onClick={handleHomeReset} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-100 active:translate-y-1 active:shadow-sm transition-all" title="Reset View">🏠</button>
             </div>
 
-            <button onClick={handleUndo} disabled={history.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${history.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 cursor-not-allowed border-slate-100'}`} title="Undo Last Action">↩️</button>
+            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 cursor-not-allowed border-slate-100'}`} title="Undo Last Action">↩️</button>
           </div>
         </main>
       </div>
