@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
@@ -104,15 +105,20 @@ const App: React.FC = () => {
   };
 
   const persistUser = (updatedUser: User) => {
-    setCurrentUser(updatedUser);
-    localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
-    const accountsData = localStorage.getItem('dreamclass_accounts');
-    if (accountsData) {
-      const accounts: User[] = JSON.parse(accountsData);
-      const updatedAccounts = accounts.map(acc => 
-        acc.id === updatedUser.id ? updatedUser : acc
-      );
-      localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+    try {
+      setCurrentUser(updatedUser);
+      localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
+      const accountsData = localStorage.getItem('dreamclass_accounts');
+      if (accountsData) {
+        const accounts: User[] = JSON.parse(accountsData);
+        const updatedAccounts = accounts.map(acc => 
+          acc.id === updatedUser.id ? updatedUser : acc
+        );
+        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+      }
+    } catch (e) {
+      console.error("Storage error:", e);
+      alert("Uh oh! Your magic storage is full. Try deleting some old whiteboards from History to make room for new ones! 📦✨");
     }
   };
 
@@ -122,7 +128,11 @@ const App: React.FC = () => {
       ...currentUser, 
       classroomDesigns: {
         ...currentUser.classroomDesigns,
-        [subjectId]: design
+        [subjectId]: {
+          ...design,
+          whiteboards: design.whiteboards || [],
+          conceptBoards: design.conceptBoards || {}
+        }
       } 
     };
     persistUser(updatedUser);
@@ -151,7 +161,8 @@ const App: React.FC = () => {
           floorColor: FLOOR_COLORS[0],
           posterUrls: [],
           ambientMusic: 'none',
-          whiteboards: []
+          whiteboards: [],
+          conceptBoards: {}
         }
       }
     };

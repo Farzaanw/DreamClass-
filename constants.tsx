@@ -1,3 +1,4 @@
+
 import { Subject } from './types';
 
 export const SUBJECTS: Subject[] = [
@@ -72,6 +73,12 @@ export const STICKERS = [
   { id: 'heart', emoji: '❤️', url: 'https://cdn-icons-png.flaticon.com/512/833/833472.png' },
   { id: 'music', emoji: '🎵', url: 'https://cdn-icons-png.flaticon.com/512/1897/1897459.png' },
   { id: 'cloud', emoji: '☁️', url: 'https://cdn-icons-png.flaticon.com/512/252/252035.png' },
+  { id: 'owl', emoji: '🦉', url: 'https://cdn-icons-png.flaticon.com/512/616/616450.png' },
+  { id: 'pencil', emoji: '✏️', url: 'https://cdn-icons-png.flaticon.com/512/588/588395.png' },
+  { id: 'book', emoji: '📖', url: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png' },
+  { id: 'apple', emoji: '🍎', url: 'https://cdn-icons-png.flaticon.com/512/415/415682.png' },
+  { id: 'bulb', emoji: '💡', url: 'https://cdn-icons-png.flaticon.com/512/595/595067.png' },
+  { id: 'trophy', emoji: '🏆', url: 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png' },
 ];
 
 export interface MusicOption {

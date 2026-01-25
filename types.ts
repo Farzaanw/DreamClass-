@@ -1,3 +1,4 @@
+
 export type SubjectId = string;
 export type AppMode = 'classroom' | 'teacher';
 
@@ -31,11 +32,17 @@ export interface BoardItem {
 
 export interface Whiteboard {
   id: string;
+  conceptId?: string; // Optional: to filter history by concept
   name: string;
   timestamp: number;
   items: BoardItem[];
   bg: 'plain' | 'lined' | 'grid';
   drawingData?: string; // DataURL of the canvas layer
+  viewport?: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
 }
 
 export interface ClassroomDesign {
@@ -47,7 +54,8 @@ export interface ClassroomDesign {
   ambientMusic: string;
   mascot?: string; // 'none', 'cat', 'dog', 'owl', 'robot'
   shelves?: string[]; // list of object emojis/ids
-  whiteboards?: Whiteboard[];
+  whiteboards?: Whiteboard[]; // General history
+  conceptBoards?: Record<string, Whiteboard>; // Mapping of conceptId -> current saved state
 }
 
 export interface User {
