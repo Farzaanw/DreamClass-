@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, SubjectId, AppMode, Subject, Concept, MaterialFile } from '../types';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
@@ -49,8 +49,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateMaterials
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [view, setView] = useState<'overview' | 'materials'>('overview');
+  const [toast, setToast] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeSubjectForUpload, setActiveSubjectForUpload] = useState<string | null>(null);
 
   // Subject Edit State
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -61,10 +63,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     { title: '', icon: '✨', description: '' }
   ]);
 
-  // Material Upload State
-  const [matName, setMatName] = useState('');
-  const [matType, setMatType] = useState<'pdf' | 'slides' | 'video'>('pdf');
-  const [matSubjectId, setMatSubjectId] = useState(allSubjects[0]?.id || '');
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleOpenEdit = (subject: Subject) => {
     setEditingSubjectId(subject.id);
@@ -121,28 +125,52 @@ const Dashboard: React.FC<DashboardProps> = ({
     setShowSubjectModal(false);
   };
 
-  const handleUploadMaterial = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!matName.trim()) return;
+  const triggerFileUpload = (subjectId: string) => {
+    setActiveSubjectForUpload(subjectId);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
-    const newMaterial: MaterialFile = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: matName,
-      type: matType,
-      subjectId: matSubjectId,
-      timestamp: Date.now()
-    };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !activeSubjectForUpload) return;
+
+    const newMaterials: MaterialFile[] = Array.from(files).map((file: File) => {
+      let type: 'pdf' | 'slides' | 'video' = 'pdf';
+      const name = file.name.toLowerCase();
+      
+      if (name.endsWith('.pdf')) {
+        type = 'pdf';
+      } else if (name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || file.type.startsWith('video/')) {
+        type = 'video';
+      } else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || file.type.includes('presentation')) {
+        type = 'slides';
+      }
+
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        type: type,
+        subjectId: activeSubjectForUpload!,
+        timestamp: Date.now()
+      };
+    });
 
     const currentMaterials = user.materials || [];
-    onUpdateMaterials([...currentMaterials, newMaterial]);
-    setShowMaterialModal(false);
-    setMatName('');
+    onUpdateMaterials([...currentMaterials, ...newMaterials]);
+    setToast(`Successfully added ${newMaterials.length} file(s)! 🎉`);
+    
+    // Cleanup
+    e.target.value = '';
+    setActiveSubjectForUpload(null);
   };
 
   const handleDeleteMaterial = (id: string) => {
     if (confirm("Delete this material?")) {
       const updated = (user.materials || []).filter(m => m.id !== id);
       onUpdateMaterials(updated);
+      setToast("Material deleted. 🗑️");
     }
   };
 
@@ -173,53 +201,84 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   if (view === 'materials') {
     return (
-      <div className="p-8 max-w-6xl mx-auto font-['Fredoka']">
+      <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
+        {/* Hidden File Input */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          multiple
+          accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*"
+          onChange={handleFileChange}
+        />
+
+        {/* Success Toast */}
+        {toast && (
+          <div className="fixed top-24 right-8 z-[200] bg-white border-4 border-blue-400 px-8 py-4 rounded-[2rem] shadow-2xl font-black text-blue-600 animate-bounce-gentle flex items-center gap-3">
+             <span className="text-2xl">✨</span>
+             {toast}
+          </div>
+        )}
+
         <header className="flex justify-between items-center mb-10">
           <div className="flex items-center gap-4">
-            <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50">⬅️</button>
-            <h1 className="text-3xl font-black text-slate-800">Classroom Material 📚</h1>
+            <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90">⬅️</button>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight">Classroom Material 📚</h1>
           </div>
-          <button 
-            onClick={() => setShowMaterialModal(true)}
-            className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-black border-b-4 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all"
-          >
-            ➕ Add Material
-          </button>
         </header>
 
-        <div className="mb-8 p-1 bg-slate-100 rounded-2xl inline-flex">
-          <button className="px-6 py-2 bg-white rounded-xl shadow-sm font-black text-blue-500">My Material</button>
-          <button className="px-6 py-2 rounded-xl font-black text-slate-400 cursor-not-allowed opacity-50" title="Coming Soon">Public Library</button>
+        <div className="mb-8 p-1.5 bg-slate-100 rounded-[1.5rem] inline-flex shadow-inner">
+          <button className="px-8 py-2.5 bg-white rounded-xl shadow-sm font-black text-blue-500 transition-all">My Material</button>
+          <button className="px-8 py-2.5 rounded-xl font-black text-slate-400 cursor-not-allowed opacity-50" title="Coming Soon">Public Library</button>
         </div>
 
         <div className="space-y-12">
           {allSubjects.map(subject => {
             const subjectMaterials = (user.materials || []).filter(m => m.subjectId === subject.id);
             return (
-              <div key={subject.id}>
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-3xl">{subject.icon || '⭐'}</span>
-                  <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
-                  <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-black uppercase">{subjectMaterials.length} Items</span>
+              <div key={subject.id} className="bg-white/50 p-8 rounded-[3rem] border-2 border-slate-100/50 hover:bg-white transition-colors duration-500">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">
+                      {subject.icon || '⭐'}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="bg-slate-200 text-slate-500 text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => triggerFileUpload(subject.id)}
+                    className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group"
+                  >
+                    <span className="text-xl group-hover:rotate-12 transition-transform">➕</span>
+                    <span>Add {subject.title} Files</span>
+                  </button>
                 </div>
                 
                 {subjectMaterials.length === 0 ? (
-                  <div className="bg-white border-2 border-dashed border-slate-200 p-8 rounded-[2rem] text-center text-slate-400 font-bold italic">
-                    No resources added for this subject yet.
+                  <div className="bg-white/40 border-4 border-dashed border-slate-100 p-16 rounded-[2.5rem] text-center text-slate-400 font-bold">
+                    <div className="text-6xl mb-6 opacity-20">📁</div>
+                    <p className="text-lg">No files here yet!</p>
+                    <p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {subjectMaterials.map(mat => (
-                      <div key={mat.id} className="bg-white p-6 rounded-[2rem] shadow-sm border-2 border-slate-50 relative group hover:shadow-xl transition-all">
+                      <div key={mat.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-2 border-slate-50 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-blue-400 opacity-20"></div>
                         <button 
                           onClick={() => handleDeleteMaterial(mat.id)}
-                          className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center"
+                          className="absolute -top-1 -right-1 w-9 h-9 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-10 border-4 border-white"
                         >
                           ✕
                         </button>
-                        <div className="text-5xl mb-4 text-center">{getFileIcon(mat.type)}</div>
-                        <h4 className="font-black text-slate-800 text-center truncate mb-1" title={mat.name}>{mat.name}</h4>
-                        <div className="text-[10px] text-slate-400 font-black uppercase text-center tracking-widest">{mat.type}</div>
+                        <div className="text-6xl mb-6 text-center group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
+                        <h4 className="font-black text-slate-800 text-center truncate mb-1 px-2 text-sm" title={mat.name}>{mat.name}</h4>
+                        <div className="text-[10px] text-slate-400 font-black uppercase text-center tracking-widest bg-slate-50 py-1 rounded-full">{mat.type}</div>
                       </div>
                     ))}
                   </div>
@@ -228,51 +287,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             );
           })}
         </div>
-
-        {showMaterialModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={() => setShowMaterialModal(false)}>
-            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl p-10 relative animate-zoom-in" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowMaterialModal(false)} className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500">✕</button>
-              <h3 className="text-3xl font-black text-slate-800 text-center mb-8">Add Resource</h3>
-              <form onSubmit={handleUploadMaterial} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase ml-4">File Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="E.g. Animal Cells PDF" 
-                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800" 
-                    value={matName} 
-                    onChange={e => setMatName(e.target.value)} 
-                    required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase ml-4">Resource Type</label>
-                  <select 
-                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800 appearance-none"
-                    value={matType}
-                    onChange={e => setMatType(e.target.value as any)}
-                  >
-                    <option value="pdf">📄 PDF Document</option>
-                    <option value="slides">📊 Presentation Slides</option>
-                    <option value="video">🎬 Educational Video</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase ml-4">Assign Subject</label>
-                  <select 
-                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800 appearance-none"
-                    value={matSubjectId}
-                    onChange={e => setMatSubjectId(e.target.value)}
-                  >
-                    {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.title}</option>)}
-                  </select>
-                </div>
-                <button type="submit" className="w-full bg-blue-500 text-white font-black py-5 rounded-[2.5rem] text-2xl shadow-xl border-b-8 border-blue-700 active:translate-y-1 active:border-b-0 transition-all mt-4">Upload Resource</button>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -475,8 +489,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
         .animate-zoom-in { animation: zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-bounce-gentle { animation: bounce-gentle 1s ease-in-out infinite; }
       `}</style>
     </div>
   );
