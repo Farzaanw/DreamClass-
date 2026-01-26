@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, SubjectId, AppMode, Subject, Concept } from '../types';
+import { User, SubjectId, AppMode, Subject, Concept, MaterialFile } from '../types';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "Teachly".split("");
@@ -29,6 +29,7 @@ interface DashboardProps {
   onAddSubject: (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
   onEditSubject: (id: string, subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
   onDeleteSubject: (id: SubjectId) => void;
+  onUpdateMaterials: (materials: MaterialFile[]) => void;
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -44,9 +45,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   onNavigateSubject,
   onAddSubject,
   onEditSubject,
-  onDeleteSubject
+  onDeleteSubject,
+  onUpdateMaterials
 }) => {
-  const [showModal, setShowModal] = useState(false);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [view, setView] = useState<'overview' | 'materials'>('overview');
+
+  // Subject Edit State
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -54,6 +60,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [concepts, setConcepts] = useState<{ title: string; icon: string; description: string }[]>([
     { title: '', icon: '✨', description: '' }
   ]);
+
+  // Material Upload State
+  const [matName, setMatName] = useState('');
+  const [matType, setMatType] = useState<'pdf' | 'slides' | 'video'>('pdf');
+  const [matSubjectId, setMatSubjectId] = useState(allSubjects[0]?.id || '');
 
   const handleOpenEdit = (subject: Subject) => {
     setEditingSubjectId(subject.id);
@@ -65,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       icon: c.icon,
       description: c.description
     })));
-    setShowModal(true);
+    setShowSubjectModal(true);
   };
 
   const handleCreateOrUpdateSubject = (e: React.FormEvent) => {
@@ -98,16 +109,41 @@ const Dashboard: React.FC<DashboardProps> = ({
       });
     }
 
-    handleCloseModal();
+    handleCloseSubjectModal();
   };
 
-  const handleCloseModal = () => {
+  const handleCloseSubjectModal = () => {
     setNewName('');
     setNewDesc('');
     setNewIcon('⭐');
     setConcepts([{ title: '', icon: '✨', description: '' }]);
     setEditingSubjectId(null);
-    setShowModal(false);
+    setShowSubjectModal(false);
+  };
+
+  const handleUploadMaterial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!matName.trim()) return;
+
+    const newMaterial: MaterialFile = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: matName,
+      type: matType,
+      subjectId: matSubjectId,
+      timestamp: Date.now()
+    };
+
+    const currentMaterials = user.materials || [];
+    onUpdateMaterials([...currentMaterials, newMaterial]);
+    setShowMaterialModal(false);
+    setMatName('');
+  };
+
+  const handleDeleteMaterial = (id: string) => {
+    if (confirm("Delete this material?")) {
+      const updated = (user.materials || []).filter(m => m.id !== id);
+      onUpdateMaterials(updated);
+    }
   };
 
   const addConceptField = () => {
@@ -125,6 +161,121 @@ const Dashboard: React.FC<DashboardProps> = ({
       setConcepts(concepts.filter((_, i) => i !== index));
     }
   };
+
+  const getFileIcon = (type: string) => {
+    switch(type) {
+      case 'pdf': return '📄';
+      case 'slides': return '📊';
+      case 'video': return '🎬';
+      default: return '📁';
+    }
+  };
+
+  if (view === 'materials') {
+    return (
+      <div className="p-8 max-w-6xl mx-auto font-['Fredoka']">
+        <header className="flex justify-between items-center mb-10">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50">⬅️</button>
+            <h1 className="text-3xl font-black text-slate-800">Classroom Material 📚</h1>
+          </div>
+          <button 
+            onClick={() => setShowMaterialModal(true)}
+            className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-black border-b-4 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all"
+          >
+            ➕ Add Material
+          </button>
+        </header>
+
+        <div className="mb-8 p-1 bg-slate-100 rounded-2xl inline-flex">
+          <button className="px-6 py-2 bg-white rounded-xl shadow-sm font-black text-blue-500">My Material</button>
+          <button className="px-6 py-2 rounded-xl font-black text-slate-400 cursor-not-allowed opacity-50" title="Coming Soon">Public Library</button>
+        </div>
+
+        <div className="space-y-12">
+          {allSubjects.map(subject => {
+            const subjectMaterials = (user.materials || []).filter(m => m.subjectId === subject.id);
+            return (
+              <div key={subject.id}>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-3xl">{subject.icon || '⭐'}</span>
+                  <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
+                  <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-black uppercase">{subjectMaterials.length} Items</span>
+                </div>
+                
+                {subjectMaterials.length === 0 ? (
+                  <div className="bg-white border-2 border-dashed border-slate-200 p-8 rounded-[2rem] text-center text-slate-400 font-bold italic">
+                    No resources added for this subject yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {subjectMaterials.map(mat => (
+                      <div key={mat.id} className="bg-white p-6 rounded-[2rem] shadow-sm border-2 border-slate-50 relative group hover:shadow-xl transition-all">
+                        <button 
+                          onClick={() => handleDeleteMaterial(mat.id)}
+                          className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center"
+                        >
+                          ✕
+                        </button>
+                        <div className="text-5xl mb-4 text-center">{getFileIcon(mat.type)}</div>
+                        <h4 className="font-black text-slate-800 text-center truncate mb-1" title={mat.name}>{mat.name}</h4>
+                        <div className="text-[10px] text-slate-400 font-black uppercase text-center tracking-widest">{mat.type}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {showMaterialModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={() => setShowMaterialModal(false)}>
+            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl p-10 relative animate-zoom-in" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowMaterialModal(false)} className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500">✕</button>
+              <h3 className="text-3xl font-black text-slate-800 text-center mb-8">Add Resource</h3>
+              <form onSubmit={handleUploadMaterial} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase ml-4">File Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="E.g. Animal Cells PDF" 
+                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800" 
+                    value={matName} 
+                    onChange={e => setMatName(e.target.value)} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase ml-4">Resource Type</label>
+                  <select 
+                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800 appearance-none"
+                    value={matType}
+                    onChange={e => setMatType(e.target.value as any)}
+                  >
+                    <option value="pdf">📄 PDF Document</option>
+                    <option value="slides">📊 Presentation Slides</option>
+                    <option value="video">🎬 Educational Video</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase ml-4">Assign Subject</label>
+                  <select 
+                    className="w-full px-8 py-4 rounded-3xl border-4 border-slate-100 bg-slate-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-lg font-bold text-slate-800 appearance-none"
+                    value={matSubjectId}
+                    onChange={e => setMatSubjectId(e.target.value)}
+                  >
+                    {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.title}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="w-full bg-blue-500 text-white font-black py-5 rounded-[2.5rem] text-2xl shadow-xl border-b-8 border-blue-700 active:translate-y-1 active:border-b-0 transition-all mt-4">Upload Resource</button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto font-['Fredoka']">
@@ -190,7 +341,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid md:grid-cols-3 gap-8">
         <div 
           onClick={appMode === 'teacher' ? onNavigateDesigner : undefined}
-          className={`col-span-full p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${
+          className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${
             appMode === 'classroom' 
               ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' 
               : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'
@@ -210,6 +361,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             {appMode === 'classroom' ? '🎓' : '🏫'}
           </div>
         </div>
+
+        {appMode === 'teacher' && (
+          <div 
+            onClick={() => setView('materials')}
+            className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center group cursor-pointer"
+          >
+            <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">📚</div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">Classroom Material</h3>
+            <p className="text-slate-400 text-sm font-bold">Manage your slides, PDFs, and videos.</p>
+          </div>
+        )}
 
         <h3 className="col-span-full text-2xl font-bold text-gray-700 mt-6 mb-2 ml-2 tracking-tight">
           {appMode === 'classroom' ? 'Select a Subject' : 'Manage Subject Material'}
@@ -260,8 +422,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         {appMode === 'teacher' && (
           <div 
             onClick={() => {
-              handleCloseModal();
-              setShowModal(true);
+              handleCloseSubjectModal();
+              setShowSubjectModal(true);
             }}
             className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]"
           >
@@ -273,10 +435,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={handleCloseModal}>
+      {showSubjectModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={handleCloseSubjectModal}>
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto relative animate-zoom-in" onClick={e => e.stopPropagation()}>
-            <button onClick={handleCloseModal} className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500">✕</button>
+            <button onClick={handleCloseSubjectModal} className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500">✕</button>
             <div className="text-center mb-8">
               <h3 className="text-3xl font-bold text-gray-800">{editingSubjectId ? 'Edit Subject' : 'New Subject'}</h3>
             </div>

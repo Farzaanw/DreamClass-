@@ -45,6 +45,14 @@ export interface Whiteboard {
   };
 }
 
+export interface MaterialFile {
+  id: string;
+  name: string;
+  type: 'pdf' | 'slides' | 'video';
+  subjectId: string;
+  timestamp: number;
+}
+
 export interface ClassroomDesign {
   wallColor: string;
   wallTheme?: 'plain' | 'stripes' | 'dots';
@@ -67,6 +75,7 @@ export interface User {
   hiddenSubjectIds: string[];
   classroomDesigns: Record<SubjectId, ClassroomDesign>;
   progress: Record<string, number>;
+  materials?: MaterialFile[];
 }
 
 export interface Message {

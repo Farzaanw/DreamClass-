@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode } from './types';
+import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -208,6 +208,14 @@ const App: React.FC = () => {
         localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
       }
       return newUser;
+    });
+  };
+
+  const handleUpdateMaterials = (materials: MaterialFile[]) => {
+    if (!currentUser) return;
+    persistUser({
+      ...currentUser,
+      materials
     });
   };
 
@@ -482,34 +490,15 @@ const App: React.FC = () => {
 
           {/* Footer */}
           <footer className="bg-slate-900 text-slate-300 py-20 px-6 sm:px-12 border-t border-slate-800">
-            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-              <div className="col-span-1 md:col-span-2">
-                <RainbowLogo size="text-3xl" />
-                <p className="mt-6 text-slate-500 max-w-sm">
-                  Empowering the next generation of learners through high-fidelity, interactive digital teaching environments. Built with ❤️ for educators.
-                </p>
-                <div className="mt-8 flex gap-4">
-                  {['🐦', '📸', '👤'].map((icon, i) => (
-                    <button key={i} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-lg">{icon}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Resources</h4>
-                <ul className="space-y-4 text-sm font-medium">
-                  <li><button className="hover:text-blue-400">Teacher Guide</button></li>
-                  <li><button className="hover:text-blue-400">Lesson Library</button></li>
-                  <li><button className="hover:text-blue-400">Help Center</button></li>
-                  <li><button className="hover:text-blue-400">Community Forum</button></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Legal</h4>
-                <ul className="space-y-4 text-sm font-medium">
-                  <li><button className="hover:text-blue-400">Privacy Policy</button></li>
-                  <li><button className="hover:text-blue-400">Terms of Service</button></li>
-                  <li><button className="hover:text-blue-400">Cookie Settings</button></li>
-                </ul>
+            <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
+              <RainbowLogo size="text-3xl" />
+              <p className="mt-6 text-slate-500 max-w-xl">
+                Empowering the next generation of learners through high-fidelity, interactive digital teaching environments. Built with ❤️ for educators.
+              </p>
+              <div className="mt-8 flex gap-6">
+                {['🐦', '📸', '👤'].map((icon, i) => (
+                  <button key={i} className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 transition-all flex items-center justify-center text-2xl hover:scale-110 active:scale-95">{icon}</button>
+                ))}
               </div>
             </div>
             <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-slate-800 text-center text-xs text-slate-600 font-bold uppercase tracking-widest">
@@ -549,7 +538,7 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'dashboard' && appMode && (
-            <Dashboard user={currentUser} appMode={appMode} allSubjects={allSubjects} onModeChange={setAppMode} onLogout={handleLogout} onBackToMode={handleBackToModeSelect} onNavigateDesigner={() => setCurrentView('designer-select')} onNavigateSubject={navigateToSubject} onAddSubject={handleAddSubject} onEditSubject={handleEditSubject} onDeleteSubject={handleDeleteSubject} />
+            <Dashboard user={currentUser} appMode={appMode} allSubjects={allSubjects} onModeChange={setAppMode} onLogout={handleLogout} onBackToMode={handleBackToModeSelect} onNavigateDesigner={() => setCurrentView('designer-select')} onNavigateSubject={navigateToSubject} onAddSubject={handleAddSubject} onEditSubject={handleEditSubject} onDeleteSubject={handleDeleteSubject} onUpdateMaterials={handleUpdateMaterials} />
           )}
           
           {currentView === 'designer-select' && (
