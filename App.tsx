@@ -112,7 +112,7 @@ const App: React.FC = () => {
       if (accountsData) {
         const accounts: User[] = JSON.parse(accountsData);
         const updatedAccounts = accounts.map(acc => 
-          acc.id === updatedUser.id ? updatedUser : acc
+          acc.id === updatedUser.id ? { ...acc, ...updatedUser, password: acc.password } : acc
         );
         localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
       }
@@ -204,7 +204,7 @@ const App: React.FC = () => {
       const accountsData = localStorage.getItem('dreamclass_accounts');
       if (accountsData) {
         const accounts: User[] = JSON.parse(accountsData);
-        const updatedAccounts = accounts.map(acc => acc.id === newUser.id ? newUser : acc);
+        const updatedAccounts = accounts.map(acc => acc.id === newUser.id ? { ...acc, ...newUser, password: acc.password } : acc);
         localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
       }
       return newUser;
@@ -452,7 +452,7 @@ const App: React.FC = () => {
                   <ExampleCard emoji="🍪" title="Counting Cookies" color="bg-orange-100" />
                   <ExampleCard emoji="🦁" title="Phonics Jungle" color="bg-green-100" />
                   <ExampleCard emoji="🚀" title="Space Math Hub" color="bg-blue-100" />
-                  <ExampleCard emoji="🌋" title="Lava Science" color="bg-red-100" />
+                  <ExampleCard emoji="🏠" title="Lava Science" color="bg-red-100" />
                   <ExampleCard emoji="🏰" title="Medieval Phonics" color="bg-indigo-100" />
                   <ExampleCard emoji="🐳" title="Ocean Explorers" color="bg-cyan-100" />
                   <ExampleCard emoji="🧪" title="Chemistry Kids" color="bg-purple-100" />
@@ -562,7 +562,7 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'concept' && selectedConcept && selectedSubject && (
-            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
+            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} materials={currentUser.materials || []} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
           )}
         </div>
       )}

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Concept, ClassroomDesign, BoardItem, Whiteboard } from '../types';
+import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile } from '../types';
 import { STICKERS } from '../constants';
 
 interface ConceptDashboardProps {
   concept: Concept;
   design: ClassroomDesign;
   subjectId: string;
+  materials: MaterialFile[];
   onBack: () => void;
   onSaveDesign: (design: ClassroomDesign) => void;
 }
@@ -16,6 +17,7 @@ const CATEGORIES = {
   NUMBERS: '123',
   STICKERS: '✨',
   SHAPES: '📐',
+  MATERIALS: '📚',
   HISTORY: '🕰️'
 };
 
@@ -35,9 +37,8 @@ const HIGHLIGHTER_COLORS = [
   { name: 'Blue', value: 'rgba(59, 130, 246, 0.4)' }
 ];
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, onBack, onSaveDesign }) => {
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, onBack, onSaveDesign }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
-  // Local undo stack for the current editing session
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
   const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser'>('select');
@@ -49,6 +50,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES.LETTERS);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [activeMaterial, setActiveMaterial] = useState<MaterialFile | null>(null);
 
   // Pan and Zoom State
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
@@ -72,7 +74,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
         ctx.lineJoin = 'round';
         contextRef.current = ctx;
 
-        // Restore current session state for this concept if it exists
         const savedState = design.conceptBoards?.[concept.id];
         if (savedState) {
           setItems(savedState.items || []);
@@ -179,7 +180,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
 
   const performInteraction = (e: any) => {
     const nativeEvent = e.nativeEvent || e;
-
     if (nativeEvent.type === 'mousemove' && !(nativeEvent.buttons & 1)) {
         if (isDrawingRef.current) stopInteraction();
         return;
@@ -190,7 +190,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
         nativeEvent.touches[0].clientX - nativeEvent.touches[1].clientX,
         nativeEvent.touches[0].clientY - nativeEvent.touches[1].clientY
       );
-      
       if (lastTouchDistance.current !== null) {
         const factor = dist / lastTouchDistance.current;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -356,7 +355,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     const name = prompt("Name this lesson board:", `Lesson ${new Date().toLocaleTimeString()}`);
     if (name === null) return false;
     
-    // Capture the entire state for persistence
     const drawing = canvasRef.current?.toDataURL('image/png');
     const newBoard: Whiteboard = {
       id: Math.random().toString(36).substr(2, 9),
@@ -369,7 +367,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       viewport: { ...viewport }
     };
     
-    // Persist globally and update history
     const currentConceptBoards = design.conceptBoards || {};
     const updatedDesign: ClassroomDesign = { 
       ...design, 
@@ -386,7 +383,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
   };
 
   const restoreBoardState = (board: Whiteboard) => {
-    // Restore visual local states
     setItems(board.items || []);
     setBoardBg(board.bg || 'plain');
     if (board.viewport) setViewport(board.viewport);
@@ -405,13 +401,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
       }
     }
 
-    // Switch view to materials
     setActiveCategory(CATEGORIES.LETTERS);
     setDrawerOpen(false);
     setUndoStack([]); 
     setSelectedItemId(null);
 
-    // Persist this restoration as the "active session" so it lasts across refreshes
     const updatedDesign: ClassroomDesign = { 
       ...design, 
       conceptBoards: {
@@ -461,6 +455,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     setViewport({ x: 0, y: 0, zoom: 1 });
   };
 
+  const getFileIcon = (type: string) => {
+    switch(type) {
+      case 'pdf': return '📄';
+      case 'slides': return '📊';
+      case 'video': return '🎬';
+      default: return '📁';
+    }
+  };
+
   const renderCategoryContent = () => {
     const iconBaseClass = "w-12 h-12 bg-white rounded-xl shadow border-2 border-slate-200 font-black text-slate-900 text-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform cursor-pointer";
     
@@ -482,6 +485,20 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
     if (activeCategory === CATEGORIES.SHAPES) {
       return ['⭕', '⬜', '🔺', '⭐', '❤️', '🟦', '🔶', '🔷', '🛑', '💠', '🪁', '🌙', '☁️', '⚡'].map(s => (
         <button key={s} draggable onDragStart={(e) => handleDragStartAsset(e, s, 'shape')} onClick={() => addItem(s, 'shape')} className={iconBaseClass.replace('text-2xl', 'text-3xl')}>{s}</button>
+      ));
+    }
+    if (activeCategory === CATEGORIES.MATERIALS) {
+      const subjectMaterials = materials.filter(m => m.subjectId === subjectId);
+      if (subjectMaterials.length === 0) return <div className="col-span-4 text-center py-10 text-slate-400 font-bold px-4">No materials for this subject. Go to Teacher Mode to upload! 📚</div>;
+      
+      return subjectMaterials.map(mat => (
+        <button key={mat.id} onClick={() => setActiveMaterial(mat)} className="col-span-4 flex items-center gap-3 p-3 bg-white border-2 rounded-2xl hover:border-blue-400 shadow-sm transition-all group/mat">
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl group-hover/mat:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
+          <div className="flex-1 text-left min-w-0">
+            <div className="font-black text-slate-900 truncate text-xs">{mat.name}</div>
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{mat.type}</div>
+          </div>
+        </button>
       ));
     }
     if (activeCategory === CATEGORIES.HISTORY) {
@@ -541,6 +558,53 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
           onDragOver={handleDragOverBoard}
           onWheel={handleWheel}
         >
+          {activeMaterial && (
+            <div className="absolute inset-0 z-[90] flex items-center justify-center pointer-events-none p-12">
+              <div className="bg-white w-full max-w-4xl h-full rounded-[3rem] shadow-2xl pointer-events-auto border-8 border-white flex flex-col animate-material-enter">
+                <div className="flex items-center justify-between p-6 bg-slate-50 rounded-t-[2.5rem] border-b-2">
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl">{getFileIcon(activeMaterial.type)}</div>
+                    <div>
+                      <h4 className="font-black text-slate-900 tracking-tight">{activeMaterial.name}</h4>
+                      <div className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Viewing Material</div>
+                    </div>
+                  </div>
+                  <button onClick={() => setActiveMaterial(null)} className="w-12 h-12 bg-white rounded-2xl shadow border-2 flex items-center justify-center text-2xl hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+                </div>
+                <div className="flex-1 bg-slate-200/50 flex items-center justify-center overflow-hidden">
+                  {activeMaterial.type === 'video' ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-black rounded-b-[2rem]">
+                      <div className="text-6xl mb-6">🎬</div>
+                      <p className="text-white font-bold">Video Player Placeholder</p>
+                      <p className="text-white/40 text-sm mt-2 italic">(In a real app, the video file would play here)</p>
+                    </div>
+                  ) : activeMaterial.type === 'pdf' ? (
+                    <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center p-12 text-center rounded-b-[2rem]">
+                      <div className="text-7xl mb-6">📄</div>
+                      <h5 className="text-2xl font-black text-slate-800 mb-2">{activeMaterial.name}</h5>
+                      <p className="text-slate-500 font-medium max-w-md">PDF Document Viewer. Scroll to read your classroom material while you use the board below!</p>
+                      <div className="mt-8 flex gap-2">
+                        {[1,2,3,4].map(p => <div key={p} className="w-16 h-20 bg-white rounded-lg shadow-sm border" />)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center rounded-b-[2rem]">
+                      <div className="text-7xl mb-6">📊</div>
+                      <p className="text-slate-700 font-black text-xl">Interactive Slideshow Viewer</p>
+                      <div className="flex gap-4 mt-8">
+                        <button className="px-6 py-2 bg-white border-2 rounded-xl font-bold">Previous</button>
+                        <button className="px-6 py-2 bg-blue-500 text-white rounded-xl font-bold">Next Slide</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white rounded-b-[2.5rem]">
+                   Teaching Tip: You can leave this window open while you demonstrate on the whiteboard edges!
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">
             {Math.round(viewport.zoom * 100)}%
           </div>
@@ -677,7 +741,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, on
         canvas { image-rendering: auto; }
         .cursor-nwse-resize { cursor: nwse-resize; }
         @keyframes fade-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes material-enter { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+        .animate-material-enter { animation: material-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
     </div>
   );
