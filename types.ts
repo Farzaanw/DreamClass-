@@ -51,6 +51,8 @@ export interface MaterialFile {
   type: 'pdf' | 'slides' | 'video';
   subjectId: string;
   timestamp: number;
+  thumbnailUrl?: string;
+  content?: string; // Persistent file data (DataURL)
 }
 
 export interface ClassroomDesign {

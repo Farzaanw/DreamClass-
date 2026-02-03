@@ -6,6 +6,7 @@ export const SUBJECTS: Subject[] = [
     id: 'phonics',
     title: 'Phonics Fun',
     color: 'bg-yellow-400',
+    icon: '🔤',
     concepts: [
       { id: 'abc-lower', title: 'ABC Lowercase', icon: '🔤', description: 'Mastering small letters.', suggestedItems: ['a', 'b', 'c', 'apple', 'ball'] },
       { id: 'abc-upper', title: 'ABC Uppercase', icon: '🅰️', description: 'Mastering BIG letters.', suggestedItems: ['A', 'B', 'C', 'APPLE', 'BALL'] },
@@ -16,6 +17,7 @@ export const SUBJECTS: Subject[] = [
     id: 'math',
     title: 'Magic Math',
     color: 'bg-blue-400',
+    icon: '🔢',
     concepts: [
       { id: 'addition', title: 'Add It Up!', icon: '➕', description: 'Combining things together.', suggestedItems: ['1', '2', '3', '+', '='] },
       { id: 'subtraction', title: 'Take Away', icon: '➖', description: 'Removing things from a group.', suggestedItems: ['5', '2', '3', '-', '='] },
@@ -26,6 +28,7 @@ export const SUBJECTS: Subject[] = [
     id: 'science',
     title: 'Super Science',
     color: 'bg-green-400',
+    icon: '🔬',
     concepts: [
       { id: 'life-science', title: 'Life Sciences', icon: '🌿', description: 'Plants, animals, and us!', suggestedItems: ['Seed', 'Water', 'Sun', 'Flower'] },
       { id: 'physical-science', title: 'Forces & Motion', icon: '🧲', description: 'How things move and work.', suggestedItems: ['Push', 'Pull', 'Magnet', 'Spring'] },
@@ -33,6 +36,14 @@ export const SUBJECTS: Subject[] = [
     ]
   }
 ];
+
+// Phonics Content
+export const VC_WORDS = ['at', 'am', 'an', 'as', 'it', 'in', 'is', 'up', 'us', 'on', 'ox', 'if'];
+export const CV_WORDS = ['ba', 'be', 'bi', 'bo', 'bu', 'ca', 'co', 'cu', 'da', 'de', 'di', 'do', 'du', 'fa', 'fe', 'fi', 'fo', 'fu', 'ga', 'ge', 'gi', 'go', 'gu', 'ha', 'he', 'hi', 'ho', 'hu'];
+export const REGULAR_SIGHT_WORDS = ['cat', 'dog', 'run', 'play', 'big', 'and', 'can', 'see', 'look', 'jump', 'red', 'one', 'two', 'three', 'away', 'come', 'find', 'for', 'help', 'here', 'make', 'me', 'my', 'not', 'said'];
+export const IRREGULAR_SIGHT_WORDS = ['the', 'was', 'were', 'to', 'do', 'you', 'your', 'said', 'where', 'what', 'who', 'some', 'come', 'one', 'once', 'eye', 'son', 'love', 'door', 'floor', 'poor'];
+export const CONSONANT_DIGRAPHS = ['ch', 'sh', 'th', 'wh', 'ph', 'ck', 'ng', 'qu', 'kn', 'wr'];
+export const VOWEL_DIGRAPHS = ['ee', 'ea', 'ai', 'ay', 'oa', 'ow', 'oo', 'ou', 'oi', 'oy', 'au', 'aw', 'ie', 'ei'];
 
 export const WALL_COLORS = ['#FEF3C7', '#DBEAFE', '#D1FAE5', '#F3E8FF', '#FFEDD5', '#FFFFFF', '#FFD1DC', '#E0FFFE', '#F1F5F9', '#ECFDF5'];
 export const FLOOR_COLORS = ['#D97706', '#2563EB', '#059669', '#7C3AED', '#EA580C', '#4B5563', '#92400E', '#1E293B'];

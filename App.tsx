@@ -562,7 +562,7 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'concept' && selectedConcept && selectedSubject && (
-            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} materials={currentUser.materials || []} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
+            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} materials={currentUser.materials || []} allSubjects={allSubjects} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
           )}
         </div>
       )}

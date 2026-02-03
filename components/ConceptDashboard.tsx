@@ -1,25 +1,17 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile } from '../types';
-import { STICKERS } from '../constants';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile, Subject } from '../types';
+import { STICKERS, VC_WORDS, CV_WORDS, REGULAR_SIGHT_WORDS, IRREGULAR_SIGHT_WORDS, CONSONANT_DIGRAPHS, VOWEL_DIGRAPHS } from '../constants';
 
 interface ConceptDashboardProps {
   concept: Concept;
   design: ClassroomDesign;
   subjectId: string;
   materials: MaterialFile[];
+  allSubjects: Subject[];
   onBack: () => void;
   onSaveDesign: (design: ClassroomDesign) => void;
 }
-
-const CATEGORIES = {
-  LETTERS: 'ABC',
-  NUMBERS: '123',
-  STICKERS: '✨',
-  SHAPES: '📐',
-  MATERIALS: '📚',
-  HISTORY: '🕰️'
-};
 
 const MARKER_COLORS = [
   { name: 'Blue', value: '#2563eb' },
@@ -37,7 +29,7 @@ const HIGHLIGHTER_COLORS = [
   { name: 'Blue', value: 'rgba(59, 130, 246, 0.4)' }
 ];
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, onBack, onSaveDesign }) => {
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
@@ -47,10 +39,55 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
   
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
-  const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES.LETTERS);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<MaterialFile | null>(null);
+  const [materialUrl, setMaterialUrl] = useState<string | null>(null);
+  const [materialPos, setMaterialPos] = useState({ x: 50, y: 50 });
+  const isDraggingMaterial = useRef(false);
+
+  // Determine Sidebar Categories based on Subject
+  const categories = useMemo(() => {
+    const commonTail = [
+      { id: 'STICKERS', label: 'Stickers', icon: '✨' },
+      { id: 'HISTORY', label: 'History', icon: '🕰️' }
+    ];
+
+    if (subjectId === 'phonics') {
+      return [
+        { id: 'UPPER', label: 'ABC', icon: '🅰️' },
+        { id: 'LOWER', label: 'abc', icon: '🔡' },
+        { id: 'BLENDS', label: 'Blends', icon: '🔗' },
+        { id: 'SIGHT', label: 'Sight', icon: '👁️' },
+        { id: 'DIGRAPHS', label: 'Digraph', icon: '🔈' },
+        ...commonTail
+      ];
+    }
+    if (subjectId === 'math') {
+      return [
+        { id: 'NUMBERS', label: '123', icon: '🔢' },
+        { id: 'SHAPES', label: 'Shapes', icon: '📐' },
+        ...commonTail
+      ];
+    }
+    if (subjectId === 'science') {
+      return [
+        { id: 'LETTERS', label: 'ABC', icon: '🅰️' },
+        { id: 'SHAPES', label: 'Shapes', icon: '📐' },
+        ...commonTail
+      ];
+    }
+    // Default categories for custom subjects
+    return [
+      { id: 'LETTERS', label: 'ABC', icon: '🅰️' },
+      { id: 'NUMBERS', label: '123', icon: '🔢' },
+      { id: 'SHAPES', label: 'Shapes', icon: '📐' },
+      ...commonTail
+    ];
+  }, [subjectId]);
+
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0].id);
 
   // Pan and Zoom State
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
@@ -93,6 +130,30 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     }
   }, [concept.id]);
 
+  // Use fetch-to-blob for more reliable rendering in iframes
+  useEffect(() => {
+    let url: string | null = null;
+    
+    if (activeMaterial && activeMaterial.content) {
+      fetch(activeMaterial.content)
+        .then(res => res.blob())
+        .then(blob => {
+          url = URL.createObjectURL(blob);
+          setMaterialUrl(url);
+        })
+        .catch(err => {
+          console.error("Failed to generate blob for material:", err);
+          setMaterialUrl(activeMaterial.content || null);
+        });
+    } else {
+      setMaterialUrl(null);
+    }
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [activeMaterial]);
+
   const saveToUndoStack = () => {
     const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : null;
     setUndoStack(prev => [...prev, { items: [...items], drawing: drawingSnapshot }].slice(-30));
@@ -129,8 +190,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     };
   };
 
-  const startInteraction = (e: any) => {
-    const nativeEvent = e.nativeEvent || e;
+  const startInteraction = (getEvent: any) => {
+    if (isDraggingMaterial.current) return;
+    const nativeEvent = getEvent.nativeEvent || getEvent;
     const isTouch = nativeEvent.touches && nativeEvent.touches.length > 0;
     
     if (isTouch && nativeEvent.touches.length === 2) {
@@ -149,7 +211,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     if (activeTool === 'select') {
       isPanningRef.current = true;
       lastPanPos.current = { x: coords.sx, y: coords.sy };
-      if (e.target === e.currentTarget) {
+      if (getEvent.target === getEvent.currentTarget) {
         setSelectedItemId(null);
       }
     } else {
@@ -178,8 +240,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     }
   };
 
-  const performInteraction = (e: any) => {
-    const nativeEvent = e.nativeEvent || e;
+  const performInteraction = (getEvent: any) => {
+    const nativeEvent = getEvent.nativeEvent || getEvent;
     if (nativeEvent.type === 'mousemove' && !(nativeEvent.buttons & 1)) {
         if (isDrawingRef.current) stopInteraction();
         return;
@@ -192,7 +254,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       );
       if (lastTouchDistance.current !== null) {
         const factor = dist / lastTouchDistance.current;
-        const rect = e.currentTarget.getBoundingClientRect();
+        const rect = getEvent.currentTarget.getBoundingClientRect();
         const midX = ((nativeEvent.touches[0].clientX + nativeEvent.touches[1].clientX) / 2) - rect.left;
         const midY = ((nativeEvent.touches[0].clientY + nativeEvent.touches[1].clientY) / 2) - rect.top;
         handleZoomAt({ sx: midX, sy: midY }, factor);
@@ -311,25 +373,26 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   };
 
   const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
-    if (activeTool !== 'select' || isPanningRef.current) return;
-    e.stopPropagation();
-    setSelectedItemId(item.id);
-    saveToUndoStack();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const initialX = item.x;
-    const initialY = item.y;
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dx = (moveEvent.clientX - startX) / viewport.zoom;
-      const dy = (moveEvent.clientY - startY) / viewport.zoom;
-      setItems(prev => prev.map(it => it.id === item.id ? { ...it, x: initialX + dx, y: initialY + dy } : it));
-    };
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    if (activeTool === 'select' && !isPanningRef.current) {
+        e.stopPropagation();
+        setSelectedItemId(item.id);
+        saveToUndoStack();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const initialX = item.x;
+        const initialY = item.y;
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+          const dx = (moveEvent.clientX - startX) / viewport.zoom;
+          const dy = (moveEvent.clientY - startY) / viewport.zoom;
+          setItems(prev => prev.map(it => it.id === item.id ? { ...it, x: initialX + dx, y: initialY + dy } : it));
+        };
+        const handleMouseUp = () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    }
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, item: BoardItem) => {
@@ -401,7 +464,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       }
     }
 
-    setActiveCategory(CATEGORIES.LETTERS);
+    setActiveCategoryId(categories[0].id);
     setDrawerOpen(false);
     setUndoStack([]); 
     setSelectedItemId(null);
@@ -464,65 +527,135 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     }
   };
 
+  const handleMaterialMouseDown = (e: React.MouseEvent) => {
+    isDraggingMaterial.current = true;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialX = materialPos.x;
+    const initialY = materialPos.y;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      setMaterialPos({
+        x: initialX + (moveEvent.clientX - startX),
+        y: initialY + (moveEvent.clientY - startY)
+      });
+    };
+
+    const onMouseUp = () => {
+      isDraggingMaterial.current = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   const renderCategoryContent = () => {
-    const iconBaseClass = "w-12 h-12 bg-white rounded-xl shadow border-2 border-slate-200 font-black text-slate-900 text-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform cursor-pointer";
-    
-    if (activeCategory === CATEGORIES.LETTERS) {
+    const iconBaseClass = "w-full aspect-square bg-white rounded-xl shadow border-2 border-slate-200 font-black text-slate-900 text-3xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform cursor-pointer overflow-hidden px-1";
+    const wordBaseClass = "col-span-1 bg-white rounded-2xl shadow border-2 border-slate-200 font-bold text-slate-900 text-sm py-4 px-2 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer text-center truncate min-h-[64px]";
+    const headerClass = "col-span-3 mt-6 mb-3 text-xs font-black uppercase text-slate-500 tracking-widest border-b-2 border-slate-100 pb-2 flex items-center gap-2";
+
+    if (activeCategoryId === 'UPPER') {
       return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => (
         <button key={l} draggable onDragStart={(e) => handleDragStartAsset(e, l, 'text')} onClick={() => addItem(l, 'text')} className={iconBaseClass}>{l}</button>
       ));
     }
-    if (activeCategory === CATEGORIES.NUMBERS) {
-      return Array.from({length: 100}, (_, i) => i + 1).map(n => (
+    if (activeCategoryId === 'LOWER') {
+      return "abcdefghijklmnopqrstuvwxyz".split("").map(l => (
+        <button key={l} draggable onDragStart={(e) => handleDragStartAsset(e, l, 'text')} onClick={() => addItem(l, 'text')} className={iconBaseClass}>{l}</button>
+      ));
+    }
+    if (activeCategoryId === 'BLENDS') {
+      return (
+        <>
+          <div className={headerClass}><span>Vowel-First (VC)</span></div>
+          {VC_WORDS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+          <div className={headerClass}><span>Consonant-First (CV)</span></div>
+          {CV_WORDS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+        </>
+      );
+    }
+    if (activeCategoryId === 'SIGHT') {
+      return (
+        <>
+          <div className={headerClass}><span>Phonics Words</span></div>
+          {REGULAR_SIGHT_WORDS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+          <div className={headerClass}><span>Irregular Words</span></div>
+          {IRREGULAR_SIGHT_WORDS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+        </>
+      );
+    }
+    if (activeCategoryId === 'DIGRAPHS') {
+      return (
+        <>
+          <div className={headerClass}><span>Consonant Teams</span></div>
+          {CONSONANT_DIGRAPHS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+          <div className={headerClass}><span>Vowel Teams</span></div>
+          {VOWEL_DIGRAPHS.map(w => (
+            <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>
+          ))}
+        </>
+      );
+    }
+    if (activeCategoryId === 'LETTERS') {
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => (
+          <button key={l} draggable onDragStart={(e) => handleDragStartAsset(e, l, 'text')} onClick={() => addItem(l, 'text')} className={iconBaseClass}>{l}</button>
+        ));
+    }
+    if (activeCategoryId === 'NUMBERS') {
+      return Array.from({length: 50}, (_, i) => i + 1).map(n => (
         <button key={n} draggable onDragStart={(e) => handleDragStartAsset(e, n.toString(), 'text')} onClick={() => addItem(n.toString(), 'text')} className={iconBaseClass}>{n}</button>
       ));
     }
-    if (activeCategory === CATEGORIES.STICKERS) {
+    if (activeCategoryId === 'STICKERS') {
       return STICKERS.map(s => (
-        <button key={s.id} draggable onDragStart={(e) => handleDragStartAsset(e, s.emoji, 'sticker')} onClick={() => addItem(s.emoji, 'sticker')} className={iconBaseClass.replace('text-2xl', 'text-3xl')}>{s.emoji}</button>
+        <button key={s.id} draggable onDragStart={(e) => handleDragStartAsset(e, s.emoji, 'sticker')} onClick={() => addItem(s.emoji, 'sticker')} className={iconBaseClass.replace('text-3xl', 'text-4xl')}>{s.emoji}</button>
       ));
     }
-    if (activeCategory === CATEGORIES.SHAPES) {
+    if (activeCategoryId === 'SHAPES') {
       return ['⭕', '⬜', '🔺', '⭐', '❤️', '🟦', '🔶', '🔷', '🛑', '💠', '🪁', '🌙', '☁️', '⚡'].map(s => (
-        <button key={s} draggable onDragStart={(e) => handleDragStartAsset(e, s, 'shape')} onClick={() => addItem(s, 'shape')} className={iconBaseClass.replace('text-2xl', 'text-3xl')}>{s}</button>
+        <button key={s} draggable onDragStart={(e) => handleDragStartAsset(e, s, 'shape')} onClick={() => addItem(s, 'shape')} className={iconBaseClass.replace('text-3xl', 'text-4xl')}>{s}</button>
       ));
     }
-    if (activeCategory === CATEGORIES.MATERIALS) {
-      const subjectMaterials = materials.filter(m => m.subjectId === subjectId);
-      if (subjectMaterials.length === 0) return <div className="col-span-4 text-center py-10 text-slate-400 font-bold px-4">No materials for this subject. Go to Teacher Mode to upload! 📚</div>;
-      
-      return subjectMaterials.map(mat => (
-        <button key={mat.id} onClick={() => setActiveMaterial(mat)} className="col-span-4 flex items-center gap-3 p-3 bg-white border-2 rounded-2xl hover:border-blue-400 shadow-sm transition-all group/mat">
-          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl group-hover/mat:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
-          <div className="flex-1 text-left min-w-0">
-            <div className="font-black text-slate-900 truncate text-xs">{mat.name}</div>
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{mat.type}</div>
-          </div>
-        </button>
-      ));
-    }
-    if (activeCategory === CATEGORIES.HISTORY) {
+    if (activeCategoryId === 'HISTORY') {
       const saved = (design.whiteboards || []).filter(b => b.conceptId === concept.id);
-      if (saved.length === 0) return <div className="col-span-4 text-center py-10 text-slate-400 font-bold px-4">No history for this concept. 🕰️</div>;
+      if (saved.length === 0) return <div className="col-span-3 text-center py-12 text-slate-400 font-bold px-4">No history yet. 🕰️</div>;
       
       return [...saved].reverse().map(board => (
-        <div key={board.id} className="col-span-4 flex items-stretch gap-2 group/hist">
+        <div key={board.id} className="col-span-3 flex items-stretch gap-2 group/hist">
           <button onClick={() => restoreBoardState(board)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-400 shadow-sm transition-all overflow-hidden">
-            <div className="font-black text-slate-900 truncate group-hover/hist:text-blue-600">{board.name}</div>
-            <div className="text-[10px] text-slate-400 font-bold uppercase">{new Date(board.timestamp).toLocaleDateString()}</div>
+            <div className="font-black text-slate-900 truncate group-hover/hist:text-blue-600 text-sm">{board.name}</div>
+            <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{new Date(board.timestamp).toLocaleDateString()}</div>
           </button>
-          <button onClick={() => deleteFromHistory(board.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-2xl text-rose-300 hover:text-rose-600 transition-colors">✕</button>
+          <button onClick={() => deleteFromHistory(board.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button>
         </div>
       ));
     }
   };
+
+  const filteredMaterials = materials.filter(m => m.subjectId === subjectId);
+  const currentSubject = allSubjects.find(s => s.id === subjectId);
 
   return (
     <div className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']">
       <header className="h-16 bg-white border-b-4 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="text-2xl p-2 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
-          <h1 className="font-black text-slate-900 tracking-tight">{concept.title}</h1>
+          <div className="flex flex-col">
+            <h1 className="font-black text-slate-900 tracking-tight leading-tight">{concept.title}</h1>
+            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleClearEverything} className="px-4 py-2 bg-slate-100 rounded-xl font-black text-slate-900 text-sm border-b-4 border-slate-200 active:translate-y-1 active:border-b-0 transition-all">✨ New</button>
@@ -536,21 +669,110 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div className={`absolute left-0 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-72 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-            <h3 className="font-black text-slate-400 text-xs tracking-widest uppercase">Materials</h3>
-            <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button>
-          </div>
-          <div className="flex bg-slate-100 p-1 border-b">
-            {Object.values(CATEGORIES).map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={`flex-1 py-3 text-xl rounded-xl font-black ${activeCategory === cat ? 'bg-white shadow-md text-blue-500' : 'opacity-40 text-slate-900'}`}>{cat}</button>
+        {/* Assets Drawer Sidebar (Left) - Removed overall overflow-hidden so toggle can stick out */}
+        <div className={`absolute left-0 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-96 flex ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          {/* Vertical Tab Sidebar - Larger and scrollable */}
+          <div className="w-28 flex-shrink-0 bg-slate-50 border-r-2 border-slate-100 flex flex-col overflow-y-auto hide-scrollbar py-6 gap-4 items-center custom-scrollbar">
+            {categories.map(cat => (
+              <button 
+                key={cat.id}
+                onClick={() => setActiveCategoryId(cat.id)}
+                className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${
+                  activeCategoryId === cat.id 
+                    ? 'bg-white shadow-lg text-blue-500 ring-2 ring-blue-100 scale-105' 
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
+                }`}
+              >
+                <span className="text-4xl font-black">{cat.icon}</span>
+                <span className="text-[11px] font-black uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+              </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto p-4 grid grid-cols-4 gap-3 content-start">
-            {renderCategoryContent()}
+
+          {/* Content Area */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-white">
+              <h3 className="font-black text-slate-400 text-xs tracking-widest uppercase truncate">
+                {categories.find(c => c.id === activeCategoryId)?.label} Drawer
+              </h3>
+              <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 grid grid-cols-3 gap-5 content-start custom-scrollbar">
+              {renderCategoryContent()}
+            </div>
           </div>
+          
+          {/* Toggle Tab - Restored and Improved */}
+          <button 
+            onClick={() => setDrawerOpen(!drawerOpen)} 
+            className="absolute left-full top-1/2 -translate-y-1/2 bg-white border-r-4 border-slate-100 p-4 rounded-r-3xl shadow-xl font-black text-xl hover:translate-x-1 transition-all flex items-center justify-center min-w-[56px] border-b-4 border-slate-200"
+            title={drawerOpen ? "Close Drawer" : "Open Drawer"}
+          >
+            {drawerOpen ? '⬅️' : '📦'}
+          </button>
         </div>
-        {!drawerOpen && <button onClick={() => setDrawerOpen(true)} className="absolute left-0 top-1/2 -translate-y-1/2 bg-white border-r-4 border-slate-100 p-3 rounded-r-3xl shadow-xl z-[60] font-black text-xl hover:translate-x-1 transition-all">📦</button>}
+
+        {/* Material Library Sidebar (Right) */}
+        <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-4 border-b flex justify-between items-center bg-blue-50">
+            <h3 className="font-black text-blue-500 text-xs tracking-widest uppercase flex items-center gap-2">
+              <span className="text-xl">📚</span> Material Library
+            </h3>
+            <button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            {!filteredMaterials.length ? (
+              <div className="text-center py-12 px-4">
+                 <div className="text-5xl mb-4 opacity-20">📂</div>
+                 <p className="font-black text-slate-400">No materials for this subject!</p>
+                 <p className="text-xs text-slate-300 mt-2">Go to Teacher Mode to upload PDFs or Videos for your class.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <h4 className="px-1 text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>
+                  {currentSubject?.title || 'Current Subject'}
+                </h4>
+                <div className="space-y-4">
+                  {filteredMaterials.map(mat => (
+                    <button 
+                      key={mat.id} 
+                      onClick={() => {
+                        setActiveMaterial(mat);
+                        setLibraryOpen(false);
+                      }} 
+                      className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all group/mat hover:-translate-y-1 active:scale-95 overflow-hidden flex flex-col"
+                    >
+                      <div className="h-28 bg-slate-50 relative flex items-center justify-center overflow-hidden">
+                        {mat.thumbnailUrl ? (
+                          <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="text-5xl group-hover/mat:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
+                        )}
+                        <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                           <span>{getFileIcon(mat.type)}</span>
+                           <span className="text-slate-500">{mat.type}</span>
+                        </div>
+                      </div>
+                      <div className="p-3 text-left">
+                        <div className="font-black text-slate-900 truncate text-xs">{mat.name}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Toggle Tab */}
+          <button 
+            onClick={() => setLibraryOpen(!libraryOpen)} 
+            className="absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px]"
+            title={libraryOpen ? "Close Library" : "Open Library"}
+          >
+            {libraryOpen ? '➡️' : '📚'}
+          </button>
+        </div>
 
         <main 
           className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" 
@@ -558,48 +780,74 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           onDragOver={handleDragOverBoard}
           onWheel={handleWheel}
         >
+          {/* Material Viewer Floating Window Overlay */}
           {activeMaterial && (
-            <div className="absolute inset-0 z-[90] flex items-center justify-center pointer-events-none p-12">
-              <div className="bg-white w-full max-w-4xl h-full rounded-[3rem] shadow-2xl pointer-events-auto border-8 border-white flex flex-col animate-material-enter">
-                <div className="flex items-center justify-between p-6 bg-slate-50 rounded-t-[2.5rem] border-b-2">
-                  <div className="flex items-center gap-4">
-                    <div className="text-3xl">{getFileIcon(activeMaterial.type)}</div>
+            <div 
+              className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter"
+              style={{ 
+                left: materialPos.x, 
+                top: materialPos.y, 
+                width: 'min(900px, 92vw)',
+                height: 'min(750px, 85vh)'
+              }}
+            >
+              <div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5">
+                <div 
+                  className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2"
+                  onMouseDown={handleMaterialMouseDown}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{getFileIcon(activeMaterial.type)}</div>
                     <div>
-                      <h4 className="font-black text-slate-900 tracking-tight">{activeMaterial.name}</h4>
-                      <div className="text-[10px] text-blue-500 font-black uppercase tracking-widest">Viewing Material</div>
+                      <h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4>
+                      <div className="text-[9px] text-blue-500 font-black uppercase tracking-widest">Teaching Mode • Active Resource</div>
                     </div>
                   </div>
-                  <button onClick={() => setActiveMaterial(null)} className="w-12 h-12 bg-white rounded-2xl shadow border-2 flex items-center justify-center text-2xl hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+                  </div>
                 </div>
-                <div className="flex-1 bg-slate-200/50 flex items-center justify-center overflow-hidden">
+                <div className="flex-1 bg-white flex items-center justify-center overflow-hidden">
                   {activeMaterial.type === 'video' ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-black rounded-b-[2rem]">
-                      <div className="text-6xl mb-6">🎬</div>
-                      <p className="text-white font-bold">Video Player Placeholder</p>
-                      <p className="text-white/40 text-sm mt-2 italic">(In a real app, the video file would play here)</p>
+                    <div className="w-full h-full bg-black flex items-center justify-center relative">
+                      {materialUrl ? (
+                        <video 
+                          src={materialUrl} 
+                          controls 
+                          className="max-w-full max-h-full"
+                          autoPlay
+                        />
+                      ) : (
+                        <div className="text-center text-white p-8">
+                          <div className="text-6xl mb-4">🎬</div>
+                          <p className="font-bold">Video content loading...</p>
+                        </div>
+                      )}
                     </div>
-                  ) : activeMaterial.type === 'pdf' ? (
-                    <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center p-12 text-center rounded-b-[2rem]">
-                      <div className="text-7xl mb-6">📄</div>
-                      <h5 className="text-2xl font-black text-slate-800 mb-2">{activeMaterial.name}</h5>
-                      <p className="text-slate-500 font-medium max-w-md">PDF Document Viewer. Scroll to read your classroom material while you use the board below!</p>
-                      <div className="mt-8 flex gap-2">
-                        {[1,2,3,4].map(p => <div key={p} className="w-16 h-20 bg-white rounded-lg shadow-sm border" />)}
+                  ) : activeMaterial.type === 'pdf' || activeMaterial.type === 'slides' ? (
+                    materialUrl ? (
+                      <iframe 
+                        src={`${materialUrl}#toolbar=1&view=FitH`} 
+                        className="w-full h-full border-none bg-white" 
+                        title={activeMaterial.name}
+                        allow="autoplay"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
+                        <div className="text-6xl mb-4 animate-bounce">📂</div>
+                        <h5 className="text-lg font-black text-slate-800 mb-1">Loading Document...</h5>
+                        <p className="text-slate-500 font-medium text-xs max-w-[200px]">Preparing your magical lesson materials. Please wait a moment! ✨</p>
                       </div>
-                    </div>
+                    )
                   ) : (
-                    <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center rounded-b-[2rem]">
-                      <div className="text-7xl mb-6">📊</div>
-                      <p className="text-slate-700 font-black text-xl">Interactive Slideshow Viewer</p>
-                      <div className="flex gap-4 mt-8">
-                        <button className="px-6 py-2 bg-white border-2 rounded-xl font-bold">Previous</button>
-                        <button className="px-6 py-2 bg-blue-500 text-white rounded-xl font-bold">Next Slide</button>
-                      </div>
+                    <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center">
+                      <div className="text-6xl mb-4">📂</div>
+                      <p className="text-slate-700 font-black text-sm">Generic Viewer</p>
                     </div>
                   )}
                 </div>
-                <div className="p-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white rounded-b-[2.5rem]">
-                   Teaching Tip: You can leave this window open while you demonstrate on the whiteboard edges!
+                <div className="p-3 text-center text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-t">
+                   Interactive Viewer • Scroll to browse • Pinch to zoom
                 </div>
               </div>
             </div>
@@ -744,6 +992,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         @keyframes material-enter { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
         .animate-material-enter { animation: material-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );

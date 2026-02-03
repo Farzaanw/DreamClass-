@@ -53,6 +53,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubjectForUpload, setActiveSubjectForUpload] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [previewMaterial, setPreviewMaterial] = useState<MaterialFile | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Subject Edit State
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -69,6 +72,30 @@ const Dashboard: React.FC<DashboardProps> = ({
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Use fetch-to-blob for more reliable rendering in previews
+  useEffect(() => {
+    let url: string | null = null;
+    
+    if (previewMaterial && previewMaterial.content) {
+      fetch(previewMaterial.content)
+        .then(res => res.blob())
+        .then(blob => {
+          url = URL.createObjectURL(blob);
+          setPreviewUrl(url);
+        })
+        .catch(err => {
+          console.error("Failed to generate preview blob:", err);
+          setPreviewUrl(previewMaterial.content || null);
+        });
+    } else {
+      setPreviewUrl(null);
+    }
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [previewMaterial]);
 
   const handleOpenEdit = (subject: Subject) => {
     setEditingSubjectId(subject.id);
@@ -132,11 +159,76 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const generateThumbnail = async (file: File, type: 'pdf' | 'slides' | 'video'): Promise<string | undefined> => {
+    return new Promise((resolve) => {
+      if (type === 'video') {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.src = URL.createObjectURL(file);
+        video.muted = true;
+        video.playsInline = true;
+        
+        video.onloadedmetadata = () => {
+          video.currentTime = 0.5;
+        };
+
+        video.onseeked = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 160;
+          canvas.height = 120;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          URL.revokeObjectURL(video.src);
+          resolve(dataUrl);
+        };
+
+        video.onerror = () => {
+          URL.revokeObjectURL(video.src);
+          resolve(undefined);
+        };
+      } else {
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = type === 'pdf' ? '#ef4444' : '#f97316';
+          ctx.fillRect(0, 0, canvas.width, 30);
+          ctx.fillStyle = '#e2e8f0';
+          for (let i = 0; i < 5; i++) {
+            ctx.fillRect(20, 50 + i * 20, canvas.width - 40, 10);
+          }
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText(file.name.substring(0, 12), 20, 160);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } else {
+          resolve(undefined);
+        }
+      }
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !activeSubjectForUpload) return;
 
-    const newMaterials: MaterialFile[] = Array.from(files).map((file: File) => {
+    setIsProcessing(true);
+    const newMaterials: MaterialFile[] = [];
+
+    for (const file of Array.from(files)) {
       let type: 'pdf' | 'slides' | 'video' = 'pdf';
       const name = file.name.toLowerCase();
       
@@ -148,22 +240,27 @@ const Dashboard: React.FC<DashboardProps> = ({
         type = 'slides';
       }
 
-      return {
+      const thumbnail = await generateThumbnail(file, type);
+      const content = await readFileAsDataURL(file);
+
+      newMaterials.push({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         type: type,
         subjectId: activeSubjectForUpload!,
-        timestamp: Date.now()
-      };
-    });
+        timestamp: Date.now(),
+        thumbnailUrl: thumbnail,
+        content: content
+      });
+    }
 
     const currentMaterials = user.materials || [];
     onUpdateMaterials([...currentMaterials, ...newMaterials]);
     setToast(`Successfully added ${newMaterials.length} file(s)! 🎉`);
     
-    // Cleanup
     e.target.value = '';
     setActiveSubjectForUpload(null);
+    setIsProcessing(false);
   };
 
   const handleDeleteMaterial = (id: string) => {
@@ -171,6 +268,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const updated = (user.materials || []).filter(m => m.id !== id);
       onUpdateMaterials(updated);
       setToast("Material deleted. 🗑️");
+      if (previewMaterial?.id === id) setPreviewMaterial(null);
     }
   };
 
@@ -202,7 +300,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   if (view === 'materials') {
     return (
       <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
-        {/* Hidden File Input */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -212,11 +309,72 @@ const Dashboard: React.FC<DashboardProps> = ({
           onChange={handleFileChange}
         />
 
-        {/* Success Toast */}
+        {isProcessing && (
+          <div className="fixed inset-0 z-[300] bg-white/60 backdrop-blur-md flex items-center justify-center">
+             <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 animate-pulse border-4 border-blue-400">
+                <div className="text-6xl animate-spin">⚙️</div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight text-center">Magically processing your files...<br/><span className="text-blue-500">Creating thumbnails ✨</span></h2>
+             </div>
+          </div>
+        )}
+
         {toast && (
           <div className="fixed top-24 right-8 z-[200] bg-white border-4 border-blue-400 px-8 py-4 rounded-[2rem] shadow-2xl font-black text-blue-600 animate-bounce-gentle flex items-center gap-3">
              <span className="text-2xl">✨</span>
              {toast}
+          </div>
+        )}
+
+        {/* Material Preview Modal */}
+        {previewMaterial && (
+          <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-lg flex items-center justify-center p-6 animate-fade-in" onClick={() => setPreviewMaterial(null)}>
+            <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative animate-zoom-in" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl">{getFileIcon(previewMaterial.type)}</div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 truncate max-w-md">{previewMaterial.name}</h3>
+                    <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{previewMaterial.type} Viewer</p>
+                  </div>
+                </div>
+                <button onClick={() => setPreviewMaterial(null)} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+              </div>
+              
+              <div className="flex-1 bg-slate-100 overflow-hidden flex items-center justify-center">
+                {previewMaterial.type === 'video' ? (
+                  <div className="w-full h-full bg-black flex items-center justify-center">
+                    {previewUrl ? (
+                      <video 
+                        src={previewUrl} 
+                        controls 
+                        className="max-w-full max-h-full shadow-2xl"
+                        autoPlay
+                      />
+                    ) : (
+                      <p className="text-white font-black">Video content unavailable.</p>
+                    )}
+                  </div>
+                ) : (
+                  previewUrl ? (
+                    <iframe 
+                      src={`${previewUrl}#toolbar=1`} 
+                      className="w-full h-full border-none bg-white" 
+                      title={previewMaterial.name}
+                      allow="autoplay"
+                    />
+                  ) : (
+                    <div className="text-center p-12">
+                      <div className="text-8xl mb-6 opacity-20">📄</div>
+                      <p className="text-slate-500 font-black">Content missing. Try re-uploading.</p>
+                    </div>
+                  )
+                )}
+              </div>
+              
+              <div className="p-4 text-center bg-white border-t border-slate-50">
+                 <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Teaching Resource Preview: {previewMaterial.name}</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -266,19 +424,44 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {subjectMaterials.map(mat => (
-                      <div key={mat.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-2 border-slate-50 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-blue-400 opacity-20"></div>
+                      <div 
+                        key={mat.id} 
+                        onClick={() => setPreviewMaterial(mat)}
+                        className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden flex flex-col h-[240px] cursor-pointer"
+                      >
                         <button 
-                          onClick={() => handleDeleteMaterial(mat.id)}
-                          className="absolute -top-1 -right-1 w-9 h-9 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-10 border-4 border-white"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(mat.id); }}
+                          className="absolute top-2 right-2 w-10 h-10 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-20 border-4 border-white"
+                          title="Delete Material"
                         >
                           ✕
                         </button>
-                        <div className="text-6xl mb-6 text-center group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
-                        <h4 className="font-black text-slate-800 text-center truncate mb-1 px-2 text-sm" title={mat.name}>{mat.name}</h4>
-                        <div className="text-[10px] text-slate-400 font-black uppercase text-center tracking-widest bg-slate-50 py-1 rounded-full">{mat.type}</div>
+                        
+                        <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                          {mat.thumbnailUrl ? (
+                            <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>
+                          )}
+                          <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
+                             <div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">🔍</div>
+                          </div>
+                          <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                             <span>{getFileIcon(mat.type)}</span>
+                             <span className="text-slate-600">{mat.type}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-white border-t border-slate-100">
+                          <h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>
+                            {mat.name}
+                          </h4>
+                          <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">
+                            Uploaded {new Date(mat.timestamp).toLocaleDateString()}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
