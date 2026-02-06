@@ -64,6 +64,7 @@ export const MASCOTS = [
 export const SHELF_OBJECTS = ['📚', '🪴', '🌍', '🏆', '🔬', '🎨', '🧸', '🔭', '🧪', '🦴', '🍎', '💎'];
 
 export const STICKERS = [
+  // ORIGINAL SET
   { id: 'star', emoji: '⭐', url: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png' },
   { id: 'rocket', emoji: '🚀', url: 'https://cdn-icons-png.flaticon.com/512/1356/1356479.png' },
   { id: 'rainbow', emoji: '🌈', url: 'https://cdn-icons-png.flaticon.com/512/2913/2913550.png' },
@@ -90,6 +91,71 @@ export const STICKERS = [
   { id: 'apple', emoji: '🍎', url: 'https://cdn-icons-png.flaticon.com/512/415/415682.png' },
   { id: 'bulb', emoji: '💡', url: 'https://cdn-icons-png.flaticon.com/512/595/595067.png' },
   { id: 'trophy', emoji: '🏆', url: 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png' },
+
+  // ANIMALS (New)
+  { id: 'lion', emoji: '🦁', url: '' },
+  { id: 'tiger', emoji: '🐯', url: '' },
+  { id: 'giraffe', emoji: '🦒', url: '' },
+  { id: 'elephant', emoji: '🐘', url: '' },
+  { id: 'penguin', emoji: '🐧', url: '' },
+  { id: 'turtle', emoji: '🐢', url: '' },
+  { id: 'zebra', emoji: '🦓', url: '' },
+  { id: 'panda', emoji: '🐼', url: '' },
+  { id: 'koala', emoji: '🐨', url: '' },
+  { id: 'monkey_new', emoji: '🐒', url: '' },
+
+  // VEHICLES (New)
+  { id: 'car', emoji: '🚗', url: '' },
+  { id: 'bike', emoji: '🚲', url: '' },
+  { id: 'chopper', emoji: '🚁', url: '' },
+  { id: 'boat', emoji: '⛵', url: '' },
+  { id: 'tractor', emoji: '🚜', url: '' },
+  { id: 'fire_truck', emoji: '🚒', url: '' },
+  { id: 'ambulance', emoji: '🚑', url: '' },
+  { id: 'ufo', emoji: '🛸', url: '' },
+  { id: 'skateboard', emoji: '🛹', url: '' },
+
+  // FACES (New)
+  { id: 'star_eyes', emoji: '🤩', url: '' },
+  { id: 'party_face', emoji: '🥳', url: '' },
+  { id: 'cool_face', emoji: '😎', url: '' },
+  { id: 'nerd_face', emoji: '🧐', url: '' },
+  { id: 'cowboy', emoji: '🤠', url: '' },
+  { id: 'ghost', emoji: '👻', url: '' },
+  { id: 'clown', emoji: '🤡', url: '' },
+
+  // FOOD (New)
+  { id: 'donut', emoji: '🍩', url: '' },
+  { id: 'burger', emoji: '🍔', url: '' },
+  { id: 'strawberry', emoji: '🍓', url: '' },
+  { id: 'avocado', emoji: '🥑', url: '' },
+  { id: 'broccoli', emoji: '🥦', url: '' },
+  { id: 'pretzel', emoji: '🥨', url: '' },
+  { id: 'taco', emoji: '🌮', url: '' },
+  { id: 'popcorn', emoji: '🍿', url: '' },
+  { id: 'candy', emoji: '🍭', url: '' },
+
+  // NATURE/WEATHER (New)
+  { id: 'tornado', emoji: '🌪️', url: '' },
+  { id: 'lightning', emoji: '⚡', url: '' },
+  { id: 'volcano', emoji: '🌋', url: '' },
+  { id: 'wave', emoji: '🌊', url: '' },
+  { id: 'cactus', emoji: '🌵', url: '' },
+  { id: 'mushroom', emoji: '🍄', url: '' },
+  { id: 'leaf', emoji: '🍂', url: '' },
+  { id: 'snowflake', emoji: '❄️', url: '' },
+  { id: 'planet', emoji: '🪐', url: '' },
+  { id: 'moon', emoji: '🌙', url: '' },
+
+  // SYMBOLS (New)
+  { id: 'diamond', emoji: '💎', url: '' },
+  { id: 'shield', emoji: '🛡️', url: '' },
+  { id: 'key', emoji: '🗝️', url: '' },
+  { id: 'medal', emoji: '🎖️', url: '' },
+  { id: 'target', emoji: '🎯', url: '' },
+  { id: 'dice', emoji: '🎲', url: '' },
+  { id: 'puzzle', emoji: '🧩', url: '' },
+  { id: 'palette', emoji: '🎨', url: '' },
 ];
 
 export interface MusicOption {

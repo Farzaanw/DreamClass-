@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile } from './types';
+import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -219,6 +219,14 @@ const App: React.FC = () => {
     });
   };
 
+  const handleUpdateSongs = (songs: Song[]) => {
+    if (!currentUser) return;
+    persistUser({
+      ...currentUser,
+      songs
+    });
+  };
+
   const navigateToSubject = (subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
@@ -258,6 +266,16 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900">
+      {/* Visual Mode Overlay: Teacher (Blue Tint) vs Classroom (Clear) */}
+      {currentUser && appMode && (
+        <div 
+          className={`pointer-events-none fixed inset-0 z-[9999] transition-colors duration-700 ${
+            appMode === 'teacher' ? 'bg-blue-500/25' : 'bg-transparent'
+          }`}
+          aria-hidden="true"
+        />
+      )}
+
       {currentView === 'landing' && (
         <div className="flex flex-col">
           {/* Landing Header */}
@@ -454,7 +472,7 @@ const App: React.FC = () => {
                   <ExampleCard emoji="🚀" title="Space Math Hub" color="bg-blue-100" />
                   <ExampleCard emoji="🏠" title="Lava Science" color="bg-red-100" />
                   <ExampleCard emoji="🏰" title="Medieval Phonics" color="bg-indigo-100" />
-                  <ExampleCard emoji="🐳" title="Ocean Explorers" color="bg-cyan-100" />
+                  <ExampleCard emoji="🏠" title="Ocean Explorers" color="bg-cyan-100" />
                   <ExampleCard emoji="🧪" title="Chemistry Kids" color="bg-purple-100" />
                 </div>
                 {/* Visual fade indicators for mobile/desktop */}
@@ -538,7 +556,21 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'dashboard' && appMode && (
-            <Dashboard user={currentUser} appMode={appMode} allSubjects={allSubjects} onModeChange={setAppMode} onLogout={handleLogout} onBackToMode={handleBackToModeSelect} onNavigateDesigner={() => setCurrentView('designer-select')} onNavigateSubject={navigateToSubject} onAddSubject={handleAddSubject} onEditSubject={handleEditSubject} onDeleteSubject={handleDeleteSubject} onUpdateMaterials={handleUpdateMaterials} />
+            <Dashboard 
+              user={currentUser} 
+              appMode={appMode} 
+              allSubjects={allSubjects} 
+              onModeChange={setAppMode} 
+              onLogout={handleLogout} 
+              onBackToMode={handleBackToModeSelect} 
+              onNavigateDesigner={() => setCurrentView('designer-select')} 
+              onNavigateSubject={navigateToSubject} 
+              onAddSubject={handleAddSubject} 
+              onEditSubject={handleEditSubject} 
+              onDeleteSubject={handleDeleteSubject} 
+              onUpdateMaterials={handleUpdateMaterials}
+              onUpdateSongs={handleUpdateSongs}
+            />
           )}
           
           {currentView === 'designer-select' && (
@@ -562,7 +594,16 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'concept' && selectedConcept && selectedSubject && (
-            <ConceptDashboard concept={selectedConcept} design={currentUser.classroomDesigns[selectedSubject.id]} subjectId={selectedSubject.id} materials={currentUser.materials || []} allSubjects={allSubjects} onBack={() => setCurrentView('classroom')} onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} />
+            <ConceptDashboard 
+              concept={selectedConcept} 
+              design={currentUser.classroomDesigns[selectedSubject.id]} 
+              subjectId={selectedSubject.id} 
+              materials={currentUser.materials || []} 
+              allSubjects={allSubjects} 
+              onBack={() => setCurrentView('classroom')} 
+              onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
+              userSongs={currentUser.songs || []}
+            />
           )}
         </div>
       )}

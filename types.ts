@@ -55,6 +55,17 @@ export interface MaterialFile {
   content?: string; // Persistent file data (DataURL)
 }
 
+export interface Song {
+  id: string;
+  title: string;
+  artist?: string;
+  icon: string;
+  url: string;
+  category: string;
+  lyrics?: string[];
+  assignedSubjectIds?: string[]; // Subject IDs this song is assigned to
+}
+
 export interface ClassroomDesign {
   wallColor: string;
   wallTheme?: 'plain' | 'stripes' | 'dots';
@@ -78,6 +89,7 @@ export interface User {
   classroomDesigns: Record<SubjectId, ClassroomDesign>;
   progress: Record<string, number>;
   materials?: MaterialFile[];
+  songs?: Song[];
 }
 
 export interface Message {
