@@ -22,12 +22,13 @@ export interface Subject {
 export interface BoardItem {
   id: string;
   content: string;
-  type: 'text' | 'emoji' | 'sticker' | 'shape';
+  type: 'text' | 'emoji' | 'sticker' | 'shape' | 'song';
   x: number;
   y: number;
   scale: number;
   rotation: number;
   color?: string;
+  metadata?: any;
 }
 
 export interface Whiteboard {

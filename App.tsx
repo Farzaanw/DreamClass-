@@ -188,27 +188,21 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSubject = (subjectId: SubjectId) => {
-    setCurrentUser(prev => {
-      if (!prev) return prev;
-      const updatedHidden = Array.from(new Set([...(prev.hiddenSubjectIds || []), subjectId]));
-      const updatedCustomSubjects = (prev.customSubjects || []).filter(s => s.id !== subjectId);
-      const updatedDesigns = { ...prev.classroomDesigns };
-      delete updatedDesigns[subjectId];
-      const newUser = {
-        ...prev,
-        customSubjects: updatedCustomSubjects,
-        hiddenSubjectIds: updatedHidden,
-        classroomDesigns: updatedDesigns
-      };
-      localStorage.setItem('dreamclass_user', JSON.stringify(newUser));
-      const accountsData = localStorage.getItem('dreamclass_accounts');
-      if (accountsData) {
-        const accounts: User[] = JSON.parse(accountsData);
-        const updatedAccounts = accounts.map(acc => acc.id === newUser.id ? { ...acc, ...newUser, password: acc.password } : acc);
-        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
-      }
-      return newUser;
-    });
+    if (!currentUser) return;
+    
+    const updatedHidden = Array.from(new Set([...(currentUser.hiddenSubjectIds || []), subjectId]));
+    const updatedCustomSubjects = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
+    const updatedDesigns = { ...currentUser.classroomDesigns };
+    delete updatedDesigns[subjectId];
+    
+    const updatedUser: User = {
+      ...currentUser,
+      customSubjects: updatedCustomSubjects,
+      hiddenSubjectIds: updatedHidden,
+      classroomDesigns: updatedDesigns
+    };
+    
+    persistUser(updatedUser);
   };
 
   const handleUpdateMaterials = (materials: MaterialFile[]) => {
@@ -270,7 +264,7 @@ const App: React.FC = () => {
       {currentUser && appMode && (
         <div 
           className={`pointer-events-none fixed inset-0 z-[9999] transition-colors duration-700 ${
-            appMode === 'teacher' ? 'bg-blue-500/25' : 'bg-transparent'
+            appMode === 'teacher' ? 'bg-blue-500/10' : 'bg-transparent'
           }`}
           aria-hidden="true"
         />

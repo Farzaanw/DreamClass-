@@ -261,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (!files || files.length === 0 || !activeSubjectForUpload) return;
     setIsProcessing(true);
     const newMaterials: MaterialFile[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of Array.from(files) as File[]) {
       let type: 'pdf' | 'slides' | 'video' = 'pdf';
       const name = file.name.toLowerCase();
       if (name.endsWith('.pdf')) type = 'pdf';
@@ -524,7 +524,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
             <div>
               <h1 className="text-3xl font-black text-slate-800 tracking-tight">Songs Library 🎶</h1>
-              <p className="text-slate-400 font-bold text-sm tracking-wide">Songs for circle time, movement, and learning</p>
+              <p className="text-slate-400 font-bold text-sm tracking-wide">Add songs to specific classrooms to bring the vibes</p>
             </div>
           </div>
           <button 
@@ -775,8 +775,23 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div key={subject.id} className="relative group">
             {appMode === 'teacher' && (
               <div className="absolute -top-3 -right-3 flex gap-2 z-10">
-                <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(subject); }} className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95">✏️</button>
-                <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); if(window.confirm(`Are you sure you want to delete ${subject.title}?`)) { onDeleteSubject(subject.id); } }} className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95">🗑️</button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleOpenEdit(subject); }} 
+                  className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                >
+                  ✏️
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if(window.confirm(`Are you sure you want to delete ${subject.title}?`)) { 
+                      onDeleteSubject(subject.id); 
+                    } 
+                  }} 
+                  className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                >
+                  🗑️
+                </button>
               </div>
             )}
             <div onClick={() => onNavigateSubject(subject.id)} className={`${subject.color} p-8 rounded-[2.5rem] shadow-lg cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center text-center border-b-8 border-black/10 h-full`}>
