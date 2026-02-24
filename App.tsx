@@ -597,6 +597,7 @@ const App: React.FC = () => {
               onBack={() => setCurrentView('classroom')} 
               onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
               userSongs={currentUser.songs || []}
+              mode={appMode!}
             />
           )}
         </div>

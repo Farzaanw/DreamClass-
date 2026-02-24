@@ -44,6 +44,7 @@ export interface Whiteboard {
     y: number;
     zoom: number;
   };
+  customIcons?: any[];
 }
 
 export interface MaterialFile {
