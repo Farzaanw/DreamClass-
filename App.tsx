@@ -224,7 +224,12 @@ const App: React.FC = () => {
   const navigateToSubject = (subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
-    setCurrentView('classroom');
+    if (appMode === 'teacher' && subject && subject.concepts.length > 0) {
+      setSelectedConcept(subject.concepts[0]);
+      setCurrentView('concept');
+    } else {
+      setCurrentView('classroom');
+    }
   };
 
   const startDesigning = (subjectId: SubjectId) => {
@@ -594,8 +599,15 @@ const App: React.FC = () => {
               subjectId={selectedSubject.id} 
               materials={currentUser.materials || []} 
               allSubjects={allSubjects} 
-              onBack={() => setCurrentView('classroom')} 
+              onBack={() => {
+                if (appMode === 'teacher') {
+                  setCurrentView('dashboard');
+                } else {
+                  setCurrentView('classroom');
+                }
+              }} 
               onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
+              onSelectConcept={(c) => setSelectedConcept(c)}
               userSongs={currentUser.songs || []}
               mode={appMode!}
             />

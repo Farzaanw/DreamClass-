@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile, Subject, Song, AppMode } from '../types';
 import { STICKERS, VC_WORDS, CV_WORDS, REGULAR_SIGHT_WORDS, IRREGULAR_SIGHT_WORDS, CONSONANT_DIGRAPHS, VOWEL_DIGRAPHS } from '../constants';
 
@@ -11,6 +12,7 @@ interface ConceptDashboardProps {
   allSubjects: Subject[];
   onBack: () => void;
   onSaveDesign: (design: ClassroomDesign) => void;
+  onSelectConcept?: (concept: Concept) => void;
   userSongs?: Song[]; // Songs added by the user
   mode: AppMode;
 }
@@ -33,7 +35,7 @@ const HIGHLIGHTER_COLORS = [
 
 const CATEGORY_TEMPLATES = [
   { id: 'NUMBERS', label: 'Numbers', icon: '🔢', type: 'category' },
-  { id: 'SYMBOLS', label: 'Symbols', icon: '➕', type: 'category' },
+  { id: 'SYMBOLS', label: 'Symbols', icon: '➗', type: 'category' },
   { id: 'LIVING', label: 'Living Things', icon: '🌱', type: 'category' },
   { id: 'ANIMALS', label: 'Animals', icon: '🦁', type: 'category' },
   { id: 'ECOSYSTEMS', label: 'Ecosystems', icon: '🌎', type: 'category' },
@@ -127,7 +129,7 @@ const getFileIcon = (type: string) => {
   }
 };
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign, userSongs = [], mode }) => {
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign, onSelectConcept, userSongs = [], mode }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
@@ -152,6 +154,39 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const [iconSearchQuery, setIconSearchQuery] = useState('');
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
+  const [showTransition, setShowTransition] = useState(false);
+  const [showAddArrow, setShowAddArrow] = useState(mode === 'teacher');
+
+  const conceptSwitcherRef = useRef<HTMLDivElement>(null);
+  const isDraggingSwitcher = useRef(false);
+  const hasMovedSwitcher = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  const handleSwitcherMouseDown = (e: React.MouseEvent) => {
+    if (!conceptSwitcherRef.current) return;
+    isDraggingSwitcher.current = true;
+    hasMovedSwitcher.current = false;
+    startX.current = e.pageX - conceptSwitcherRef.current.offsetLeft;
+    scrollLeft.current = conceptSwitcherRef.current.scrollLeft;
+  };
+
+  const handleSwitcherMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingSwitcher.current || !conceptSwitcherRef.current) return;
+    const x = e.pageX - conceptSwitcherRef.current.offsetLeft;
+    const walk = (x - startX.current) * 2;
+    if (Math.abs(walk) > 5) {
+      hasMovedSwitcher.current = true;
+      e.preventDefault();
+      conceptSwitcherRef.current.scrollLeft = scrollLeft.current - walk;
+    }
+  };
+
+  const handleSwitcherStop = () => {
+    setTimeout(() => {
+      isDraggingSwitcher.current = false;
+    }, 0);
+  };
 
   // Active Song States
   const [activeSong, setActiveSong] = useState<Song | null>(null);
@@ -179,7 +214,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       } else if (subjectId === 'math') {
         baseCategories = [
           { id: 'NUMBERS', label: '123', icon: '🔢' },
-          { id: 'SYMBOLS', label: 'Symbols', icon: '➕' },
+          { id: 'SYMBOLS', label: 'Symbols', icon: '➗' },
           { id: 'MEASURE', label: 'Measure', icon: '📏' },
           { id: 'CALENDAR', label: 'Calendar', icon: '📅' },
           { id: 'SHAPES', label: 'Shapes', icon: '🟦' },
@@ -203,9 +238,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     const addMaterialBtn = mode === 'teacher' ? [{ id: 'ADD_MATERIAL', label: 'Add', icon: '➕' }] : [];
 
     return [
+      ...addMaterialBtn,
       ...baseCategories,
       ...customCats,
-      ...addMaterialBtn,
       ...commonTail
     ];
   }, [subjectId, customIcons, mode]);
@@ -230,6 +265,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawingRef = useRef(false);
+
+  useEffect(() => {
+    setShowTransition(true);
+    const timer = setTimeout(() => setShowTransition(false), 1500);
+    return () => clearTimeout(timer);
+  }, [concept.title]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -258,7 +299,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               ctx.drawImage(img, 0, 0);
             };
             img.src = savedState.drawingData;
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
           }
+        } else {
+          setItems([]);
+          setBoardBg('plain');
+          setViewport({ x: 0, y: 0, zoom: 1 });
+          setCurrentBoardId(null);
+          setCurrentBoardName(null);
+          setCustomIcons([]);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
       }
     }
@@ -1231,15 +1282,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
   const filteredMaterials = materials.filter(m => m.subjectId === subjectId);
   const currentSubject = allSubjects.find(s => s.id === subjectId);
+  const subjectConcepts = currentSubject?.concepts || [];
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']">
+    <div 
+      className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']"
+      onClick={() => setShowAddArrow(false)}
+    >
       <header className="h-16 bg-white border-b-4 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
           <button onClick={onBack} className="text-2xl p-2 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-[120px]">
             <div className="flex items-center gap-2">
-              <h1 className="font-black text-slate-900 tracking-tight leading-tight">{concept.title} Master</h1>
+              <h1 className="font-black text-slate-900 tracking-tight leading-tight truncate max-w-[150px]">{concept.title}</h1>
               {currentBoardName && (
                 <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-md border border-blue-100 uppercase tracking-tighter">
                   Active: {currentBoardName}
@@ -1248,6 +1303,41 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
             </div>
             <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
           </div>
+
+          {/* Concept Switcher for Teacher Mode */}
+          {mode === 'teacher' && subjectConcepts.length > 1 && (
+            <div className="relative ml-4 flex-1 max-w-[500px] group/switcher">
+              <div 
+                ref={conceptSwitcherRef}
+                onMouseDown={handleSwitcherMouseDown}
+                onMouseMove={handleSwitcherMouseMove}
+                onMouseUp={handleSwitcherStop}
+                onMouseLeave={handleSwitcherStop}
+                className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border-2 border-slate-100 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none"
+              >
+                {subjectConcepts.map((c) => (
+                  <button
+                    key={c.title}
+                    onClick={() => {
+                      if (!hasMovedSwitcher.current) {
+                        onSelectConcept?.(c);
+                      }
+                    }}
+                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${
+                      c.title === concept.title 
+                        ? 'bg-white text-blue-600 shadow-sm ring-2 ring-blue-100' 
+                        : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
+                    }`}
+                  >
+                    {c.icon} {c.title}
+                  </button>
+                ))}
+              </div>
+              {/* Fade indicators */}
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-50 to-transparent pointer-events-none rounded-l-2xl opacity-0 group-hover/switcher:opacity-100 transition-opacity"></div>
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none rounded-r-2xl opacity-0 group-hover/switcher:opacity-100 transition-opacity"></div>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleClearEverything} className="px-4 py-2 bg-slate-100 rounded-xl font-black text-slate-900 text-sm border-b-4 border-slate-200 active:translate-y-1 active:border-b-0 transition-all">✨ New</button>
@@ -1270,35 +1360,79 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* ASSETS DRAWER (LEFT) */}
-        <div className="absolute left-0 top-0 bottom-0 z-[70] w-28 bg-slate-50 border-r-2 border-slate-100 flex flex-col overflow-y-auto py-6 gap-3 items-center custom-scrollbar shadow-lg">
-          {categories.map((cat) => (
-            <button 
-              key={cat.id} 
-              onClick={() => { 
-                if (cat.id === 'ADD_MATERIAL') {
+        <div className="absolute left-0 top-0 bottom-0 z-[70] w-28 bg-slate-50 border-r-2 border-slate-100 flex flex-col shadow-lg">
+          {/* Fixed Add Button at Top (Teacher Mode) */}
+          {mode === 'teacher' && (
+            <div className="p-4 flex flex-col items-center border-b-2 border-slate-100 relative z-[80]">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsSearchingIcons(true);
-                } else {
+                  setShowAddArrow(false);
+                }}
+                className="w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all bg-blue-50 border-2 border-blue-100 text-blue-500 animate-glow-flow hover:scale-105 active:scale-95 shadow-sm"
+              >
+                <span className="text-3xl font-black leading-none">➕</span>
+                <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
+              </button>
+
+              <AnimatePresence>
+                {showAddArrow && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute left-full ml-4 z-[100] flex items-center pointer-events-none"
+                  >
+                    <motion.span 
+                      animate={{ x: [0, 10, 0] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-4xl drop-shadow-lg"
+                    >
+                      ⬅️
+                    </motion.span>
+                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2 animate-bounce-gentle">
+                      Click to add icons!
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Scrollable Categories */}
+          <div className="flex-1 overflow-y-auto py-4 flex flex-col items-center gap-3 custom-scrollbar">
+            {categories.filter(cat => cat.id !== 'ADD_MATERIAL').map((cat) => (
+              <button 
+                key={cat.id} 
+                onClick={(e) => { 
+                  e.stopPropagation();
                   setActiveCategoryId(cat.id); 
                   setDrawerOpen(true); 
-                }
-              }} 
-              className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${activeCategoryId === cat.id && drawerOpen ? 'bg-white shadow-lg text-blue-500 ring-2 ring-blue-100 scale-105' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
-            >
-              <span className="text-3xl font-black leading-none">{cat.icon}</span>
-              <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
-              {cat.isCustom && mode === 'teacher' && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
-                  }}
-                  className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
-                >
-                  ✕
-                </button>
-              )}
-            </button>
-          ))}
+                }} 
+                className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${
+                  activeCategoryId === cat.id && drawerOpen 
+                    ? 'bg-white shadow-lg text-blue-500 ring-2 ring-blue-100 scale-105' 
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
+                }`}
+              >
+                <span className="text-3xl font-black leading-none">{cat.icon}</span>
+                <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+                
+                {cat.isCustom && mode === 'teacher' && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                    }}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+                  >
+                    ✕
+                  </button>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className={`absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -1329,6 +1463,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
         {/* WHITEBOARD MAIN AREA */}
         <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" onDrop={handleDropOnBoard} onDragOver={(e) => e.preventDefault()} onWheel={(e) => { e.preventDefault(); handleZoomAt({ sx: e.clientX, sy: e.clientY }, Math.pow(1.1, e.deltaY > 0 ? -1 : 1)); }}>
+          <AnimatePresence>
+            {showTransition && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.1, y: -20 }}
+                className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none"
+              >
+                <div className="bg-white/40 backdrop-blur-sm px-12 py-6 rounded-[3rem] border-4 border-white/50 shadow-2xl flex flex-col items-center gap-4">
+                  <span className="text-8xl drop-shadow-2xl">{concept.icon}</span>
+                  <h2 className="text-6xl font-black text-slate-800 tracking-tighter uppercase drop-shadow-lg">{concept.title}</h2>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {activeMaterial && <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}><div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5"><div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}><div className="flex items-center gap-3"><div className="text-2xl">{getFileIcon(activeMaterial.type)}</div><div><h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4></div></div><button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button></div><div className="flex-1 bg-white flex items-center justify-center overflow-hidden">{activeMaterial.type === 'video' ? (materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />) : (materialUrl && <iframe src={`${materialUrl}#toolbar=1&view=FitH`} className="w-full h-full border-none bg-white" title={activeMaterial.name} />)}</div></div></div>}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
@@ -1699,6 +1848,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         @keyframes material-enter { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes live-jiggle { 0% { transform: scale(1); } 25% { transform: scale(1.2) rotate(5deg); } 50% { transform: scale(1.1) rotate(-5deg); } 100% { transform: scale(1) rotate(0); } }
         @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes glow-flow {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .animate-glow-flow { animation: glow-flow 2s infinite; }
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
         .animate-material-enter { animation: material-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-live-jiggle { animation: live-jiggle 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
