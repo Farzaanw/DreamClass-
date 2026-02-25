@@ -757,7 +757,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <div className="grid md:grid-cols-3 gap-8">
         <div onClick={appMode === 'teacher' ? onNavigateDesigner : undefined} className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'}`}>
-          <div className="relative z-10"><h2 className="text-4xl font-bold mb-3">{appMode === 'classroom' ? 'Ready for Lessons?' : 'Build Your Classroom'}</h2><p className="text-white/90 max-w-md text-lg">{appMode === 'classroom' ? 'Select a subject below to jump into an interactive session with your students.' : 'Customize colors, stickers, and music to create the perfect magic learning environment.'}</p></div>
+          <div className="relative z-10"><h2 className="text-4xl font-bold mb-3">{appMode === 'classroom' ? 'Ready for Lessons?' : 'Decorate Your Classrooms'}</h2><p className="text-white/90 max-w-md text-lg">{appMode === 'classroom' ? 'Select a subject below to jump into an interactive session with your students.' : 'Customize colors, stickers, and music to create the perfect magic learning environment.'}</p></div>
           <div className="absolute right-[-30px] bottom-[-30px] text-[12rem] opacity-20 transform -rotate-12 select-none pointer-events-none">{appMode === 'classroom' ? '🎓' : '🏫'}</div>
         </div>
 

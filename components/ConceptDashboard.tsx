@@ -62,6 +62,7 @@ const CATEGORY_TEMPLATES = [
   { id: 'ARTISTS', label: 'Famous Artists', icon: '🖼️', type: 'category' },
   { id: 'INSTRUMENTS', label: 'Instruments', icon: '🎸', type: 'category' },
   { id: 'MUSIC_NOTES', label: 'Music Notes', icon: '🎵', type: 'category' },
+  { id: 'HEALTH', label: 'Health & Life', icon: '❤️', type: 'category' },
 ];
 
 const ALL_TOPIC_ICONS = [
@@ -118,6 +119,11 @@ const ALL_TOPIC_ICONS = [
   { label: 'Koala', content: '🐨', type: 'sticker' },
   { label: 'Whale', content: '🐳', type: 'sticker' },
   { label: 'Octopus', content: '🐙', type: 'sticker' },
+  { label: 'Hygiene', content: '🪥', type: 'sticker' },
+  { label: 'Nutrition', content: '🥗', type: 'sticker' },
+  { label: 'Emotions', content: '😊', type: 'sticker' },
+  { label: 'Kindness', content: '🤝', type: 'sticker' },
+  { label: 'Safety', content: '🚦', type: 'sticker' },
 ];
 
 const getFileIcon = (type: string) => {
@@ -156,6 +162,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
   const [showTransition, setShowTransition] = useState(false);
   const [showAddArrow, setShowAddArrow] = useState(mode === 'teacher');
+  const [showLibraryArrow, setShowLibraryArrow] = useState(mode === 'teacher');
+  const [showSwitcherArrow, setShowSwitcherArrow] = useState(mode === 'teacher');
 
   const conceptSwitcherRef = useRef<HTMLDivElement>(null);
   const isDraggingSwitcher = useRef(false);
@@ -1210,6 +1218,98 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       ));
     }
 
+    if (effectiveCategoryId === 'HEALTH') {
+      const groups = [
+        {
+          label: 'Hygiene 🪥',
+          items: [
+            { e: '🪥', l: 'Brush', t: 'sticker', c: '🪥' },
+            { e: '🧼', l: 'Soap', t: 'sticker', c: '🧼' },
+            { e: '🚿', l: 'Shower', t: 'sticker', c: '🚿' },
+            { e: '🛁', l: 'Bath', t: 'sticker', c: '🛁' },
+            { e: '🧴', l: 'Lotion', t: 'sticker', c: '🧴' },
+            { e: '🧻', l: 'Paper', t: 'sticker', c: '🧻' },
+            { e: '🧺', l: 'Laundry', t: 'sticker', c: '🧺' },
+          ]
+        },
+        {
+          label: 'Nutrition 🥗',
+          items: [
+            { e: '🥗', l: 'Salad', t: 'sticker', c: '🥗' },
+            { e: '🍎', l: 'Apple', t: 'sticker', c: '🍎' },
+            { e: '🥦', l: 'Broccoli', t: 'sticker', c: '🥦' },
+            { e: '🥕', l: 'Carrot', t: 'sticker', c: '🥕' },
+            { e: '🍌', l: 'Banana', t: 'sticker', c: '🍌' },
+            { e: '🍓', l: 'Berry', t: 'sticker', c: '🍓' },
+            { e: '🌽', l: 'Corn', t: 'sticker', c: '🌽' },
+            { e: '🥛', l: 'Milk', t: 'sticker', c: '🥛' },
+            { e: '🍳', l: 'Eggs', t: 'sticker', c: '🍳' },
+            { e: '🥣', l: 'Cereal', t: 'sticker', c: '🥣' },
+          ]
+        },
+        {
+          label: 'Emotions 😊',
+          items: [
+            { e: '😊', l: 'Happy', t: 'sticker', c: '😊' },
+            { e: '😢', l: 'Sad', t: 'sticker', c: '😢' },
+            { e: '😠', l: 'Angry', t: 'sticker', c: '😠' },
+            { e: '😮', l: 'Surprised', t: 'sticker', c: '😮' },
+            { e: '😴', l: 'Sleepy', t: 'sticker', c: '😴' },
+            { e: '🥳', l: 'Party', t: 'sticker', c: '🥳' },
+            { e: '🤢', l: 'Sick', t: 'sticker', c: '🤢' },
+            { e: '🤯', l: 'Mind Blown', t: 'sticker', c: '🤯' },
+            { e: '🥺', l: 'Please', t: 'sticker', c: '🥺' },
+            { e: '😤', l: 'Proud', t: 'sticker', c: '😤' },
+            { e: '🧘', l: 'Calm', t: 'sticker', c: '🧘' },
+          ]
+        },
+        {
+          label: 'Kindness 🤝',
+          items: [
+            { e: '🤝', l: 'Help', t: 'sticker', c: '🤝' },
+            { e: '❤️', l: 'Love', t: 'sticker', c: '❤️' },
+            { e: '🫂', l: 'Hug', t: 'sticker', c: '🫂' },
+            { e: '🤲', l: 'Share', t: 'sticker', c: '🤲' },
+            { e: '🗣️', l: 'Speak', t: 'sticker', c: '🗣️' },
+            { e: '👂', l: 'Listen', t: 'sticker', c: '👂' },
+            { e: '🌟', l: 'Star', t: 'sticker', c: '🌟' },
+            { e: '✨', l: 'Magic', t: 'sticker', c: '✨' },
+          ]
+        },
+        {
+          label: 'Safety 🚦',
+          items: [
+            { e: '🚦', l: 'Signal', t: 'sticker', c: '🚦' },
+            { e: '🛑', l: 'Stop', t: 'sticker', c: '🛑' },
+            { e: '🚧', l: 'Caution', t: 'sticker', c: '🚧' },
+            { e: '🦺', l: 'Vest', t: 'sticker', c: '🦺' },
+            { e: '🚲', l: 'Helmet', t: 'sticker', c: '🚲' },
+            { e: '🛟', l: 'Lifebuoy', t: 'sticker', c: '🛟' },
+            { e: '🩹', l: 'Bandage', t: 'sticker', c: '🩹' },
+            { e: '🚑', l: 'Ambulance', t: 'sticker', c: '🚑' },
+            { e: '🚒', l: 'Fire Truck', t: 'sticker', c: '🚒' },
+            { e: '👮', l: 'Officer', t: 'sticker', c: '👮' },
+          ]
+        }
+      ];
+
+      return (
+        <>
+          {groups.map(g => (
+            <React.Fragment key={g.label}>
+              <div className={headerClass}><span>{g.label}</span></div>
+              {g.items.map(i => (
+                <div key={i.l} className="flex flex-col items-center gap-1">
+                  <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+                </div>
+              ))}
+            </React.Fragment>
+          ))}
+        </>
+      );
+    }
+
     if (effectiveCategoryId === 'CALENDAR') {
       const stickers = [
         { e: 'AM', l: 'AM', t: 'text' },
@@ -1287,7 +1387,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   return (
     <div 
       className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']"
-      onClick={() => setShowAddArrow(false)}
+      onClick={() => {
+        setShowAddArrow(false);
+        setShowLibraryArrow(false);
+        setShowSwitcherArrow(false);
+      }}
     >
       <header className="h-16 bg-white border-b-4 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
         <div className="flex items-center gap-4 flex-1">
@@ -1307,6 +1411,27 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           {/* Concept Switcher for Teacher Mode */}
           {mode === 'teacher' && subjectConcepts.length > 1 && (
             <div className="relative ml-4 flex-1 max-w-[500px] group/switcher">
+              <AnimatePresence>
+                {showSwitcherArrow && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] flex flex-col items-center pointer-events-none"
+                  >
+                    <div className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[8px] uppercase tracking-widest shadow-xl border border-white mb-1 whitespace-nowrap">
+                      Switch Concepts
+                    </div>
+                    <motion.span 
+                      animate={{ y: [0, 5, 0] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-2xl drop-shadow-md"
+                    >
+                      ⬇️
+                    </motion.span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div 
                 ref={conceptSwitcherRef}
                 onMouseDown={handleSwitcherMouseDown}
@@ -1456,8 +1581,37 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {!filteredMaterials.length ? <div className="text-center py-12 px-4 opacity-50"><div className="text-5xl mb-4">📂</div><p className="font-black text-slate-400">No subject materials.</p></div> : <div className="space-y-6"><h4 className="px-1 text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>{currentSubject?.title}</h4><div className="space-y-4">{filteredMaterials.map(m => <button key={m.id} onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"><div className="h-28 bg-slate-50 flex items-center justify-center">{m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}</div><div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div></button>)}</div></div>}
           </div>
-          <button onClick={() => setLibraryOpen(!libraryOpen)} className="absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px]">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setLibraryOpen(!libraryOpen);
+              setShowLibraryArrow(false);
+            }} 
+            className="absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px]"
+          >
             {libraryOpen ? '➡️' : '📚'}
+
+            {showLibraryArrow && !libraryOpen && (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute right-full mr-4 z-[100] flex items-center pointer-events-none"
+                >
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2 animate-bounce-gentle">
+                    Classroom Materials
+                  </div>
+                  <motion.span 
+                    animate={{ x: [0, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    className="text-4xl drop-shadow-lg"
+                  >
+                    ➡️
+                  </motion.span>
+                </motion.div>
+              </AnimatePresence>
+            )}
           </button>
         </div>
 
