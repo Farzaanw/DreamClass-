@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song } from '../types';
+import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song, Game } from '../types';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "Teachly".split("");
@@ -31,6 +31,7 @@ interface DashboardProps {
   onDeleteSubject: (id: SubjectId) => void;
   onUpdateMaterials: (materials: MaterialFile[]) => void;
   onUpdateSongs: (songs: Song[]) => void;
+  onUpdateGames: (games: Game[]) => void;
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -48,6 +49,17 @@ const PUBLIC_SONG_POOL: Song[] = [
   { id: 'p10', title: 'Ring Around the Rosie', icon: '🌹', category: 'Movement', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
 ];
 
+const PUBLIC_GAME_POOL: Game[] = [
+  { id: 'g1', title: 'Memory Match', icon: '🧩', category: 'Logic', description: 'Find the matching pairs of cards!', url: '#' },
+  { id: 'g2', title: 'Math Race', icon: '🏎️', category: 'Math', description: 'Solve equations to speed up your car!', url: '#' },
+  { id: 'g3', title: 'Word Search', icon: '🔍', category: 'Literacy', description: 'Find all the hidden words in the grid.', url: '#' },
+  { id: 'g4', title: 'Color Sort', icon: '🎨', category: 'Logic', description: 'Sort objects by their color.', url: '#' },
+  { id: 'g5', title: 'Animal Sounds', icon: '🦁', category: 'Science', description: 'Match the animal to the sound it makes.', url: '#' },
+  { id: 'g6', title: 'Shape Sorter', icon: '📐', category: 'Math', description: 'Drag the shapes into the correct holes.', url: '#' },
+  { id: 'g7', title: 'Phonics Pop', icon: '🎈', category: 'Literacy', description: 'Pop the balloons with the correct letter sounds.', url: '#' },
+  { id: 'g8', title: 'Pattern Maker', icon: '✨', category: 'Logic', description: 'Complete the pattern to win!', url: '#' },
+];
+
 const Dashboard: React.FC<DashboardProps> = ({ 
   user, 
   appMode, 
@@ -61,10 +73,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   onEditSubject,
   onDeleteSubject,
   onUpdateMaterials,
-  onUpdateSongs
+  onUpdateSongs,
+  onUpdateGames
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [view, setView] = useState<'overview' | 'materials' | 'songs'>('overview');
+  const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubjectForUpload, setActiveSubjectForUpload] = useState<string | null>(null);
@@ -79,6 +92,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [songToAssign, setSongToAssign] = useState<Song | null>(null);
   const [previewingSongUrl, setPreviewingSongUrl] = useState<string | null>(null);
   const songAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Games State
+  const [activeGameCategory, setActiveGameCategory] = useState<string>('All');
+  const [gameSearchQuery, setGameSearchQuery] = useState('');
+  const [showAddGamePanel, setShowAddGamePanel] = useState(false);
+  const [gameToAssign, setGameToAssign] = useState<Game | null>(null);
 
   // Subject Edit State
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -99,16 +118,35 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     let url: string | null = null;
     if (previewMaterial && previewMaterial.content) {
-      fetch(previewMaterial.content)
-        .then(res => res.blob())
-        .then(blob => {
+      if (previewMaterial.content.startsWith('data:')) {
+        try {
+          const parts = previewMaterial.content.split(',');
+          const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
           url = URL.createObjectURL(blob);
           setPreviewUrl(url);
-        })
-        .catch(err => {
-          console.error("Failed to generate preview blob:", err);
-          setPreviewUrl(previewMaterial.content || null);
-        });
+        } catch (e) {
+          console.error("Manual blob conversion failed:", e);
+          setPreviewUrl(previewMaterial.content);
+        }
+      } else {
+        fetch(previewMaterial.content)
+          .then(res => res.blob())
+          .then(blob => {
+            url = URL.createObjectURL(blob);
+            setPreviewUrl(url);
+          })
+          .catch(err => {
+            console.error("Failed to generate preview blob:", err);
+            setPreviewUrl(previewMaterial.content || null);
+          });
+      }
     } else {
       setPreviewUrl(null);
     }
@@ -334,6 +372,38 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Games Library Logic
+  const handleToggleGameSubject = (gameId: string, subjectId: string) => {
+    const currentGames = user.games || [];
+    const gameIndex = currentGames.findIndex(g => g.id === gameId);
+    
+    if (gameIndex === -1) {
+      const publicGame = PUBLIC_GAME_POOL.find(g => g.id === gameId);
+      if (publicGame) {
+        onUpdateGames([...currentGames, { ...publicGame, assignedSubjectIds: [subjectId] }]);
+      }
+      return;
+    }
+
+    const game = currentGames[gameIndex];
+    const assignedIds = game.assignedSubjectIds || [];
+    const newAssignedIds = assignedIds.includes(subjectId)
+      ? assignedIds.filter(id => id !== subjectId)
+      : [...assignedIds, subjectId];
+
+    const updatedGames = [...currentGames];
+    updatedGames[gameIndex] = { ...game, assignedSubjectIds: newAssignedIds };
+    onUpdateGames(updatedGames);
+  };
+
+  const handleDeleteGame = (id: string) => {
+    if (confirm("Delete this game from your library?")) {
+      const updated = (user.games || []).filter(g => g.id !== id);
+      onUpdateGames(updated);
+      setToast("Game deleted. 🗑️");
+    }
+  };
+
   const filteredPublicSongs = useMemo(() => {
     return PUBLIC_SONG_POOL.filter(s => {
       const matchesSearch = s.title.toLowerCase().includes(songSearchQuery.toLowerCase());
@@ -341,6 +411,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       return matchesSearch && matchesCategory;
     });
   }, [songSearchQuery, activeSongCategory]);
+
+  const filteredPublicGames = useMemo(() => {
+    return PUBLIC_GAME_POOL.filter(g => {
+      const matchesSearch = g.title.toLowerCase().includes(gameSearchQuery.toLowerCase());
+      const matchesCategory = activeGameCategory === 'All' || g.category === activeGameCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [gameSearchQuery, activeGameCategory]);
 
   const addConceptField = () => {
     setConcepts([...concepts, { title: '', icon: '✨', description: '' }]);
@@ -403,7 +481,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {previewUrl ? <video src={previewUrl} controls className="max-w-full max-h-full shadow-2xl" autoPlay /> : <p className="text-white font-black">Video content unavailable.</p>}
                   </div>
                 ) : (
-                  previewUrl ? <iframe src={`${previewUrl}#toolbar=1`} className="w-full h-full border-none bg-white" title={previewMaterial.name} allow="autoplay" /> : <div className="text-center p-12"><div className="text-8xl mb-6 opacity-20">📄</div><p className="text-slate-500 font-black">Content missing. Try re-uploading.</p></div>
+                  previewUrl ? <iframe src={previewUrl} className="w-full h-full border-none bg-white" title={previewMaterial.name} allow="autoplay" /> : <div className="text-center p-12"><div className="text-8xl mb-6 opacity-20">📄</div><p className="text-slate-500 font-black">Content missing. Try re-uploading.</p></div>
                 )}
               </div>
               <div className="p-4 text-center bg-white border-t border-slate-50"><p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Teaching Resource Preview: {previewMaterial.name}</p></div>
@@ -736,6 +814,170 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
+  if (view === 'games') {
+    return (
+      <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh] animate-fade-in">
+        {toast && (
+          <div className="fixed top-24 right-8 z-[200] bg-white border-4 border-emerald-400 px-8 py-4 rounded-[2rem] shadow-2xl font-black text-emerald-600 animate-bounce-gentle flex items-center gap-3">
+             <span className="text-2xl">🎮</span> {toast}
+          </div>
+        )}
+
+        {/* ONE-STEP Assignment Overlay */}
+        {gameToAssign && (
+          <div className="fixed inset-0 z-[300] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setGameToAssign(null)}>
+             <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-lg animate-zoom-in border-[12px] border-emerald-100" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col items-center text-center mb-8">
+                   <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl mb-4 shadow-inner">
+                    {gameToAssign.icon}
+                   </div>
+                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">Assign "{gameToAssign.title}"</h3>
+                   <p className="text-slate-400 font-bold text-sm">Where should we play this? 🎮</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar p-1">
+                   {allSubjects.map(sub => {
+                     const isAssigned = (user.games?.find(g => g.id === gameToAssign.id)?.assignedSubjectIds || []).includes(sub.id);
+                     return (
+                       <button 
+                         key={sub.id} 
+                         onClick={() => handleToggleGameSubject(gameToAssign.id, sub.id)}
+                         className={`p-4 rounded-3xl border-4 transition-all flex items-center gap-3 text-left group/sub ${isAssigned ? 'border-emerald-400 bg-emerald-50 shadow-md scale-[1.02]' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
+                       >
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-3xl shadow-sm ${isAssigned ? 'bg-white' : 'bg-white'}`}>
+                            {sub.icon}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-black text-xs text-slate-800 truncate max-w-[80px]">{sub.title}</div>
+                            <div className={`text-[9px] font-bold uppercase tracking-wider ${isAssigned ? 'text-emerald-500' : 'text-slate-400'}`}>
+                              {isAssigned ? 'Assigned ✅' : 'Assign'}
+                            </div>
+                          </div>
+                       </button>
+                     );
+                   })}
+                </div>
+                <button 
+                  onClick={() => {
+                    setGameToAssign(null);
+                    setToast("Assignments saved! ✨");
+                  }} 
+                  className="w-full mt-10 bg-emerald-500 text-white font-black py-4 rounded-3xl shadow-xl hover:scale-105 active:scale-95 transition-all border-b-6 border-emerald-700"
+                >
+                  Done 🎮
+                </button>
+             </div>
+          </div>
+        )}
+
+        <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+          <div className="flex items-center gap-4">
+            {!showAddGamePanel && (
+              <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90">⬅️</button>
+            )}
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight">Games Library 🎮</h1>
+          </div>
+          <div className="flex items-center gap-4 w-full md:w-auto">
+             <div className="relative flex-1 md:w-64">
+               <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+               <input 
+                 type="text" 
+                 placeholder="Search games..." 
+                 className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-emerald-400 outline-none font-bold text-sm"
+                 value={gameSearchQuery}
+                 onChange={(e) => setGameSearchQuery(e.target.value)}
+               />
+             </div>
+             <button 
+               onClick={() => setShowAddGamePanel(!showAddGamePanel)}
+               className={`px-6 py-3 rounded-2xl font-black text-sm transition-all flex items-center gap-2 ${showAddGamePanel ? 'bg-slate-100 text-slate-500' : 'bg-emerald-500 text-white shadow-lg border-b-4 border-emerald-700 hover:scale-105'}`}
+             >
+               {showAddGamePanel ? 'Back to Library' : 'Add Games'}
+             </button>
+          </div>
+        </header>
+
+        {showAddGamePanel ? (
+          <div className="animate-fade-in">
+             <div className="mb-10 flex gap-3 overflow-x-auto pb-4 hide-scrollbar">
+                {['All', 'Logic', 'Math', 'Literacy', 'Science'].map(cat => (
+                  <button 
+                    key={cat} 
+                    onClick={() => setActiveGameCategory(cat)}
+                    className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all whitespace-nowrap ${activeGameCategory === cat ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white text-slate-400 hover:bg-slate-50 border-2 border-slate-50'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredPublicGames.map(game => {
+                  const isAdded = (user.games || []).some(g => g.id === game.id);
+                  return (
+                    <div key={game.id} className="bg-white p-8 rounded-[3rem] shadow-xl border-2 border-slate-50 flex flex-col items-center text-center group hover:border-emerald-200 transition-all relative overflow-hidden">
+                       <div className="absolute top-4 right-4">
+                          {isAdded && <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">In Library</span>}
+                       </div>
+                       <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">
+                         {game.icon}
+                       </div>
+                       <h4 className="text-2xl font-black text-slate-800 mb-2">{game.title}</h4>
+                       <p className="text-slate-400 text-sm font-bold mb-6">{game.description}</p>
+                       <button 
+                         onClick={() => {
+                           if (!isAdded) {
+                             onUpdateGames([...(user.games || []), { ...game, assignedSubjectIds: [] }]);
+                             setToast(`Added ${game.title} to your library! ✨`);
+                           } else {
+                             handleDeleteGame(game.id);
+                           }
+                         }}
+                         className={`w-full py-4 rounded-3xl font-black text-sm transition-all border-b-6 ${isAdded ? 'bg-rose-50 text-rose-500 border-rose-200 hover:bg-rose-100' : 'bg-emerald-500 text-white border-emerald-700 hover:scale-105'}`}
+                       >
+                         {isAdded ? 'Remove from Library' : 'Add to Library'}
+                       </button>
+                    </div>
+                  );
+                })}
+             </div>
+          </div>
+        ) : (
+          <div className="space-y-12 animate-fade-in">
+            <section>
+              <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest mb-8 ml-2">My Games Library</h3>
+              {(user.games || []).length === 0 ? (
+                <div className="bg-white/50 border-4 border-dashed border-slate-100 p-20 rounded-[4rem] text-center">
+                   <div className="text-8xl mb-6 opacity-20">🎮</div>
+                   <h4 className="text-2xl font-black text-slate-300 mb-2">Your library is empty!</h4>
+                   <p className="text-slate-400 font-bold mb-8">Click "Add Games" to explore interactive activities.</p>
+                   <button onClick={() => setShowAddGamePanel(true)} className="bg-emerald-500 text-white px-10 py-4 rounded-3xl font-black shadow-xl border-b-6 border-emerald-700 hover:scale-105 transition-all">Browse Games</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {(user.games || []).map(game => (
+                    <div key={game.id} className="bg-white p-6 rounded-[2.5rem] shadow-xl border-2 border-slate-50 flex flex-col items-center text-center group hover:-translate-y-2 transition-all relative">
+                      <button onClick={() => handleDeleteGame(game.id)} className="absolute top-2 right-2 w-8 h-8 bg-rose-50 text-rose-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs">✕</button>
+                      <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center text-4xl mb-4 shadow-inner group-hover:rotate-6 transition-transform">
+                        {game.icon}
+                      </div>
+                      <h4 className="font-black text-slate-800 mb-6 line-clamp-1">{game.title}</h4>
+                      <button 
+                        onClick={() => setGameToAssign(game)}
+                        className="mt-auto bg-blue-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-transform border-b-4 border-blue-700"
+                      >
+                        Assign Game
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 max-w-6xl mx-auto font-['Fredoka']">
       <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
@@ -828,6 +1070,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                  </div>
                </div>
                <div className="hidden lg:flex items-center justify-center bg-pink-500 text-white w-14 h-14 rounded-2xl shadow-lg animate-bounce group-hover:animate-none">✨</div>
+            </div>
+
+            <h3 className="col-span-full text-2xl font-bold text-gray-700 mt-12 mb-2 ml-2 tracking-tight">Games Library 🎮</h3>
+            <div 
+              onClick={() => setView('games')} 
+              className="col-span-full bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-emerald-400 hover:-translate-y-2 transition-all flex flex-col md:flex-row items-center gap-10 group cursor-pointer relative overflow-hidden"
+            >
+               <div className="absolute right-[-40px] top-[-40px] text-[10rem] opacity-5 transform rotate-12 group-hover:rotate-45 transition-transform duration-700">🎮</div>
+               <div className="w-32 h-32 bg-emerald-50 rounded-full flex items-center justify-center text-6xl group-hover:scale-110 transition-transform shadow-inner flex-shrink-0">🧩</div>
+               <div className="text-center md:text-left flex-1">
+                 <h4 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">Games Library</h4>
+                 <p className="text-slate-500 text-lg font-medium leading-relaxed">Interactive games for logic, math, and literacy</p>
+                 <div className="mt-8 flex flex-wrap justify-center md:justify-start gap-3">
+                    <span className="bg-emerald-100 text-emerald-600 px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border border-emerald-200">Logic Puzzles</span>
+                    <span className="bg-blue-100 text-blue-600 px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border border-blue-200">Math Challenges</span>
+                    <span className="bg-orange-100 text-orange-600 px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border border-orange-200">Literacy Quests</span>
+                 </div>
+               </div>
+               <div className="hidden lg:flex items-center justify-center bg-emerald-500 text-white w-14 h-14 rounded-2xl shadow-lg animate-bounce group-hover:animate-none">✨</div>
             </div>
           </>
         )}

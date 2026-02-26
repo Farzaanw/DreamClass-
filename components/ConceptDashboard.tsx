@@ -326,16 +326,35 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   useEffect(() => {
     let url: string | null = null;
     if (activeMaterial && activeMaterial.content) {
-      fetch(activeMaterial.content)
-        .then(res => res.blob())
-        .then(blob => {
+      if (activeMaterial.content.startsWith('data:')) {
+        try {
+          const parts = activeMaterial.content.split(',');
+          const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
           url = URL.createObjectURL(blob);
           setMaterialUrl(url);
-        })
-        .catch(err => {
-          console.error("Failed to generate blob:", err);
-          setMaterialUrl(activeMaterial.content || null);
-        });
+        } catch (e) {
+          console.error("Manual blob conversion failed:", e);
+          setMaterialUrl(activeMaterial.content);
+        }
+      } else {
+        fetch(activeMaterial.content)
+          .then(res => res.blob())
+          .then(blob => {
+            url = URL.createObjectURL(blob);
+            setMaterialUrl(url);
+          })
+          .catch(err => {
+            console.error("Failed to generate blob:", err);
+            setMaterialUrl(activeMaterial.content || null);
+          });
+      }
     } else {
       setMaterialUrl(null);
     }
@@ -1632,7 +1651,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               </motion.div>
             )}
           </AnimatePresence>
-          {activeMaterial && <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}><div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5"><div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}><div className="flex items-center gap-3"><div className="text-2xl">{getFileIcon(activeMaterial.type)}</div><div><h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4></div></div><button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button></div><div className="flex-1 bg-white flex items-center justify-center overflow-hidden">{activeMaterial.type === 'video' ? (materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />) : (materialUrl && <iframe src={`${materialUrl}#toolbar=1&view=FitH`} className="w-full h-full border-none bg-white" title={activeMaterial.name} />)}</div></div></div>}
+          {activeMaterial && <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}><div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5"><div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}><div className="flex items-center gap-3"><div className="text-2xl">{getFileIcon(activeMaterial.type)}</div><div><h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4></div></div><button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button></div><div className="flex-1 bg-white flex items-center justify-center overflow-hidden">{activeMaterial.type === 'video' ? (materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />) : (materialUrl && <iframe src={materialUrl} className="w-full h-full border-none bg-white" title={activeMaterial.name} />)}</div></div></div>}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
             <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : 'bg-white'}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px' }}>

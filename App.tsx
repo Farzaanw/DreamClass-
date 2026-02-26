@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song } from './types';
+import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song, Game } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -218,6 +218,14 @@ const App: React.FC = () => {
     persistUser({
       ...currentUser,
       songs
+    });
+  };
+
+  const handleUpdateGames = (games: Game[]) => {
+    if (!currentUser) return;
+    persistUser({
+      ...currentUser,
+      games
     });
   };
 
@@ -569,6 +577,7 @@ const App: React.FC = () => {
               onDeleteSubject={handleDeleteSubject} 
               onUpdateMaterials={handleUpdateMaterials}
               onUpdateSongs={handleUpdateSongs}
+              onUpdateGames={handleUpdateGames}
             />
           )}
           

@@ -68,6 +68,16 @@ export interface Song {
   assignedSubjectIds?: string[]; // Subject IDs this song is assigned to
 }
 
+export interface Game {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  url: string;
+  category: string;
+  assignedSubjectIds?: string[];
+}
+
 export interface ClassroomDesign {
   wallColor: string;
   wallTheme?: 'plain' | 'stripes' | 'dots';
@@ -92,6 +102,7 @@ export interface User {
   progress: Record<string, number>;
   materials?: MaterialFile[];
   songs?: Song[];
+  games?: Game[];
 }
 
 export interface Message {
