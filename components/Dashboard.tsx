@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song, Game } from '../types';
+import CalendarOverlay from './CalendarOverlay';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "Teachly".split("");
@@ -32,6 +34,7 @@ interface DashboardProps {
   onUpdateMaterials: (materials: MaterialFile[]) => void;
   onUpdateSongs: (songs: Song[]) => void;
   onUpdateGames: (games: Game[]) => void;
+  onUpdateCalendarData: (calendarData: any) => void;
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -74,7 +77,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onDeleteSubject,
   onUpdateMaterials,
   onUpdateSongs,
-  onUpdateGames
+  onUpdateGames,
+  onUpdateCalendarData
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
@@ -84,6 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewMaterial, setPreviewMaterial] = useState<MaterialFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Songs State
   const [activeSongCategory, setActiveSongCategory] = useState<string>('All');
@@ -994,14 +999,37 @@ const Dashboard: React.FC<DashboardProps> = ({
           <button onClick={() => onModeChange('classroom')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'classroom' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">👨‍🏫</span>Classroom</button>
           <button onClick={() => onModeChange('teacher')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'teacher' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">🛠️</span>Teacher</button>
         </div>
-        <div className="flex gap-4"><button onClick={onLogout} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-medium transition-colors border-b-4 border-gray-300">Logout</button></div>
+        <div className="flex gap-4">
+          <button onClick={onLogout} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-medium transition-colors border-b-4 border-gray-300">Logout</button>
+        </div>
       </header>
+      
+      <AnimatePresence>
+        {showCalendar && (
+          <CalendarOverlay 
+            calendarData={user.calendarData || { events: {} }}
+            onUpdateCalendarData={onUpdateCalendarData}
+            onClose={() => setShowCalendar(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="grid md:grid-cols-3 gap-8">
         <div onClick={appMode === 'teacher' ? onNavigateDesigner : undefined} className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'}`}>
           <div className="relative z-10"><h2 className="text-4xl font-bold mb-3">{appMode === 'classroom' ? 'Ready for Lessons?' : 'Decorate Your Classrooms'}</h2><p className="text-white/90 max-w-md text-lg">{appMode === 'classroom' ? 'Select a subject below to jump into an interactive session with your students.' : 'Customize colors, stickers, and music to create the perfect magic learning environment.'}</p></div>
           <div className="absolute right-[-30px] bottom-[-30px] text-[12rem] opacity-20 transform -rotate-12 select-none pointer-events-none">{appMode === 'classroom' ? '🎓' : '🏫'}</div>
         </div>
+
+        {appMode === 'classroom' && (
+          <div 
+            onClick={() => setShowCalendar(true)} 
+            className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-blue-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center justify-center text-center group cursor-pointer"
+          >
+            <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">📅</div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">Classroom Calendar</h3>
+            <p className="text-slate-400 text-sm font-bold">Birthdays, weather, and more!</p>
+          </div>
+        )}
 
         {appMode === 'teacher' && (
           <div onClick={() => setView('materials')} className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center group cursor-pointer">

@@ -103,6 +103,9 @@ export interface User {
   materials?: MaterialFile[];
   songs?: Song[];
   games?: Game[];
+  calendarData?: {
+    events: Record<string, any[]>;
+  };
 }
 
 export interface Message {

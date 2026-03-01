@@ -229,6 +229,14 @@ const App: React.FC = () => {
     });
   };
 
+  const handleUpdateCalendarData = (calendarData: any) => {
+    if (!currentUser) return;
+    persistUser({
+      ...currentUser,
+      calendarData
+    });
+  };
+
   const navigateToSubject = (subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
@@ -578,6 +586,7 @@ const App: React.FC = () => {
               onUpdateMaterials={handleUpdateMaterials}
               onUpdateSongs={handleUpdateSongs}
               onUpdateGames={handleUpdateGames}
+              onUpdateCalendarData={handleUpdateCalendarData}
             />
           )}
           
