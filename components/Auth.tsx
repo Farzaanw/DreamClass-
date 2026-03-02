@@ -207,7 +207,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
         {view === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Email Address</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Email Address</label>
               <input
                 type="email"
                 placeholder="example@school.com"
@@ -218,11 +218,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
             </div>
             <div className="space-y-1">
               <div className="flex justify-between items-center px-4">
-                <label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
                 <button 
                   type="button" 
                   onClick={() => setView('reset-request')}
-                  className="text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-600 uppercase tracking-wider"
+                  className="text-xs font-bold text-blue-400 hover:text-blue-600 uppercase tracking-wider"
                 >
                   Forgot?
                 </button>
@@ -256,7 +256,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
         {view === 'signup' && (
           <form onSubmit={handleSignUp} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Username</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Username</label>
               <input
                 type="text"
                 placeholder="Teacher Name"
@@ -276,7 +276,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Password</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -306,7 +306,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
         {view === 'reset-request' && (
           <form onSubmit={handleResetRequest} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Your Email</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Your Email</label>
               <input
                 type="email"
                 placeholder="example@school.com"
@@ -334,7 +334,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
         {view === 'reset-password' && (
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">6-Digit Code</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">6-Digit Code</label>
               <input
                 type="text"
                 maxLength={6}
@@ -345,7 +345,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">New Password</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">New Password</label>
               <input
                 type="password"
                 placeholder="••••••••"
@@ -355,7 +355,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Confirm New Password</label>
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Confirm New Password</label>
               <input
                 type="password"
                 placeholder="••••••••"

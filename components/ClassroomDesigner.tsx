@@ -100,7 +100,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
         </div>
         <div className="text-center">
           <h2 className="text-2xl font-bold text-blue-600">Room Designer ✨</h2>
-          <p className="text-blue-400 font-bold uppercase text-[10px] tracking-widest">{subjectTitle}</p>
+          <p className="text-blue-400 font-bold uppercase text-xs tracking-widest">{subjectTitle}</p>
         </div>
         <button onClick={() => onSave(localDesign)} className="bg-green-400 text-white font-bold px-8 py-3 rounded-2xl border-b-4 border-green-600 active:translate-y-1 transition-all shadow-lg">✅ Save</button>
       </header>

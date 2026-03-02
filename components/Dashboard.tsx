@@ -475,7 +475,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <div className="text-4xl">{getFileIcon(previewMaterial.type)}</div>
                   <div>
                     <h3 className="text-xl font-black text-slate-800 truncate max-w-md">{previewMaterial.name}</h3>
-                    <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{previewMaterial.type} Viewer</p>
+                    <p className="text-xs font-black uppercase text-blue-500 tracking-widest">{previewMaterial.type} Viewer</p>
                   </div>
                 </div>
                 <button onClick={() => setPreviewMaterial(null)} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
@@ -489,7 +489,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   previewUrl ? <iframe src={previewUrl} className="w-full h-full border-none bg-white" title={previewMaterial.name} allow="autoplay" /> : <div className="text-center p-12"><div className="text-8xl mb-6 opacity-20">📄</div><p className="text-slate-500 font-black">Content missing. Try re-uploading.</p></div>
                 )}
               </div>
-              <div className="p-4 text-center bg-white border-t border-slate-50"><p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Teaching Resource Preview: {previewMaterial.name}</p></div>
+              <div className="p-4 text-center bg-white border-t border-slate-50"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest">Teaching Resource Preview: {previewMaterial.name}</p></div>
             </div>
           </div>
         )}
@@ -513,7 +513,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">{subject.icon || '⭐'}</div>
                     <div>
                       <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
-                      <div className="flex items-center gap-2 mt-1"><span className="bg-slate-200 text-slate-500 text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span></div>
+                      <div className="flex items-center gap-2 mt-1"><span className="bg-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span></div>
                     </div>
                   </div>
                   <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
@@ -530,9 +530,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
                           {mat.thumbnailUrl ? <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" /> : <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>}
                           <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center"><div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">🔍</div></div>
-                          <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
+                          <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
                         </div>
-                        <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
+                        <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
                       </div>
                     ))}
                   </div>
@@ -579,7 +579,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                           <div className="flex-1">
                             <div className="font-black text-xs text-slate-800 truncate max-w-[80px]">{sub.title}</div>
-                            <div className={`text-[9px] font-bold uppercase tracking-wider ${isAssigned ? 'text-pink-500' : 'text-slate-400'}`}>
+                            <div className={`text-xs font-bold uppercase tracking-wider ${isAssigned ? 'text-pink-500' : 'text-slate-400'}`}>
                               {isAssigned ? 'Assigned ✅' : 'Assign'}
                             </div>
                           </div>
@@ -643,7 +643,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </button>
                 ))}
               </div>
-              <p className="text-center mt-6 text-[10px] text-slate-300 font-bold uppercase tracking-[0.2em]">Source: IMSLP Open Music Library</p>
+              <p className="text-center mt-6 text-xs text-slate-300 font-bold uppercase tracking-[0.2em]">Source: IMSLP Open Music Library</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -662,7 +662,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div className="flex gap-2 w-full mt-auto">
                         <button 
                           onClick={() => handlePreviewSong(song.url)}
-                          className={`flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${previewingSongUrl === song.url ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                          className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${previewingSongUrl === song.url ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                           {previewingSongUrl === song.url ? '⏸️ Stop' : '▶️ Preview'}
                         </button>
@@ -706,7 +706,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-3xl">{subject.icon}</div>
                                 <div>
                                    <h3 className="text-xl font-black text-slate-700 tracking-tight">{subject.title} Songs</h3>
-                                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">{subjectSongs.length} Songs Assigned</p>
+                                   <p className="text-xs font-black uppercase text-slate-400 tracking-[0.2em]">{subjectSongs.length} Songs Assigned</p>
                                 </div>
                              </div>
                              <button onClick={() => setShowAddSongPanel(true)} className="opacity-0 group-hover/subject:opacity-100 transition-opacity bg-slate-100 text-slate-500 px-6 py-2 rounded-2xl font-black text-xs hover:bg-pink-50 hover:text-pink-500 shadow-sm border border-slate-200">+ Add More</button>
@@ -731,7 +731,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <h4 className="text-base font-black text-slate-800 mb-6 line-clamp-1">{song.title}</h4>
                                     <button 
                                       onClick={() => handlePreviewSong(song.url)}
-                                      className={`w-full py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${previewingSongUrl === song.url ? 'bg-amber-400 text-white' : 'bg-pink-500 text-white shadow-sm hover:bg-pink-600'}`}
+                                      className={`w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${previewingSongUrl === song.url ? 'bg-amber-400 text-white' : 'bg-pink-500 text-white shadow-sm hover:bg-pink-600'}`}
                                     >
                                       {previewingSongUrl === song.url ? '⏸️ Stop' : '▶️ Play'}
                                     </button>
@@ -753,7 +753,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border-2 border-slate-100 flex items-center justify-center text-3xl">📦</div>
                              <div>
                                 <h3 className="text-xl font-black text-slate-500 tracking-tight">Unassigned Songs</h3>
-                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">In your collection but not in a classroom</p>
+                                <p className="text-xs font-black uppercase text-slate-400 tracking-[0.2em]">In your collection but not in a classroom</p>
                              </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -776,7 +776,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <h4 className="text-base font-black text-slate-800 mb-6 line-clamp-1">{song.title}</h4>
                                     <button 
                                       onClick={() => setSongToAssign(song)}
-                                      className="w-full mt-4 py-3 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all border-b-4 border-blue-700 active:border-b-0"
+                                      className="w-full mt-4 py-3 bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all border-b-4 border-blue-700 active:border-b-0"
                                     >
                                       Assign to Classroom
                                     </button>
@@ -805,7 +805,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <h4 className="font-black text-slate-800 mb-6 line-clamp-1">{song.title}</h4>
                     <button 
                       onClick={() => setSongToAssign(song)}
-                      className="mt-auto bg-blue-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-transform border-b-4 border-blue-700"
+                      className="mt-auto bg-blue-500 text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform border-b-4 border-blue-700"
                     >
                       Assign Song
                     </button>
@@ -853,7 +853,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                           <div className="flex-1">
                             <div className="font-black text-xs text-slate-800 truncate max-w-[80px]">{sub.title}</div>
-                            <div className={`text-[9px] font-bold uppercase tracking-wider ${isAssigned ? 'text-emerald-500' : 'text-slate-400'}`}>
+                            <div className={`text-xs font-bold uppercase tracking-wider ${isAssigned ? 'text-emerald-500' : 'text-slate-400'}`}>
                               {isAssigned ? 'Assigned ✅' : 'Assign'}
                             </div>
                           </div>
@@ -921,7 +921,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   return (
                     <div key={game.id} className="bg-white p-8 rounded-[3rem] shadow-xl border-2 border-slate-50 flex flex-col items-center text-center group hover:border-emerald-200 transition-all relative overflow-hidden">
                        <div className="absolute top-4 right-4">
-                          {isAdded && <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">In Library</span>}
+                          {isAdded && <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">In Library</span>}
                        </div>
                        <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">
                          {game.icon}
@@ -968,7 +968,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <h4 className="font-black text-slate-800 mb-6 line-clamp-1">{game.title}</h4>
                       <button 
                         onClick={() => setGameToAssign(game)}
-                        className="mt-auto bg-blue-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-transform border-b-4 border-blue-700"
+                        className="mt-auto bg-blue-500 text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform border-b-4 border-blue-700"
                       >
                         Assign Game
                       </button>

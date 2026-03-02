@@ -141,7 +141,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           </button>
           <div className="hidden sm:block">
             <RainbowLogo size="text-2xl lg:text-4xl" />
-            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest leading-none mt-1">Interactive Magic Lab</p>
+            <p className="text-gray-400 font-bold text-xs uppercase tracking-widest leading-none mt-1">Interactive Magic Lab</p>
           </div>
         </div>
         
@@ -152,7 +152,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
                   className={`flex items-center gap-2 px-3 sm:px-6 py-1.5 sm:py-2 rounded-full border transition-all ${showLyrics ? 'bg-purple-500 text-white border-purple-600 shadow-inner' : 'bg-purple-50 text-purple-500 border-purple-100 hover:bg-purple-100'}`}
                 >
                     <span className="text-lg sm:text-xl">🎤</span>
-                    <span className="text-[10px] sm:text-xs font-bold uppercase">{showLyrics ? 'Lyrics On' : 'Sing Along'}</span>
+                    <span className="text-xs font-bold uppercase">{showLyrics ? 'Lyrics On' : 'Sing Along'}</span>
                 </button>
             )}
             <div className={`px-4 sm:px-8 py-2 sm:py-3 ${subject.color} text-white rounded-full font-bold text-sm sm:text-lg shadow-lg border-b-4 border-black/10 uppercase truncate max-w-[120px] sm:max-w-none`}>
@@ -194,19 +194,19 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
               <div 
                 key={concept.id}
                 onClick={() => onSelectConcept(concept)}
-                className="group w-28 h-[130px] sm:w-32 sm:h-[160px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
+                className="group w-40 h-[180px] sm:w-48 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
               >
                 <div 
-                  className="w-full h-full bg-white rounded-[2.5rem] sm:rounded-[3.5rem] shadow-xl flex flex-col items-center justify-center p-3 sm:p-4 text-center border-b-[8px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-3 animate-float-card transition-all" 
+                  className="w-full h-full bg-white rounded-[3rem] sm:rounded-[4rem] shadow-xl flex flex-col items-center justify-center p-4 sm:p-6 text-center border-b-[10px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-4 animate-float-card transition-all" 
                   style={{ animationDelay: `${idx * 0.4}s` }}
                 >
-                  <div className="w-10 h-10 sm:w-14 sm:h-14 bg-slate-50 rounded-full flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-3 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-2 ring-black/5">
+                  <div className="w-14 h-14 sm:w-20 sm:h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-4 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-4 ring-black/5">
                     {concept.icon || '📚'}
                   </div>
-                  <h3 className="text-[10px] sm:text-[13px] font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1">
+                  <h3 className="text-xs sm:text-base font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1">
                     {concept.title}
                   </h3>
-                  <div className="mt-1 bg-blue-500 text-white text-[7px] sm:text-[9px] px-3 sm:px-4 py-1 sm:py-1 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-1 group-hover:translate-y-0 uppercase tracking-widest">
+                  <div className="mt-2 bg-blue-500 text-white text-xs sm:text-[11px] px-4 sm:px-6 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest">
                     Play! 🚀
                   </div>
                 </div>
@@ -251,7 +251,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
                 {MASCOTS.find(m => m.id === design.mascot)?.emoji}
               </span>
               {isMascotPeeking && (
-                <div className="absolute top-1/2 left-[80%] -translate-y-1/2 bg-white px-3 py-1 rounded-full shadow-lg text-[9px] font-bold text-blue-500 animate-pulse whitespace-nowrap">
+                <div className="absolute top-1/2 left-[80%] -translate-y-1/2 bg-white px-3 py-1 rounded-full shadow-lg text-xs font-bold text-blue-500 animate-pulse whitespace-nowrap">
                   Peek! ✨
                 </div>
               )}

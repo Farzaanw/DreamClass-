@@ -106,16 +106,20 @@ const App: React.FC = () => {
 
   const persistUser = (updatedUser: User) => {
     try {
-      setCurrentUser(updatedUser);
-      localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
-      const accountsData = localStorage.getItem('dreamclass_accounts');
-      if (accountsData) {
-        const accounts: User[] = JSON.parse(accountsData);
-        const updatedAccounts = accounts.map(acc => 
-          acc.id === updatedUser.id ? { ...acc, ...updatedUser, password: acc.password } : acc
-        );
-        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
-      }
+      setCurrentUser(prev => {
+        const newUser = { ...prev, ...updatedUser };
+        localStorage.setItem('dreamclass_user', JSON.stringify(newUser));
+        
+        const accountsData = localStorage.getItem('dreamclass_accounts');
+        if (accountsData) {
+          const accounts: User[] = JSON.parse(accountsData);
+          const updatedAccounts = accounts.map(acc => 
+            acc.id === newUser.id ? { ...acc, ...newUser, password: acc.password } : acc
+          );
+          localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+        }
+        return newUser;
+      });
     } catch (e) {
       console.error("Storage error:", e);
       alert("Uh oh! Your magic storage is full. Try deleting some old whiteboards from History to make room for new ones! 📦✨");
@@ -123,19 +127,37 @@ const App: React.FC = () => {
   };
 
   const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
-    if (!currentUser) return;
-    const updatedUser = { 
-      ...currentUser, 
-      classroomDesigns: {
-        ...currentUser.classroomDesigns,
-        [subjectId]: {
-          ...design,
-          whiteboards: design.whiteboards || [],
-          conceptBoards: design.conceptBoards || {}
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      const updatedUser = { 
+        ...prev, 
+        classroomDesigns: {
+          ...prev.classroomDesigns,
+          [subjectId]: {
+            ...design,
+            whiteboards: design.whiteboards || [],
+            conceptBoards: design.conceptBoards || {}
+          }
+        } 
+      };
+      
+      // Persist inside the functional update to ensure we have the latest state
+      try {
+        localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
+        const accountsData = localStorage.getItem('dreamclass_accounts');
+        if (accountsData) {
+          const accounts: User[] = JSON.parse(accountsData);
+          const updatedAccounts = accounts.map(acc => 
+            acc.id === updatedUser.id ? { ...acc, ...updatedUser, password: acc.password } : acc
+          );
+          localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
         }
-      } 
-    };
-    persistUser(updatedUser);
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
+      
+      return updatedUser;
+    });
   };
 
   const handleAddSubject = (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
@@ -285,7 +307,7 @@ const App: React.FC = () => {
       {currentUser && appMode && (
         <div 
           className={`pointer-events-none fixed inset-0 z-[9999] transition-colors duration-700 ${
-            appMode === 'teacher' ? 'bg-blue-500/10' : 'bg-transparent'
+            appMode === 'teacher' ? 'bg-blue-500/15' : 'bg-transparent'
           }`}
           aria-hidden="true"
         />

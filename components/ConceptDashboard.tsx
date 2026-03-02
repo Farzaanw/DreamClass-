@@ -720,7 +720,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleSaveBoard = () => {
+  const handleSaveBoard = (onSuccess?: () => void) => {
     let boardId = currentBoardId;
     let boardName = currentBoardName;
 
@@ -758,10 +758,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard } 
     });
     
-    setTimeout(() => {
-      setSaveStatus('saved');
+    setSaveStatus('saved');
+    if (onSuccess) {
+      setTimeout(onSuccess, 800);
+    } else {
       setTimeout(() => setSaveStatus('idle'), 2000);
-    }, 500);
+    }
 
     return true;
   };
@@ -795,7 +797,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-3xl flex items-center justify-center hover:scale-110 hover:border-blue-200 active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
     const letterBaseClass = stickerBaseClass.replace('text-3xl', 'text-2xl');
     const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-sm py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-200 active:scale-95 transition-all cursor-pointer text-center truncate min-h-[56px]";
-    const headerClass = "col-span-4 mt-8 mb-4 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
+    const headerClass = "col-span-4 mt-8 mb-4 text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
 
     const effectiveCategoryId = activeSubCategoryId || activeCategoryId;
 
@@ -826,7 +828,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -880,15 +882,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return (
         <>
           <div className={headerClass}><span>Backgrounds</span></div>
-          {bgs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {bgs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
           <div className={headerClass}><span>Classifications</span></div>
-          {types.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {types.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
           <div className={headerClass}><span>Life Cycles</span></div>
-          {cycles.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {cycles.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
           <div className={headerClass}><span>Animals</span></div>
-          {specific.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {specific.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
           <div className={headerClass}><span>Dinosaurs</span></div>
-          {dinosaurs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {dinosaurs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
         </>
       );
     }
@@ -914,7 +916,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -937,7 +939,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -953,7 +955,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any, i.m)} onClick={() => addItem(i.c, i.t as any, undefined, undefined, i.m)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -974,7 +976,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -988,7 +990,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           <div className={headerClass}><span>Tools</span></div>
           <div className="flex flex-col items-center gap-1">
             <button draggable onDragStart={(e) => handleDragStartAsset(e, '📖', 'sticker')} onClick={() => addItem('📖', 'sticker')} className={stickerBaseClass}>📖</button>
-            <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">Dictionary</span>
+            <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">Dictionary</span>
           </div>
         </>
       );
@@ -1010,7 +1012,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1029,7 +1031,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1053,7 +1055,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any, i.m)} onClick={() => addItem(i.c, i.t as any, undefined, undefined, i.m)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1074,7 +1076,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1095,7 +1097,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1114,7 +1116,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1133,7 +1135,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1156,7 +1158,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1175,7 +1177,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1192,7 +1194,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1213,7 +1215,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1232,7 +1234,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       return items.map(i => (
         <div key={i.l} className="flex flex-col items-center gap-1">
           <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
         </div>
       ));
     }
@@ -1320,7 +1322,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               {g.items.map(i => (
                 <div key={i.l} className="flex flex-col items-center gap-1">
                   <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
                 </div>
               ))}
             </React.Fragment>
@@ -1346,13 +1348,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           <div className={headerClass}><span>Tools</span></div>
           <div className="flex flex-col items-center gap-1">
             <button draggable onDragStart={(e) => handleDragStartAsset(e, 'calendar', 'shape', { month: 2, year: 2026, selectedDays: [] })} onClick={() => addItem('calendar', 'shape', undefined, undefined, { month: 2, year: 2026, selectedDays: [] })} className={stickerBaseClass}>📅</button>
-            <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">Interactive Calendar</span>
+            <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">Interactive Calendar</span>
           </div>
           <div className={headerClass}><span>Stickers</span></div>
           {stickers.map(i => (
             <div key={i.l} className="flex flex-col items-center gap-1">
               <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-              <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
+              <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
             </div>
           ))}
           <div className={headerClass}><span>Day Cards</span></div>
@@ -1395,7 +1397,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     if (activeCategoryId === 'HISTORY') {
       const hist = (design.whiteboards || []).filter(b => b.conceptId === concept.id);
       if (!hist.length) return <div className="col-span-4 text-center py-12 text-slate-300 font-bold px-4">No history yet. 🕰️</div>;
-      return [...hist].reverse().map(b => <div key={b.id} className="col-span-4 flex items-stretch gap-2 mb-2"><button onClick={() => restoreBoardState(b)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-300 shadow-sm transition-all overflow-hidden"><div className="font-black text-slate-800 truncate text-sm">{b.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-wider">{new Date(b.timestamp).toLocaleDateString()}</div></button><button onClick={() => deleteFromHistory(b.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button></div>);
+      return [...hist].reverse().map(b => <div key={b.id} className="col-span-4 flex items-stretch gap-2 mb-2"><button onClick={() => restoreBoardState(b)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-300 shadow-sm transition-all overflow-hidden"><div className="font-black text-slate-800 truncate text-sm">{b.name}</div><div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">{new Date(b.timestamp).toLocaleDateString()}</div></button><button onClick={() => deleteFromHistory(b.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button></div>);
     }
   };
 
@@ -1412,19 +1414,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         setShowSwitcherArrow(false);
       }}
     >
-      <header className="h-16 bg-white border-b-4 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
-        <div className="flex items-center gap-4 flex-1">
-          <button onClick={onBack} className="text-2xl p-2 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
-          <div className="flex flex-col min-w-[120px]">
-            <div className="flex items-center gap-2">
-              <h1 className="font-black text-slate-900 tracking-tight leading-tight truncate max-w-[150px]">{concept.title}</h1>
+      <header className="h-24 bg-white border-b-4 border-slate-100 px-8 flex items-center justify-between z-50 shadow-sm">
+        <div className="flex items-center gap-6 flex-1">
+          <button onClick={onBack} className="text-3xl p-3 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
+          <div className="flex flex-col min-w-[150px]">
+            <div className="flex items-center gap-3">
+              <h1 className="font-black text-slate-900 text-2xl tracking-tight leading-tight truncate max-w-[250px]">{concept.title}</h1>
               {currentBoardName && (
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-md border border-blue-100 uppercase tracking-tighter">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-sm font-black rounded-md border border-blue-100 uppercase tracking-tighter">
                   Active: {currentBoardName}
                 </span>
               )}
             </div>
-            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
+            <span className="text-sm font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
           </div>
 
           {/* Concept Switcher for Teacher Mode */}
@@ -1433,21 +1435,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               <AnimatePresence>
                 {showSwitcherArrow && (
                   <motion.div
-                    initial={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] flex flex-col items-center pointer-events-none"
+                    className="absolute top-full left-1/2 -translate-x-1/2 mt-4 z-[100] flex flex-col items-center pointer-events-none"
                   >
-                    <div className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[8px] uppercase tracking-widest shadow-xl border border-white mb-1 whitespace-nowrap">
+                    <motion.span 
+                      animate={{ y: [0, -5, 0] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-3xl drop-shadow-md mb-1"
+                    >
+                      ⬆️
+                    </motion.span>
+                    <div className="bg-green-600 text-white px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
                       Switch Concepts
                     </div>
-                    <motion.span 
-                      animate={{ y: [0, 5, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-2xl drop-shadow-md"
-                    >
-                      ⬇️
-                    </motion.span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1457,7 +1459,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                 onMouseMove={handleSwitcherMouseMove}
                 onMouseUp={handleSwitcherStop}
                 onMouseLeave={handleSwitcherStop}
-                className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border-2 border-slate-100 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none"
+                className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border-2 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)] overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none transition-all duration-500"
               >
                 {subjectConcepts.map((c) => (
                   <button
@@ -1467,7 +1469,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                         onSelectConcept?.(c);
                       }
                     }}
-                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${
+                    className={`px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${
                       c.title === concept.title 
                         ? 'bg-white text-blue-600 shadow-sm ring-2 ring-blue-100' 
                         : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
@@ -1483,22 +1485,53 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={handleClearEverything} className="px-4 py-2 bg-slate-100 rounded-xl font-black text-slate-900 text-sm border-b-4 border-slate-200 active:translate-y-1 active:border-b-0 transition-all">✨ New</button>
-          <button 
-            onClick={handleSaveBoard} 
-            className={`px-6 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-md flex items-center gap-2 ${
-              saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
-              saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
-              'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
-            }`}
-            disabled={saveStatus === 'saving'}
-          >
-            {saveStatus === 'saved' ? '✅ Saved!' : saveStatus === 'saving' ? '⏳ Saving...' : '💾 Save'}
-          </button>
-          <div className="flex gap-1 ml-4 bg-slate-100 p-1 rounded-xl">
-             {['plain', 'lined', 'grid'].map(b => <button key={b} onClick={() => setBoardBg(b as any)} className={`p-2 rounded-lg ${boardBg === b ? 'bg-white shadow-sm ring-2 ring-blue-400' : ''}`}>{b === 'plain' ? '⬜' : b === 'lined' ? '📝' : '📊'}</button>)}
-          </div>
+        <div className="flex items-center gap-4">
+          {mode === 'teacher' ? (
+            <button 
+              onClick={() => handleSaveBoard(() => onBack())} 
+              className={`px-10 py-5 rounded-2xl font-black text-xl border-b-8 transition-all shadow-2xl flex items-center gap-4 ${
+                saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
+                saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
+                'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-2 active:border-b-0'
+              }`}
+              disabled={saveStatus === 'saving'}
+            >
+              <span className="text-3xl">{saveStatus === 'saved' ? '✅' : '💾'}</span>
+              {saveStatus === 'saved' ? 'Changes Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save Lesson'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={handleClearEverything} 
+                className="px-6 py-3 bg-slate-100 rounded-xl font-black text-slate-900 text-base border-b-4 border-slate-200 active:translate-y-1 active:border-b-0 transition-all"
+              >
+                ✨ New
+              </button>
+              <button 
+                onClick={handleSaveBoard} 
+                className={`px-8 py-3 rounded-xl font-black text-base border-b-4 transition-all shadow-md flex items-center gap-2 ${
+                  saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
+                  saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
+                  'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
+                }`}
+                disabled={saveStatus === 'saving'}
+              >
+                {saveStatus === 'saved' ? '✅ Saved!' : saveStatus === 'saving' ? '⏳ Saving...' : '💾 Save'}
+              </button>
+              <div className="flex gap-2 ml-4 bg-slate-100 p-1.5 rounded-xl">
+                 {(['plain', 'lined', 'grid'] as const).map(b => (
+                   <button 
+                    key={b} 
+                    onClick={() => setBoardBg(b)} 
+                    className={`p-3 rounded-xl transition-all ${boardBg === b ? 'bg-white shadow-sm ring-2 ring-blue-400' : 'hover:bg-white/50'}`}
+                    title={`${b.charAt(0).toUpperCase() + b.slice(1)} Paper`}
+                   >
+                     <span className="text-xl">{b === 'plain' ? '⬜' : b === 'lined' ? '📝' : '📊'}</span>
+                   </button>
+                 ))}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -1517,7 +1550,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                 className="w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all bg-blue-50 border-2 border-blue-100 text-blue-500 animate-glow-flow hover:scale-105 active:scale-95 shadow-sm"
               >
                 <span className="text-3xl font-black leading-none">➕</span>
-                <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
+                <span className="text-xs font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
               </button>
 
               <AnimatePresence>
@@ -1535,7 +1568,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                     >
                       ⬅️
                     </motion.span>
-                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2 animate-bounce-gentle">
+                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2 animate-bounce-gentle">
                       Click to add icons!
                     </div>
                   </motion.div>
@@ -1561,7 +1594,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                 }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
-                <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+                <span className="text-xs font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
                 
                 {cat.isCustom && mode === 'teacher' && (
                   <button 
@@ -1569,7 +1602,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                       e.stopPropagation();
                       setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
                     }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                   >
                     ✕
                   </button>
@@ -1581,7 +1614,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
         <div className={`absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="px-6 py-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
-            <h3 className="font-black text-slate-400 text-[10px] tracking-[0.2em] uppercase truncate">
+            <h3 className="font-black text-slate-400 text-xs tracking-[0.2em] uppercase truncate">
               {categories.find(c => c.id === activeCategoryId)?.label || (activeCategoryId === 'SONGS' ? 'Songs' : 'Games')} Library
             </h3>
             <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 transition-colors">✕</button>
@@ -1598,7 +1631,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-xs tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            {!filteredMaterials.length ? <div className="text-center py-12 px-4 opacity-50"><div className="text-5xl mb-4">📂</div><p className="font-black text-slate-400">No subject materials.</p></div> : <div className="space-y-6"><h4 className="px-1 text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>{currentSubject?.title}</h4><div className="space-y-4">{filteredMaterials.map(m => <button key={m.id} onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"><div className="h-28 bg-slate-50 flex items-center justify-center">{m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}</div><div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div></button>)}</div></div>}
+            {!filteredMaterials.length ? <div className="text-center py-12 px-4 opacity-50"><div className="text-5xl mb-4">📂</div><p className="font-black text-slate-400">No subject materials.</p></div> : <div className="space-y-6"><h4 className="px-1 text-xs font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>{currentSubject?.title}</h4><div className="space-y-4">{filteredMaterials.map(m => <button key={m.id} onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"><div className="h-28 bg-slate-50 flex items-center justify-center">{m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}</div><div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div></button>)}</div></div>}
           </div>
           <button 
             onClick={(e) => {
@@ -1618,7 +1651,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="absolute right-full mr-4 z-[100] flex items-center pointer-events-none"
                 >
-                  <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2 animate-bounce-gentle">
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2 animate-bounce-gentle">
                     Classroom Materials
                   </div>
                   <motion.span 
@@ -1742,7 +1775,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                         <div className="absolute w-6 h-6 bg-slate-800 rounded-full z-30" />
                         
                         {selectedItemId === item.id && (
-                          <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                          <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
                             Drag hands to set time! 🕒
                           </div>
                         )}
@@ -1755,7 +1788,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                         <div className={`absolute inset-0 flex ${item.metadata?.vertical ? 'flex-col' : 'flex-row'}`}>
                           {Array.from({length: item.metadata?.vertical ? 24 : 12}).map((_, i) => (
                             <div key={i} className={`flex-1 border-slate-400/30 flex ${item.metadata?.vertical ? 'border-b flex-row justify-between items-center px-2' : 'border-r flex-col justify-between items-center py-2'}`}>
-                              <span className="text-[10px] font-black text-slate-500">{i}</span>
+                              <span className="text-xs font-black text-slate-500">{i}</span>
                               <div className={`flex ${item.metadata?.vertical ? 'flex-col gap-1' : 'flex-row gap-1'}`}>
                                 {Array.from({length: 4}).map((_, j) => (
                                   <div key={j} className={`bg-slate-400/50 ${item.metadata?.vertical ? 'h-px w-2' : 'w-px h-2'}`} />
@@ -1781,7 +1814,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           const info = getCubeClusterInfo(item);
                           if (info && info.isTopLeft) {
                             return (
-                              <div className="absolute -top-8 left-0 bg-slate-800 text-white px-2 py-0.5 rounded-md text-[10px] font-black whitespace-nowrap shadow-xl z-50">
+                              <div className="absolute -top-8 left-0 bg-slate-800 text-white px-2 py-0.5 rounded-md text-xs font-black whitespace-nowrap shadow-xl z-50">
                                 {info.width > 1 && info.height > 1 ? `${info.width} × ${info.height} = ${info.total}` : info.total}
                               </div>
                             );
@@ -1811,7 +1844,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                         {selectedItemId === item.id && (
                           <div className="absolute -right-16 top-1/2 -translate-y-1/2 flex flex-col items-center bg-slate-800 text-white p-2 rounded-xl shadow-2xl border border-slate-700 pointer-events-none">
                             <span className="text-sm font-black">{item.metadata?.temp || 0}°</span>
-                            <span className="text-[8px] uppercase font-bold text-slate-400">Temp</span>
+                            <span className="text-xs uppercase font-bold text-slate-400">Temp</span>
                           </div>
                         )}
                       </div>
@@ -1822,7 +1855,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           style={{ height: `${((item.metadata?.fill || 0) / (item.metadata?.capacity || 1)) * 100}%` }} 
                         />
                         <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
-                          <div className="text-[10px] font-black text-slate-500 uppercase">{item.metadata?.capacity} Cup</div>
+                          <div className="text-xs font-black text-slate-500 uppercase">{item.metadata?.capacity} Cup</div>
                           <div className="flex-1 border-l-2 border-slate-300/50 my-2 relative">
                             <div className="absolute top-1/4 left-0 w-2 h-px bg-slate-300" />
                             <div className="absolute top-1/2 left-0 w-4 h-px bg-slate-300" />
@@ -1857,7 +1890,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           <button onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { month: (item.metadata?.month || 1) % 12 + 1 }); }} className="hover:scale-110 transition-transform">▶️</button>
                         </div>
                         <div className="grid grid-cols-7 gap-1 p-4">
-                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-[10px] font-black text-slate-300 py-2">{d}</div>)}
+                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-xs font-black text-slate-300 py-2">{d}</div>)}
                           {Array.from({length: new Date(item.metadata?.year || 2026, item.metadata?.month || 1, 0).getDate()}).map((_, i) => {
                             const day = i + 1;
                             const isSelected = item.metadata?.selectedDays?.includes(day);
@@ -1880,12 +1913,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           })}
                         </div>
                         <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
                             {item.metadata?.selectedDays?.length || 0} Days Selected
                           </div>
                           <button 
                             onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { selectedDays: [] }); }}
-                            className="text-[10px] font-black text-blue-500 uppercase hover:underline"
+                            className="text-xs font-black text-blue-500 uppercase hover:underline"
                           >
                             Clear
                           </button>
@@ -1920,7 +1953,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                   className={`w-16 h-16 rounded-full transition-all flex flex-col items-center justify-center relative ${activeCategoryId === extra.id && drawerOpen ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40 hover:opacity-70'}`}
                  >
                    <span className="text-2xl">{extra.icon}</span>
-                   <span className="text-[8px] font-bold uppercase">{extra.label}</span>
+                   <span className="text-xs font-bold uppercase">{extra.label}</span>
                  </button>
               ))}
               <div className="w-px h-10 bg-slate-200 mx-1 self-center" />
@@ -1988,7 +2021,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                       className={`aspect-square rounded-3xl border-4 transition-all flex flex-col items-center justify-center gap-2 relative group ${isAlreadyAdded ? 'border-blue-400 bg-blue-50 shadow-inner' : 'border-slate-100 bg-white hover:border-blue-200 hover:scale-105 shadow-sm'}`}
                     >
                       <span className="text-4xl">{cat.icon}</span>
-                      <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter text-center px-1 truncate w-full">{cat.label}</span>
+                      <span className="text-xs font-black uppercase text-slate-400 tracking-tighter text-center px-1 truncate w-full">{cat.label}</span>
                       {isAlreadyAdded && (
                         <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg border-2 border-white">✓</div>
                       )}

@@ -57,7 +57,7 @@ const DraggableTool: React.FC<{ type: string, icon: string | React.ReactNode, la
     className={`flex flex-col items-center gap-1 p-3 rounded-2xl bg-white shadow-sm border-2 border-slate-100 cursor-grab active:cursor-grabbing hover:scale-105 transition-all hover:border-blue-200`}
   >
     <div className="text-3xl">{icon}</div>
-    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+    <span className="text-xs font-black uppercase tracking-widest text-slate-400">{label}</span>
   </div>
 );
 
@@ -167,7 +167,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                   </div>
                 )}
                 {event.type === 'sticky' && (
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[8px] shadow-sm border ${event.color || STICKY_COLORS[0]}`} title={event.text}>
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs shadow-sm border ${event.color || STICKY_COLORS[0]}`} title={event.text}>
                     📝
                   </div>
                 )}
@@ -199,7 +199,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
           {WEATHER_ICONS.map(w => (
             <DraggableTool key={w.label} type="weather" icon={w.icon} label={w.label} />
           ))}
-          <div className="mt-auto hidden md:block p-4 bg-blue-50 rounded-2xl text-[10px] font-bold text-blue-600 italic">
+          <div className="mt-auto hidden md:block p-4 bg-blue-50 rounded-2xl text-xs font-bold text-blue-600 italic">
             Drag tools onto any day to add them!
           </div>
         </div>
@@ -212,7 +212,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
               <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-inner">📅</div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-black tracking-tight">{monthName} {year}</h2>
-                <p className="text-blue-100 font-bold text-[10px] sm:text-xs">Interactive Classroom Calendar 🍎</p>
+                <p className="text-blue-100 font-bold text-xs">Interactive Classroom Calendar 🍎</p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
@@ -227,7 +227,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
             <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center font-black text-slate-400 text-[9px] sm:text-[10px] uppercase tracking-widest py-2">{day}</div>
+                <div key={day} className="text-center font-black text-slate-400 text-xs sm:text-sm uppercase tracking-widest py-2">{day}</div>
               ))}
               {renderCalendar()}
             </div>
