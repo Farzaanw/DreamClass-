@@ -89,6 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [previewMaterial, setPreviewMaterial] = useState<MaterialFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const modalScrollRef = useRef<HTMLDivElement>(null);
 
   // Songs State
   const [activeSongCategory, setActiveSongCategory] = useState<string>('All');
@@ -427,6 +428,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const addConceptField = () => {
     setConcepts([...concepts, { title: '', icon: '✨', description: '' }]);
+    setTimeout(() => {
+      if (modalScrollRef.current) {
+        modalScrollRef.current.scrollTo({
+          top: modalScrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 50);
   };
 
   const updateConcept = (index: number, field: string, value: string) => {
@@ -1124,7 +1133,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {showSubjectModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in" onClick={handleCloseSubjectModal}>
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto relative animate-zoom-in" onClick={e => e.stopPropagation()}>
+          <div ref={modalScrollRef} className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto relative animate-zoom-in" onClick={e => e.stopPropagation()}>
             <button onClick={handleCloseSubjectModal} className="absolute top-8 right-8 text-3xl text-gray-300 hover:text-red-500">✕</button>
             <div className="text-center mb-8"><h3 className="text-3xl font-bold text-gray-800">{editingSubjectId ? 'Edit Subject' : 'New Subject'}</h3></div>
             <form onSubmit={handleCreateOrUpdateSubject} className="space-y-6">

@@ -18,12 +18,16 @@ interface ConceptDashboardProps {
 }
 
 const MARKER_COLORS = [
-  { name: 'Blue', value: '#2563eb' },
-  { name: 'Black', value: '#000000' },
   { name: 'Red', value: '#ef4444' },
-  { name: 'Green', value: '#22c55e' },
   { name: 'Orange', value: '#f97316' },
-  { name: 'Purple', value: '#a855f7' }
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Blue', value: '#2563eb' },
+  { name: 'Indigo', value: '#4f46e5' },
+  { name: 'Violet', value: '#9333ea' },
+  { name: 'Pink', value: '#ec4899' },
+  { name: 'Black', value: '#000000' },
+  { name: 'Brown', value: '#78350f' }
 ];
 
 const HIGHLIGHTER_COLORS = [
@@ -145,6 +149,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
   
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
+  const [boardBgColor, setBoardBgColor] = useState<string>('#ffffff');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -204,6 +209,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const categories = useMemo(() => {
     const commonTail = [
       { id: 'STICKERS', label: 'Stickers', icon: '✨' },
+      { id: 'GAMES', label: 'Games', icon: '🎮' },
       { id: 'HISTORY', label: 'History', icon: '🕰️' }
     ];
 
@@ -295,6 +301,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         if (savedState) {
           setItems(savedState.items || []);
           setBoardBg(savedState.bg || 'plain');
+          setBoardBgColor(savedState.bgColor || '#ffffff');
           if (savedState.viewport) setViewport(savedState.viewport);
           setCurrentBoardId(savedState.id);
           setCurrentBoardName(savedState.name);
@@ -313,6 +320,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         } else {
           setItems([]);
           setBoardBg('plain');
+          setBoardBgColor('#ffffff');
           setViewport({ x: 0, y: 0, zoom: 1 });
           setCurrentBoardId(null);
           setCurrentBoardName(null);
@@ -413,6 +421,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     saveToUndoStack();
     setItems(board.items || []);
     setBoardBg(board.bg || 'plain');
+    setBoardBgColor(board.bgColor || '#ffffff');
     if (board.viewport) setViewport(board.viewport);
     setCurrentBoardId(board.id);
     setCurrentBoardName(board.name);
@@ -720,6 +729,45 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  // Auto-save whiteboard items and basic state
+  useEffect(() => {
+    if (mode === 'teacher') {
+      const timer = setTimeout(() => {
+        // Only auto-save if we have something to save
+        if (items.length === 0 && boardBg === 'plain' && viewport.x === 0 && viewport.y === 0 && viewport.zoom === 1) return;
+
+        const boardId = currentBoardId || `auto-${concept.id}`;
+        const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
+        
+        const newBoard: Whiteboard = {
+          id: boardId,
+          conceptId: concept.id,
+          name: boardName,
+          timestamp: Date.now(),
+          items: [...items],
+          bg: boardBg,
+          bgColor: boardBgColor,
+          viewport: { ...viewport },
+          customIcons: [...customIcons],
+          // Keep existing drawing data during auto-save
+          drawingData: design.conceptBoards?.[concept.id]?.drawingData
+        };
+
+        const existingWhiteboards = design.whiteboards || [];
+        const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
+          ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
+          : [...existingWhiteboards, newBoard];
+
+        onSaveDesign({
+          ...design,
+          whiteboards: updatedWhiteboards,
+          conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
+        });
+      }, 2000); // 2 second debounce for auto-save
+      return () => clearTimeout(timer);
+    }
+  }, [items, boardBg, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode]);
+
   const handleSaveBoard = (onSuccess?: () => void) => {
     let boardId = currentBoardId;
     let boardName = currentBoardName;
@@ -735,6 +783,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
     setSaveStatus('saving');
 
+    // Capture the full state including the drawing layer
+    const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : undefined;
+
     const newBoard: Whiteboard = { 
       id: boardId, 
       conceptId: concept.id, 
@@ -742,7 +793,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       timestamp: Date.now(), 
       items: [...items], 
       bg: boardBg, 
-      drawingData: canvasRef.current?.toDataURL('image/png'), 
+      bgColor: boardBgColor,
+      drawingData: drawingSnapshot, 
       viewport: { ...viewport },
       customIcons: [...customIcons]
     };
@@ -752,11 +804,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
       ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
       : [...existingWhiteboards, newBoard];
 
-    onSaveDesign({ 
+    const updatedDesign = { 
       ...design, 
       whiteboards: updatedWhiteboards, 
       conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard } 
-    });
+    };
+
+    onSaveDesign(updatedDesign);
     
     setSaveStatus('saved');
     if (onSuccess) {
@@ -1529,6 +1583,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                      <span className="text-xl">{b === 'plain' ? '⬜' : b === 'lined' ? '📝' : '📊'}</span>
                    </button>
                  ))}
+                 <div className="w-px h-8 bg-slate-200 mx-1 self-center" />
+                 {['#ffffff', '#fefce8', '#f0fdf4', '#eff6ff', '#fdf2f8', '#faf5ff'].map(color => (
+                   <button 
+                    key={color} 
+                    onClick={() => setBoardBgColor(color)} 
+                    className={`w-10 h-10 rounded-lg border-2 transition-all ${boardBgColor === color ? 'border-blue-400 scale-110 shadow-sm' : 'border-transparent hover:scale-105'}`}
+                    style={{ backgroundColor: color }}
+                   />
+                 ))}
               </div>
             </div>
           )}
@@ -1687,7 +1750,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           {activeMaterial && <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}><div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5"><div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}><div className="flex items-center gap-3"><div className="text-2xl">{getFileIcon(activeMaterial.type)}</div><div><h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4></div></div><button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button></div><div className="flex-1 bg-white flex items-center justify-center overflow-hidden">{activeMaterial.type === 'video' ? (materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />) : (materialUrl && <iframe src={materialUrl} className="w-full h-full border-none bg-white" title={activeMaterial.name} />)}</div></div></div>}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
-            <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : 'bg-white'}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px' }}>
+            <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px', backgroundColor: boardBgColor }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
               {items.map(item => (
                 <div key={item.id} className="absolute z-10 select-none group pointer-events-auto" style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => handleItemMouseDown(e, item)}>
@@ -1943,20 +2006,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           </div>
           <div className="h-24 bg-white/95 backdrop-blur-md border-t-4 border-slate-100 flex items-center justify-center gap-6 z-50">
             <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
-              {[ {id: 'GAMES', icon: '🎮', label: 'Games'} ].map(extra => (
-                 <button 
-                  key={extra.id}
-                  onClick={() => {
-                    setActiveCategoryId(extra.id);
-                    setDrawerOpen(true);
-                  }}
-                  className={`w-16 h-16 rounded-full transition-all flex flex-col items-center justify-center relative ${activeCategoryId === extra.id && drawerOpen ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40 hover:opacity-70'}`}
-                 >
-                   <span className="text-2xl">{extra.icon}</span>
-                   <span className="text-xs font-bold uppercase">{extra.label}</span>
-                 </button>
-              ))}
-              <div className="w-px h-10 bg-slate-200 mx-1 self-center" />
               {[ {id: 'select', icon: '🖐️'}, {id: 'marker', icon: '✏️'}, {id: 'highlighter', icon: '🖍️'}, {id: 'eraser', icon: '🧼'} ].map(t => (
                 <div key={t.id} className="relative group/tool">
                   <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-16 h-16 rounded-full transition-all flex items-center justify-center text-2xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>

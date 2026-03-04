@@ -38,6 +38,7 @@ export interface Whiteboard {
   timestamp: number;
   items: BoardItem[];
   bg: 'plain' | 'lined' | 'grid';
+  bgColor?: string;
   drawingData?: string; // DataURL of the canvas layer
   viewport?: {
     x: number;

@@ -32,9 +32,15 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const [isMascotCelebrating, setIsMascotCelebrating] = useState(false);
   // Default to false (shown in bold color)
   const [isMascotPeeking, setIsMascotPeeking] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [dragDistance, setDragDistance] = useState(0);
+
+  // Triple the concepts for infinite scroll effect
+  const tripledConcepts = [...subject.concepts, ...subject.concepts, ...subject.concepts];
+  const originalCount = subject.concepts.length;
 
   const activeMusic = MUSIC_OPTIONS.find(m => m.id === design.ambientMusic);
 
@@ -96,40 +102,77 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
     return 'none';
   };
 
-  const scrollBySet = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const scrollAmount = scrollRef.current.clientWidth * 0.75;
-      scrollRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
+  useEffect(() => {
+    // Initial scroll to the middle set of concepts
+    if (scrollRef.current && originalCount > 0) {
+      const container = scrollRef.current;
+      const cardWidth = container.scrollWidth / 3;
+      container.scrollLeft = cardWidth;
     }
+  }, [originalCount]);
+
+  const handleInfiniteScroll = () => {
+    if (!scrollRef.current || originalCount === 0) return;
+    
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    const cardWidth = scrollWidth / 3;
+
+    // Jump back to middle if we go too far left or right
+    if (scrollLeft <= 5) {
+      scrollRef.current.scrollLeft = cardWidth + 5;
+    } else if (scrollLeft >= scrollWidth - clientWidth - 5) {
+      scrollRef.current.scrollLeft = cardWidth - clientWidth - 5;
+    }
+
+    // Update active index for dots
+    const relativeScroll = scrollLeft % cardWidth;
+    const itemWidth = cardWidth / originalCount;
+    const index = Math.round(relativeScroll / itemWidth) % originalCount;
+    setActiveIndex(index);
   };
 
-  const updateScrollState = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 10);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-      
-      const cardWidth = scrollWidth / subject.concepts.length;
-      const index = Math.round(scrollLeft / cardWidth);
-      setActiveIndex(index);
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+    setDragDistance(0);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Scroll speed
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+    setDragDistance(Math.abs(x - startX));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleCardClick = (e: React.MouseEvent, concept: Concept) => {
+    // If we dragged more than a tiny bit, don't trigger the click
+    if (dragDistance > 10) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
     }
+    onSelectConcept(concept);
   };
 
   useEffect(() => {
     const current = scrollRef.current;
     if (current) {
-      current.addEventListener('scroll', updateScrollState);
-      updateScrollState();
-      window.addEventListener('resize', updateScrollState);
+      current.addEventListener('scroll', handleInfiniteScroll);
+      window.addEventListener('resize', handleInfiniteScroll);
       return () => {
-        current.removeEventListener('scroll', updateScrollState);
-        window.removeEventListener('resize', updateScrollState);
+        current.removeEventListener('scroll', handleInfiniteScroll);
+        window.removeEventListener('resize', handleInfiniteScroll);
       };
     }
-  }, [subject.concepts]);
+  }, [originalCount]);
 
   return (
     <div className="relative h-screen w-full overflow-hidden flex flex-col font-['Fredoka']">
@@ -187,18 +230,22 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         {/* Concept Cards Carousel */}
         <div 
           ref={scrollRef}
-          className="absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center snap-x snap-mandatory hide-scrollbar"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center snap-x snap-mandatory hide-scrollbar ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
         >
-          <div className="flex items-center justify-center min-w-full gap-4 sm:gap-8 py-4 px-12">
-            {subject.concepts.map((concept, idx) => (
+          <div className="flex items-center min-w-max gap-4 sm:gap-8 py-4 px-12 pointer-events-none">
+            {tripledConcepts.map((concept, idx) => (
               <div 
-                key={concept.id}
-                onClick={() => onSelectConcept(concept)}
-                className="group w-40 h-[180px] sm:w-48 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center"
+                key={`${concept.id}-${idx}`}
+                onClick={(e) => handleCardClick(e, concept)}
+                className="group w-40 h-[180px] sm:w-48 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center pointer-events-auto"
               >
                 <div 
                   className="w-full h-full bg-white rounded-[3rem] sm:rounded-[4rem] shadow-xl flex flex-col items-center justify-center p-4 sm:p-6 text-center border-b-[10px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-4 animate-float-card transition-all" 
-                  style={{ animationDelay: `${idx * 0.4}s` }}
+                  style={{ animationDelay: `${(idx % originalCount) * 0.4}s` }}
                 >
                   <div className="w-14 h-14 sm:w-20 sm:h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-4 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-4 ring-black/5">
                     {concept.icon || '📚'}
@@ -214,24 +261,6 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
             ))}
           </div>
         </div>
-
-        {/* Navigation Arrows */}
-        {subject.concepts.length > 1 && (
-          <div className="absolute bottom-[24%] left-0 right-0 flex justify-center items-center gap-48 sm:gap-72 z-[40] pointer-events-none">
-            <button 
-              onClick={() => scrollBySet('left')}
-              className={`pointer-events-auto w-10 h-10 sm:w-14 sm:h-14 bg-blue-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl transition-all border-b-6 border-blue-600 hover:bg-blue-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-            >
-              ⬅️
-            </button>
-            <button 
-              onClick={() => scrollBySet('right')}
-              className={`pointer-events-auto w-10 h-10 sm:w-14 sm:h-14 bg-yellow-400 text-white rounded-full shadow-2xl flex items-center justify-center text-xl transition-all border-b-6 border-yellow-600 hover:bg-yellow-300 hover:scale-110 active:translate-y-1 active:border-b-0 ${canScrollRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-            >
-              ➡️
-            </button>
-          </div>
-        )}
 
         {/* Floor Area */}
         <div className="absolute bottom-0 w-full h-[35%] border-t-8 border-black/5 shadow-[inset_0_10px_10px_rgba(0,0,0,0.05)] z-0" style={{ backgroundColor: design.floorColor }}>

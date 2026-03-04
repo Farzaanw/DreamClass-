@@ -104,32 +104,33 @@ const App: React.FC = () => {
     localStorage.removeItem('dreamclass_user');
   };
 
-  const persistUser = (updatedUser: User) => {
-    try {
-      setCurrentUser(prev => {
-        const newUser = { ...prev, ...updatedUser };
-        localStorage.setItem('dreamclass_user', JSON.stringify(newUser));
-        
-        const accountsData = localStorage.getItem('dreamclass_accounts');
-        if (accountsData) {
-          const accounts: User[] = JSON.parse(accountsData);
-          const updatedAccounts = accounts.map(acc => 
-            acc.id === newUser.id ? { ...acc, ...newUser, password: acc.password } : acc
-          );
-          localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
-        }
-        return newUser;
-      });
-    } catch (e) {
-      console.error("Storage error:", e);
-      alert("Uh oh! Your magic storage is full. Try deleting some old whiteboards from History to make room for new ones! 📦✨");
+  // Centralized persistence effect
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('dreamclass_user', JSON.stringify(currentUser));
+      
+      const accountsData = localStorage.getItem('dreamclass_accounts');
+      if (accountsData) {
+        const accounts: User[] = JSON.parse(accountsData);
+        const updatedAccounts = accounts.map(acc => 
+          acc.id === currentUser.id ? { ...acc, ...currentUser, password: acc.password } : acc
+        );
+        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
+      }
     }
+  }, [currentUser]);
+
+  const persistUser = (updatedUser: Partial<User>) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      return { ...prev, ...updatedUser };
+    });
   };
 
   const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
     setCurrentUser(prev => {
       if (!prev) return prev;
-      const updatedUser = { 
+      return { 
         ...prev, 
         classroomDesigns: {
           ...prev.classroomDesigns,
@@ -140,23 +141,6 @@ const App: React.FC = () => {
           }
         } 
       };
-      
-      // Persist inside the functional update to ensure we have the latest state
-      try {
-        localStorage.setItem('dreamclass_user', JSON.stringify(updatedUser));
-        const accountsData = localStorage.getItem('dreamclass_accounts');
-        if (accountsData) {
-          const accounts: User[] = JSON.parse(accountsData);
-          const updatedAccounts = accounts.map(acc => 
-            acc.id === updatedUser.id ? { ...acc, ...updatedUser, password: acc.password } : acc
-          );
-          localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
-        }
-      } catch (e) {
-        console.error("Storage error:", e);
-      }
-      
-      return updatedUser;
     });
   };
 
