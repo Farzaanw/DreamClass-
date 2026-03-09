@@ -22,7 +22,7 @@ export interface Subject {
 export interface BoardItem {
   id: string;
   content: string;
-  type: 'text' | 'emoji' | 'sticker' | 'shape' | 'song';
+  type: 'text' | 'emoji' | 'sticker' | 'shape' | 'song' | 'timer' | 'spinner';
   x: number;
   y: number;
   scale: number;

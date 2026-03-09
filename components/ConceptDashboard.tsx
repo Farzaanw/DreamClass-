@@ -13,6 +13,7 @@ interface ConceptDashboardProps {
   onBack: () => void;
   onSaveDesign: (design: ClassroomDesign) => void;
   onSelectConcept?: (concept: Concept) => void;
+  onUpdateMaterials?: (materials: MaterialFile[]) => void;
   userSongs?: Song[]; // Songs added by the user
   mode: AppMode;
 }
@@ -139,7 +140,7 @@ const getFileIcon = (type: string) => {
   }
 };
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign, onSelectConcept, userSongs = [], mode }) => {
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign, onSelectConcept, onUpdateMaterials, userSongs = [], mode }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
@@ -154,6 +155,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<MaterialFile | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<MaterialFile | null>(null);
   const [materialUrl, setMaterialUrl] = useState<string | null>(null);
   const [materialPos, setMaterialPos] = useState({ x: 50, y: 50 });
   const isDraggingMaterial = useRef(false);
@@ -271,6 +273,34 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     }
   }, [categories, activeCategoryId]);
 
+  // Handle Timer Countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setItems(prev => {
+        let hasChanges = false;
+        const newItems = prev.map(item => {
+          if (item.type === 'timer' && item.metadata?.isRunning && item.metadata?.timeLeft > 0) {
+            hasChanges = true;
+            const newTime = item.metadata.timeLeft - 1;
+            
+            // Play sound when time is up
+            if (newTime === 0) {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1017/1017-preview.mp3');
+              audio.volume = 0.5;
+              audio.play().catch(() => {});
+            }
+            
+            return { ...item, metadata: { ...item.metadata, timeLeft: newTime, isRunning: newTime > 0 } };
+          }
+          return item;
+        });
+        return hasChanges ? newItems : prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
@@ -368,6 +398,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     }
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [activeMaterial]);
+
+  useEffect(() => {
+    if (activeMaterial && !materials.some(m => m.id === activeMaterial.id)) {
+      setActiveMaterial(null);
+    }
+  }, [materials, activeMaterial]);
 
   // Handle Song Audio
   useEffect(() => {
@@ -1694,7 +1730,43 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-xs tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            {!filteredMaterials.length ? <div className="text-center py-12 px-4 opacity-50"><div className="text-5xl mb-4">📂</div><p className="font-black text-slate-400">No subject materials.</p></div> : <div className="space-y-6"><h4 className="px-1 text-xs font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>{currentSubject?.title}</h4><div className="space-y-4">{filteredMaterials.map(m => <button key={m.id} onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"><div className="h-28 bg-slate-50 flex items-center justify-center">{m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}</div><div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div></button>)}</div></div>}
+            {!filteredMaterials.length ? (
+              <div className="text-center py-12 px-4 opacity-50">
+                <div className="text-5xl mb-4">📂</div>
+                <p className="font-black text-slate-400">No subject materials.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <h4 className="px-1 text-xs font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>
+                  {currentSubject?.title}
+                </h4>
+                <div className="space-y-4">
+                  {filteredMaterials.map(m => (
+                    <div key={m.id} className="relative group">
+                      <button 
+                        onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} 
+                        className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
+                      >
+                        <div className="h-28 bg-slate-50 flex items-center justify-center">
+                          {m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}
+                        </div>
+                        <div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div>
+                      </button>
+                      {mode === 'teacher' && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setItemToRemove(m); }}
+                          className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg transition-all border-2 border-white z-10 hover:scale-110 active:scale-90"
+                          title="Delete Material"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <button 
             onClick={(e) => {
@@ -1747,7 +1819,39 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               </motion.div>
             )}
           </AnimatePresence>
-          {activeMaterial && <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}><div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5"><div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}><div className="flex items-center gap-3"><div className="text-2xl">{getFileIcon(activeMaterial.type)}</div><div><h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4></div></div><button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button></div><div className="flex-1 bg-white flex items-center justify-center overflow-hidden">{activeMaterial.type === 'video' ? (materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />) : (materialUrl && <iframe src={materialUrl} className="w-full h-full border-none bg-white" title={activeMaterial.name} />)}</div></div></div>}
+          {activeMaterial && (
+            <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}>
+              <div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5">
+                <div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}>
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{getFileIcon(activeMaterial.type)}</div>
+                    <div>
+                      <h4 className="font-black text-slate-900 text-xs tracking-tight truncate max-w-[200px]">{activeMaterial.name}</h4>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {mode === 'teacher' && (
+                      <button 
+                        onClick={() => setItemToRemove(activeMaterial)} 
+                        className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all"
+                        title="Delete Material"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                    <button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
+                  </div>
+                </div>
+                <div className="flex-1 bg-white flex items-center justify-center overflow-hidden">
+                  {activeMaterial.type === 'video' ? (
+                    materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />
+                  ) : (
+                    materialUrl && <iframe src={materialUrl} className="w-full h-full border-none bg-white" title={activeMaterial.name} />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
             <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px', backgroundColor: boardBgColor }}>
@@ -1793,6 +1897,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                       </div>
                     ) : item.type === 'shape' && item.content === 'clock' ? (
                       <div className="w-64 h-64 bg-white rounded-full border-8 border-slate-800 relative shadow-2xl flex items-center justify-center pointer-events-auto clock-container">
+                        {/* Remove Button */}
+                        <button 
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                          className="absolute -top-4 -right-4 w-8 h-8 bg-white rounded-full shadow-lg border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all z-50"
+                        >
+                          ✕
+                        </button>
                         {/* Minute Ticks */}
                         {Array.from({length: 60}).map((_, i) => {
                           const angle = i * 6 * (Math.PI / 180);
@@ -1987,6 +2099,270 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           </button>
                         </div>
                       </div>
+                    ) : item.type === 'timer' ? (
+                      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-blue-100 flex flex-col items-center gap-6 min-w-[280px] pointer-events-auto">
+                        <div className="flex justify-between w-full items-center">
+                          <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Classroom Timer ⏱️</div>
+                          <button 
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                            className="text-slate-300 hover:text-rose-500 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className={`text-7xl font-black tabular-nums transition-colors ${item.metadata?.timeLeft === 0 ? 'text-rose-500 animate-bounce-gentle' : 'text-slate-800'}`}>
+                          {Math.floor((item.metadata?.timeLeft || 0) / 60)}:{String((item.metadata?.timeLeft || 0) % 60).padStart(2, '0')}
+                        </div>
+                        
+                        <div className="flex gap-4 w-full" onMouseDown={e => e.stopPropagation()}>
+                          <button 
+                            onClick={() => {
+                              const isRunning = !item.metadata?.isRunning;
+                              updateItemMetadata(item.id, { isRunning });
+                            }}
+                            className={`flex-1 py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 ${item.metadata?.isRunning ? 'bg-amber-100 text-amber-600 border-b-4 border-amber-300' : 'bg-emerald-500 text-white border-b-4 border-emerald-700'}`}
+                          >
+                            {item.metadata?.isRunning ? '⏸️ Pause' : '▶️ Start'}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              updateItemMetadata(item.id, { timeLeft: item.metadata?.initialTime || 60, isRunning: false });
+                            }}
+                            className="px-6 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black border-b-4 border-slate-200 hover:bg-slate-200 transition-all"
+                          >
+                            🔄
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 w-full bg-slate-50 p-3 rounded-2xl" onMouseDown={e => e.stopPropagation()}>
+                          <span className="text-xs font-black text-slate-400 uppercase">Set:</span>
+                          {[1, 2, 5, 10].map(m => (
+                            <button 
+                              key={m}
+                              onClick={() => updateItemMetadata(item.id, { timeLeft: m * 60, initialTime: m * 60, isRunning: false })}
+                              className="flex-1 py-2 bg-white rounded-xl text-sm font-black text-slate-600 border-2 border-slate-100 hover:border-blue-300 transition-all"
+                            >
+                              {m}m
+                            </button>
+                          ))}
+                        </div>
+
+                        {item.metadata?.timeLeft === 0 && (
+                          <div className="text-rose-500 font-black text-xl animate-pulse">TIME IS UP! 🔔</div>
+                        )}
+                      </div>
+                    ) : item.type === 'spinner' ? (
+                      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-purple-100 flex flex-col items-center gap-6 min-w-[350px] pointer-events-auto">
+                        <div className="flex justify-between w-full items-center">
+                          <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Wheel Spinner 🎡</div>
+                          <button 
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                            className="text-slate-300 hover:text-rose-500 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        
+                        <div className="relative w-72 h-72">
+                          {/* Spinner Ticker */}
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl z-20 drop-shadow-lg">🔻</div>
+                          
+                          {/* The Wheel */}
+                          <motion.div 
+                            animate={{ rotate: item.metadata?.rotation || 0 }}
+                            transition={item.metadata?.isSpinning ? { duration: 4, ease: [0.15, 0, 0.15, 1] } : { duration: 0 }}
+                            className="w-full h-full rounded-full border-[12px] border-slate-900 relative overflow-hidden shadow-2xl bg-slate-100"
+                          >
+                            {(item.metadata?.names || []).length > 0 ? (
+                              <svg viewBox="0 0 100 100" className="w-full h-full">
+                                {(item.metadata?.names || []).map((name: string, i: number, arr: string[]) => {
+                                  const sliceAngle = 360 / arr.length;
+                                  const startAngle = i * sliceAngle;
+                                  const endAngle = (i + 1) * sliceAngle;
+                                  const colors = ['#eab308', '#ec4899', '#3b82f6', '#8b5cf6', '#22c55e', '#f97316', '#ef4444'];
+                                  
+                                  // Special case for 1 student: full circle
+                                  if (arr.length === 1) {
+                                    return (
+                                      <g key={i}>
+                                        <circle cx="50" cy="50" r="50" fill={colors[0]} />
+                                        <text 
+                                          x="50" 
+                                          y="50" 
+                                          textAnchor="middle" 
+                                          dominantBaseline="middle" 
+                                          fill="white" 
+                                          className="font-black text-[10px] drop-shadow-sm"
+                                        >
+                                          {name}
+                                        </text>
+                                      </g>
+                                    );
+                                  }
+
+                                  // Path calculation for slices
+                                  const radius = 50;
+                                  const centerX = 50;
+                                  const centerY = 50;
+                                  
+                                  const startRad = (startAngle - 90) * Math.PI / 180.0;
+                                  const endRad = (endAngle - 90) * Math.PI / 180.0;
+                                  
+                                  const x1 = centerX + radius * Math.cos(startRad);
+                                  const y1 = centerY + radius * Math.sin(startRad);
+                                  const x2 = centerX + radius * Math.cos(endRad);
+                                  const y2 = centerY + radius * Math.sin(endRad);
+                                  
+                                  const largeArcFlag = sliceAngle <= 180 ? "0" : "1";
+                                  const d = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+
+                                  // Text positioning
+                                  const textAngle = startAngle + sliceAngle / 2;
+                                  const textRad = (textAngle - 90) * Math.PI / 180.0;
+                                  const textX = centerX + (radius * 0.65) * Math.cos(textRad);
+                                  const textY = centerY + (radius * 0.65) * Math.sin(textRad);
+
+                                  return (
+                                    <g key={i}>
+                                      <path d={d} fill={colors[i % colors.length]} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+                                      <text 
+                                        x={textX} 
+                                        y={textY} 
+                                        textAnchor="middle" 
+                                        dominantBaseline="middle" 
+                                        fill="white" 
+                                        className="font-black text-[6px] drop-shadow-sm"
+                                        transform={`rotate(${textAngle}, ${textX}, ${textY})`}
+                                      >
+                                        {name}
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+                              </svg>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold italic text-center p-8">Add names below to start!</div>
+                            )}
+                          </motion.div>
+
+                          {/* Center Button - Dark Circular */}
+                          <button 
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={() => {
+                              if ((item.metadata?.names || []).length < 2) return;
+                              const extraSpins = 6 + Math.random() * 4;
+                              const newRotation = (item.metadata?.rotation || 0) + (360 * extraSpins) + Math.random() * 360;
+                              updateItemMetadata(item.id, { isSpinning: true, rotation: newRotation, selectedName: null });
+                              
+                              // Play spin sound
+                              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
+                              audio.volume = 0.3;
+                              audio.play().catch(() => {});
+
+                              setTimeout(() => {
+                                const finalRotation = newRotation % 360;
+                                const anglePerSegment = 360 / (item.metadata?.names || []).length;
+                                // Ticker is at top (270 deg). 
+                                const winningAngle = (360 - (finalRotation % 360) + 270) % 360;
+                                const winnerIdx = Math.floor(winningAngle / anglePerSegment);
+                                const winner = item.metadata?.names[winnerIdx];
+                                updateItemMetadata(item.id, { isSpinning: false, selectedName: winner });
+                                
+                                // Play win sound
+                                const winAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3');
+                                winAudio.volume = 0.4;
+                                winAudio.play().catch(() => {});
+                              }, 4000);
+                            }}
+                            disabled={item.metadata?.isSpinning || (item.metadata?.names || []).length < 2}
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-slate-900 text-white rounded-full border-4 border-slate-700 shadow-2xl z-30 font-black text-sm hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <span className="text-xl">🎡</span>
+                            <span>SPIN</span>
+                          </button>
+                        </div>
+
+                        {/* Name Input */}
+                        <div className="w-full space-y-3" onMouseDown={e => e.stopPropagation()}>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              placeholder="Add student name..."
+                              value={spinnerInputs[item.id] || ''}
+                              onChange={(e) => setSpinnerInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const name = spinnerInputs[item.id]?.trim();
+                                  if (name) {
+                                    updateItemMetadata(item.id, { names: [...(item.metadata?.names || []), name] });
+                                    setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
+                                  }
+                                }
+                              }}
+                            />
+                            <button 
+                              onClick={() => {
+                                const name = spinnerInputs[item.id]?.trim();
+                                if (name) {
+                                  updateItemMetadata(item.id, { names: [...(item.metadata?.names || []), name] });
+                                  setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
+                                }
+                              }}
+                              className="px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-md"
+                            >
+                              Add
+                            </button>
+                            <button 
+                              onClick={() => updateItemMetadata(item.id, { names: [] })}
+                              className="px-4 py-3 bg-slate-100 text-slate-400 rounded-xl font-black text-xs hover:bg-rose-50 hover:text-rose-500 transition-all"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-1 custom-scrollbar">
+                            {(item.metadata?.names || []).map((name: string, i: number) => (
+                              <div key={i} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-black flex items-center gap-2 border border-purple-100">
+                                {name}
+                                <button onClick={() => updateItemMetadata(item.id, { names: (item.metadata?.names || []).filter((_: any, idx: number) => idx !== i) })} className="hover:text-rose-500">✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Winner Announcement */}
+                        <AnimatePresence>
+                          {item.metadata?.selectedName && (
+                            <motion.div 
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-8 rounded-[3rem] text-center shadow-2xl border-4 border-purple-200"
+                              onMouseDown={e => e.stopPropagation()}
+                            >
+                              <motion.div 
+                                animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.2, 1] }}
+                                transition={{ duration: 0.5, repeat: Infinity }}
+                                className="text-8xl mb-6"
+                              >
+                                🌟
+                              </motion.div>
+                              <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2">The Winner Is...</div>
+                              <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 mb-8 animate-celebrate drop-shadow-sm">
+                                {item.metadata?.selectedName}
+                              </div>
+                              <button 
+                                onClick={() => updateItemMetadata(item.id, { selectedName: null })}
+                                className="px-10 py-5 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-2xl font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                              >
+                                Awesome! 🎉
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     ) : (
                       <span className={`block pointer-events-none ${item.type === 'text' ? 'text-7xl font-black text-slate-900' : 'text-9xl'}`}>{item.content}</span>
                     )}
@@ -2022,6 +2398,27 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               <button onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl">🏠</button>
             </div>
             <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
+            {mode === 'teacher' && (
+              <>
+                <div className="h-12 w-px bg-slate-200" />
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
+                    className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
+                    title="Add Timer"
+                  >
+                    ⏱️
+                  </button>
+                  <button 
+                    onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: [], rotation: 0, isSpinning: false })}
+                    className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
+                    title="Add Wheel Spinner"
+                  >
+                    🎡
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -2092,13 +2489,53 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
         </div>
       )}
 
+      <AnimatePresence>
+        {itemToRemove && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-modal-fade-in">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full text-center"
+            >
+              <div className="text-5xl mb-4">🗑️</div>
+              <h3 className="text-xl font-black text-slate-800 mb-4">Are you sure you want to remove this material from your classroom?</h3>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setItemToRemove(null)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors"
+                >
+                  No
+                </button>
+                <button 
+                  onClick={() => {
+                    if (onUpdateMaterials) {
+                      const updated = materials.filter(m => m.id !== itemToRemove.id);
+                      onUpdateMaterials([...updated]);
+                    }
+                    if (activeMaterial?.id === itemToRemove.id) {
+                      setActiveMaterial(null);
+                    }
+                    setItemToRemove(null);
+                  }}
+                  className="flex-1 py-3 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-colors shadow-lg border-b-4 border-rose-700 active:translate-y-1 active:border-b-0"
+                >
+                  Yes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <style>{`
-        .board-lined { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.1) 2px, transparent 2px); }
-        .board-grid { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.08) 2px, transparent 2px), linear-gradient(90deg, rgba(59, 130, 246, 0.08) 2px, transparent 2px); }
+        .board-lined { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.25) 2px, transparent 2px); }
+        .board-grid { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.2) 2px, transparent 2px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 2px, transparent 2px); }
         .cursor-grab { cursor: grab; }
         .active\\:cursor-grabbing:active { cursor: grabbing; }
         canvas { image-rendering: auto; }
         .cursor-nwse-resize { cursor: nwse-resize; }
+        @keyframes modal-fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         @keyframes fade-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
         @keyframes material-enter { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes live-jiggle { 0% { transform: scale(1); } 25% { transform: scale(1.2) rotate(5deg); } 50% { transform: scale(1.1) rotate(-5deg); } 100% { transform: scale(1) rotate(0); } }
@@ -2109,6 +2546,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
         .animate-glow-flow { animation: glow-flow 2s infinite; }
+        .animate-modal-fade-in { animation: modal-fade-in 0.2s ease-out forwards; }
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
         .animate-material-enter { animation: material-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-live-jiggle { animation: live-jiggle 0.6s cubic-bezier(0.16, 1, 0.3, 1); }

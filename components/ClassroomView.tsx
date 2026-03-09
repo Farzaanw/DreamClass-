@@ -37,6 +37,10 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [dragDistance, setDragDistance] = useState(0);
+  const velocityRef = useRef<number>(0);
+  const lastXRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
+  const momentumRef = useRef<number>(0);
 
   // Triple the concepts for infinite scroll effect
   const tripledConcepts = [...subject.concepts, ...subject.concepts, ...subject.concepts];
@@ -60,6 +64,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
     return () => {
       if (audioRef.current) audioRef.current.pause();
+      cancelAnimationFrame(momentumRef.current);
     };
   }, [design.ambientMusic]);
 
@@ -114,42 +119,77 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const handleInfiniteScroll = () => {
     if (!scrollRef.current || originalCount === 0) return;
     
-    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-    const cardWidth = scrollWidth / 3;
+    const container = scrollRef.current;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    const oneSetWidth = scrollWidth / 3;
 
-    // Jump back to middle if we go too far left or right
-    if (scrollLeft <= 5) {
-      scrollRef.current.scrollLeft = cardWidth + 5;
-    } else if (scrollLeft >= scrollWidth - clientWidth - 5) {
-      scrollRef.current.scrollLeft = cardWidth - clientWidth - 5;
+    // Jump logic: Keep the scroll position within the middle set
+    if (scrollLeft <= 0) {
+      container.scrollLeft = oneSetWidth;
+    } else if (scrollLeft >= scrollWidth - clientWidth) {
+      container.scrollLeft = oneSetWidth * 2 - clientWidth;
     }
 
     // Update active index for dots
-    const relativeScroll = scrollLeft % cardWidth;
-    const itemWidth = cardWidth / originalCount;
+    const relativeScroll = (scrollLeft % oneSetWidth);
+    const itemWidth = oneSetWidth / originalCount;
     const index = Math.round(relativeScroll / itemWidth) % originalCount;
     setActiveIndex(index);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (!scrollRef.current) return;
     setIsDragging(true);
-    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
+    setStartX(pageX - scrollRef.current.offsetLeft);
     setScrollLeft(scrollRef.current.scrollLeft);
     setDragDistance(0);
+    
+    // Reset momentum tracking
+    velocityRef.current = 0;
+    lastXRef.current = pageX;
+    lastTimeRef.current = Date.now();
+    cancelAnimationFrame(momentumRef.current);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
+    if (e.cancelable) e.preventDefault();
+    
+    const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
+    const x = pageX - scrollRef.current.offsetLeft;
     const walk = (x - startX) * 1.5; // Scroll speed
     scrollRef.current.scrollLeft = scrollLeft - walk;
     setDragDistance(Math.abs(x - startX));
+
+    // Calculate velocity
+    const now = Date.now();
+    const dt = now - lastTimeRef.current;
+    if (dt > 0) {
+      const dx = pageX - lastXRef.current;
+      velocityRef.current = dx / dt;
+    }
+    lastXRef.current = pageX;
+    lastTimeRef.current = now;
+  };
+
+  const applyMomentum = () => {
+    if (!scrollRef.current || isDragging) return;
+    
+    scrollRef.current.scrollLeft -= velocityRef.current * 15; // Apply velocity
+    velocityRef.current *= 0.95; // Friction
+
+    if (Math.abs(velocityRef.current) > 0.1) {
+      momentumRef.current = requestAnimationFrame(applyMomentum);
+    }
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    // Trigger momentum if we were moving fast enough
+    if (Math.abs(velocityRef.current) > 0.2) {
+      applyMomentum();
+    }
   };
 
   const handleCardClick = (e: React.MouseEvent, concept: Concept) => {
@@ -234,7 +274,10 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center snap-x snap-mandatory hide-scrollbar ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center hide-scrollbar ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
         >
           <div className="flex items-center min-w-max gap-4 sm:gap-8 py-4 px-12 pointer-events-none">
             {tripledConcepts.map((concept, idx) => (
@@ -337,7 +380,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         .animate-wiggle { animation: wiggle 2s ease-in-out infinite; }
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .glow { filter: drop-shadow(0 0 50px rgba(255,255,255,1)); }
       `}</style>
     </div>

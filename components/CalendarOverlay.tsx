@@ -47,6 +47,14 @@ const STICKY_COLORS = [
   'bg-purple-100 border-purple-200',
 ];
 
+const WEATHER_SOUNDS: Record<string, string> = {
+  Sunny: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  Rainy: 'https://assets.mixkit.co/active_storage/sfx/2393/2393-preview.mp3',
+  Stormy: 'https://assets.mixkit.co/active_storage/sfx/2438/2438-preview.mp3',
+  Windy: 'https://assets.mixkit.co/active_storage/sfx/1173/1173-preview.mp3',
+  Snowy: 'https://assets.mixkit.co/active_storage/sfx/2533/2533-preview.mp3',
+};
+
 const DraggableTool: React.FC<{ type: string, icon: string | React.ReactNode, label: string, color?: string }> = ({ type, icon, label, color }) => (
   <div 
     draggable
@@ -79,6 +87,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [stickyText, setStickyText] = useState('');
   const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0]);
   const dayRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const weatherAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const events = calendarData?.events || {};
 
@@ -136,6 +145,12 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
 
   const triggerConfetti = (name: string) => {
     setCelebrationName(name);
+    
+    // Add celebration sound
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Celebration audio failed:', e));
+
     confetti({
       particleCount: 150,
       spread: 70,
@@ -146,8 +161,31 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   };
 
   const triggerWeatherEffect = (type: string) => {
+    // Stop previous audio if any
+    if (weatherAudioRef.current) {
+      weatherAudioRef.current.pause();
+      weatherAudioRef.current = null;
+    }
+
     setActiveWeatherEffect(type);
-    setTimeout(() => setActiveWeatherEffect(null), 5000);
+    
+    const soundUrl = WEATHER_SOUNDS[type];
+    if (soundUrl) {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.4;
+      audio.play().catch(e => console.log('Audio play failed:', e));
+      weatherAudioRef.current = audio;
+    }
+
+    // Standardize duration to 3000ms and ensure audio stops when effect ends
+    const duration = 3000;
+    setTimeout(() => {
+      setActiveWeatherEffect(null);
+      if (weatherAudioRef.current) {
+        weatherAudioRef.current.pause();
+        weatherAudioRef.current = null;
+      }
+    }, duration);
   };
 
   const renderCalendar = () => {

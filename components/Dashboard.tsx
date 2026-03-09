@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song, Game } from '../types';
 import CalendarOverlay from './CalendarOverlay';
+import PublicLibrary, { Resource } from './PublicLibrary';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "Teachly".split("");
@@ -35,6 +36,7 @@ interface DashboardProps {
   onUpdateSongs: (songs: Song[]) => void;
   onUpdateGames: (games: Game[]) => void;
   onUpdateCalendarData: (calendarData: any) => void;
+  onAddResourceToClassroom: (resource: Resource, subjectId: string) => void;
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -78,10 +80,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateMaterials,
   onUpdateSongs,
   onUpdateGames,
-  onUpdateCalendarData
+  onUpdateCalendarData,
+  onAddResourceToClassroom
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
+  const [materialSubView, setMaterialSubView] = useState<'my' | 'public'>('my');
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubjectForUpload, setActiveSubjectForUpload] = useState<string | null>(null);
@@ -90,6 +94,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const modalScrollRef = useRef<HTMLDivElement>(null);
+  const songFileInputRef = useRef<HTMLInputElement>(null);
+  const [activeSubjectForSongUpload, setActiveSubjectForSongUpload] = useState<string | null>(null);
 
   // Songs State
   const [activeSongCategory, setActiveSongCategory] = useState<string>('All');
@@ -325,8 +331,13 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleDeleteMaterial = (id: string) => {
     if (confirm("Delete this material?")) {
-      const updated = (user.materials || []).filter(m => m.id !== id);
-      onUpdateMaterials(updated);
+      // Use a fresh copy of materials from the user prop to ensure we're filtering the latest state
+      const currentMaterials = user.materials || [];
+      const updated = currentMaterials.filter(m => m.id !== id);
+      
+      // Ensure we are not mutating the original array
+      onUpdateMaterials([...updated]);
+      
       setToast("Material deleted. 🗑️");
       if (previewMaterial?.id === id) setPreviewMaterial(null);
     }
@@ -368,6 +379,39 @@ const Dashboard: React.FC<DashboardProps> = ({
     const updatedSongs = [...currentSongs];
     updatedSongs[songIndex] = { ...song, assignedSubjectIds: newAssignedIds };
     onUpdateSongs(updatedSongs);
+  };
+
+  const handleSongUploadClick = (subjectId: string) => {
+    setActiveSubjectForSongUpload(subjectId);
+    if (songFileInputRef.current) {
+      songFileInputRef.current.click();
+    }
+  };
+
+  const handleSongFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeSubjectForSongUpload) return;
+
+    setIsProcessing(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const newSong: Song = {
+        id: `custom-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        icon: '🎵',
+        category: 'Uploaded',
+        url: content,
+        assignedSubjectIds: [activeSubjectForSongUpload]
+      };
+      
+      onUpdateSongs([...(user.songs || []), newSong]);
+      setToast("Song uploaded and assigned! 🎶");
+      setIsProcessing(false);
+      setActiveSubjectForSongUpload(null);
+      if (songFileInputRef.current) songFileInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteSong = (id: string) => {
@@ -509,47 +553,85 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </header>
         <div className="mb-8 p-1.5 bg-slate-100 rounded-[1.5rem] inline-flex shadow-inner">
-          <button className="px-8 py-2.5 bg-white rounded-xl shadow-sm font-black text-blue-500 transition-all">My Material</button>
-          <button className="px-8 py-2.5 rounded-xl font-black text-slate-400 cursor-not-allowed opacity-50" title="Coming Soon">Public Library</button>
+          <button 
+            onClick={() => setMaterialSubView('my')}
+            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'my' ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            My Material
+          </button>
+          <button 
+            onClick={() => setMaterialSubView('public')}
+            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'public' ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Public Library
+          </button>
         </div>
-        <div className="space-y-12">
-          {allSubjects.map(subject => {
-            const subjectMaterials = (user.materials || []).filter(m => m.subjectId === subject.id);
-            return (
-              <div key={subject.id} className="bg-white/50 p-8 rounded-[3rem] border-2 border-slate-100/50 hover:bg-white transition-colors duration-500">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">{subject.icon || '⭐'}</div>
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
-                      <div className="flex items-center gap-2 mt-1"><span className="bg-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span></div>
-                    </div>
-                  </div>
-                  <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
-                    <span className="text-xl group-hover:rotate-12 transition-transform">➕</span><span>Add {subject.title} Files</span>
-                  </button>
-                </div>
-                {subjectMaterials.length === 0 ? (
-                  <div className="bg-white/40 border-4 border-dashed border-slate-100 p-16 rounded-[2.5rem] text-center text-slate-400 font-bold"><div className="text-6xl mb-6 opacity-20">📁</div><p className="text-lg">No files here yet!</p><p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p></div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {subjectMaterials.map(mat => (
-                      <div key={mat.id} onClick={() => setPreviewMaterial(mat)} className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden flex flex-col h-[240px] cursor-pointer">
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(mat.id); }} className="absolute top-2 right-2 w-10 h-10 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-20 border-4 border-white" title="Delete Material">✕</button>
-                        <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
-                          {mat.thumbnailUrl ? <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" /> : <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>}
-                          <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center"><div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">🔍</div></div>
-                          <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
-                        </div>
-                        <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
+
+        {materialSubView === 'my' ? (
+          <div className="space-y-12">
+            {allSubjects.map(subject => {
+              const subjectMaterials = (user.materials || []).filter(m => m.subjectId === subject.id);
+              return (
+                <div key={subject.id} id={`subject-section-${subject.id}`} className="bg-white/50 p-8 rounded-[3rem] border-2 border-slate-100/50 hover:bg-white transition-colors duration-500">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">{subject.icon || '⭐'}</div>
+                      <div>
+                        <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
+                        <div className="flex items-center gap-2 mt-1"><span className="bg-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span></div>
                       </div>
-                    ))}
+                    </div>
+                    <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
+                      <span className="text-xl group-hover:rotate-12 transition-transform">➕</span><span>Add {subject.title} Files</span>
+                    </button>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {subjectMaterials.length === 0 ? (
+                    <div className="bg-white/40 border-4 border-dashed border-slate-100 p-16 rounded-[2.5rem] text-center text-slate-400 font-bold"><div className="text-6xl mb-6 opacity-20">📁</div><p className="text-lg">No files here yet!</p><p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p></div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                      {subjectMaterials.map(mat => (
+                        <div key={mat.id} onClick={() => setPreviewMaterial(mat)} className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden flex flex-col h-[240px] cursor-pointer">
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(mat.id); }} className="absolute top-2 right-2 w-10 h-10 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-20 border-4 border-white" title="Delete Material">✕</button>
+                          <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                            {mat.thumbnailUrl ? <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" /> : <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>}
+                            <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center"><div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">🔍</div></div>
+                            <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
+                          </div>
+                          <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="animate-fade-in">
+            <PublicLibrary 
+              onBack={() => setMaterialSubView('my')}
+              onLogin={() => {}} // Not needed in dashboard
+              isLoggedIn={true}
+              onAddResource={(resource, subjectId) => {
+                onAddResourceToClassroom(resource, subjectId);
+                // Switch back to "My Material" after a short delay to show success message
+                setTimeout(() => {
+                  setMaterialSubView('my');
+                  // Scroll to the subject section
+                  setTimeout(() => {
+                    const element = document.getElementById(`subject-section-${subjectId}`);
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }, 300);
+                }, 1500);
+              }}
+              subjectsList={allSubjects.map(s => ({ id: s.id, title: s.title }))}
+              hideNavbar={true}
+              buttonText="Add"
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -589,7 +671,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <div className="flex-1">
                             <div className="font-black text-xs text-slate-800 truncate max-w-[80px]">{sub.title}</div>
                             <div className={`text-xs font-bold uppercase tracking-wider ${isAssigned ? 'text-pink-500' : 'text-slate-400'}`}>
-                              {isAssigned ? 'Assigned ✅' : 'Assign'}
+                              {isAssigned ? 'Assigned' : 'Assign'}
                             </div>
                           </div>
                        </button>
@@ -611,21 +693,17 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
           <div className="flex items-center gap-4">
-            {!showAddSongPanel && (
-              <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90">⬅️</button>
-            )}
+            <button 
+              onClick={() => showAddSongPanel ? setShowAddSongPanel(false) : setView('overview')} 
+              className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90"
+            >
+              ⬅️
+            </button>
             <div>
               <h1 className="text-3xl font-black text-slate-800 tracking-tight">Songs Library 🎶</h1>
-              <p className="text-slate-400 font-bold text-sm tracking-wide">Add songs to specific classrooms to bring the vibes</p>
+              <p className="text-slate-400 font-bold text-base tracking-wide">Add songs to specific classrooms to bring the vibes</p>
             </div>
           </div>
-          <button 
-            onClick={() => setShowAddSongPanel(!showAddSongPanel)}
-            className="bg-pink-500 text-white px-8 py-4 rounded-[2rem] font-black border-b-6 border-pink-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group flex items-center gap-3"
-          >
-            <span className="text-xl group-hover:rotate-12 transition-transform">{showAddSongPanel ? '🔙' : '➕'}</span>
-            <span>{showAddSongPanel ? 'Back to Library' : 'Add New Song'}</span>
-          </button>
         </header>
 
         {showAddSongPanel ? (
@@ -718,7 +796,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                    <p className="text-xs font-black uppercase text-slate-400 tracking-[0.2em]">{subjectSongs.length} Songs Assigned</p>
                                 </div>
                              </div>
-                             <button onClick={() => setShowAddSongPanel(true)} className="opacity-0 group-hover/subject:opacity-100 transition-opacity bg-slate-100 text-slate-500 px-6 py-2 rounded-2xl font-black text-xs hover:bg-pink-50 hover:text-pink-500 shadow-sm border border-slate-200">+ Add More</button>
+                             <div className="flex gap-2 transition-opacity">
+                                <button 
+                                  onClick={() => handleSongUploadClick(subject.id)} 
+                                  className="bg-blue-500 text-white px-6 py-2 rounded-2xl font-black text-xs hover:bg-blue-600 shadow-sm border border-blue-600 flex items-center gap-2"
+                                >
+                                  <span>📤</span> Upload
+                                </button>
+                                <button 
+                                  onClick={() => setShowAddSongPanel(true)} 
+                                  className="bg-slate-100 text-slate-500 px-6 py-2 rounded-2xl font-black text-xs hover:bg-pink-50 hover:text-pink-500 shadow-sm border border-slate-200"
+                                >
+                                  + Add More
+                                </button>
+                             </div>
                           </div>
 
                           {subjectSongs.length === 0 ? (
@@ -824,6 +915,14 @@ const Dashboard: React.FC<DashboardProps> = ({
             </section>
           </div>
         )}
+        {/* Hidden Song File Input */}
+        <input 
+          type="file" 
+          ref={songFileInputRef} 
+          className="hidden" 
+          accept="audio/*" 
+          onChange={handleSongFileChange} 
+        />
       </div>
     );
   }
@@ -1044,7 +1143,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div onClick={() => setView('materials')} className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center group cursor-pointer">
             <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">📚</div>
             <h3 className="text-2xl font-black text-slate-800 mb-2">Classroom Material</h3>
-            <p className="text-slate-400 text-sm font-bold">Manage your slides, PDFs, and videos.</p>
+            <p className="text-slate-400 text-sm font-bold">Upload and assign your material to specific classrooms and access the public library for more.</p>
           </div>
         )}
 

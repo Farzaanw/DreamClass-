@@ -48,6 +48,24 @@ export const VOWEL_DIGRAPHS = ['ee', 'ea', 'ai', 'ay', 'oa', 'ow', 'oo', 'ou', '
 export const WALL_COLORS = ['#FEF3C7', '#DBEAFE', '#D1FAE5', '#F3E8FF', '#FFEDD5', '#FFFFFF', '#FFD1DC', '#E0FFFE', '#F1F5F9', '#ECFDF5'];
 export const FLOOR_COLORS = ['#D97706', '#2563EB', '#059669', '#7C3AED', '#EA580C', '#4B5563', '#92400E', '#1E293B'];
 
+export const WALL_THEMES = [
+  { id: 'plain', label: 'Plain', icon: '⬜' },
+  { id: 'stripes', label: 'Stripes', icon: '📏' },
+  { id: 'dots', label: 'Polka Dots', icon: '⚪' },
+  { id: 'stars', label: 'Stars', icon: '⭐' },
+  { id: 'confetti', label: 'Confetti', icon: '🎉' },
+  { id: 'zigzag', label: 'Zig Zag', icon: '〰️' },
+];
+
+export const FLOOR_THEMES = [
+  { id: 'plain', label: 'Plain', icon: '⬜' },
+  { id: 'wood', label: 'Wood', icon: '🪵' },
+  { id: 'tile', icon: '🧱', label: 'Tiles' },
+  { id: 'carpet', label: 'Carpet', icon: '🧶' },
+  { id: 'grass', label: 'Grass', icon: '🌿' },
+  { id: 'checkerboard', label: 'Checkers', icon: '🏁' },
+];
+
 export const MASCOTS = [
   { id: 'none', label: 'No Pet', emoji: '🚫' },
   { id: 'cat', label: 'Whiskers', emoji: '🐱' },

@@ -7,8 +7,9 @@ import Dashboard from './components/Dashboard';
 import ClassroomView from './components/ClassroomView';
 import ConceptDashboard from './components/ConceptDashboard';
 import ClassroomDesigner from './components/ClassroomDesigner';
+import PublicLibrary, { Resource } from './components/PublicLibrary';
 
-type View = 'landing' | 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept';
+type View = 'landing' | 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept' | 'public-library';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-4xl" }) => {
   const letters = "Teachly".split("");
@@ -243,6 +244,35 @@ const App: React.FC = () => {
     });
   };
 
+  const handleAddResourceToClassroom = (resource: Resource, subjectId: string) => {
+    if (!currentUser) return;
+    
+    const typeMap: Record<string, 'pdf' | 'slides' | 'video'> = {
+      'Lesson': 'slides',
+      'Game': 'video',
+      'Song': 'video',
+      'Worksheet': 'pdf'
+    };
+
+    const newMaterial: MaterialFile = {
+      id: `lib-${resource.id}-${Date.now()}`,
+      name: resource.title,
+      type: typeMap[resource.type] || 'pdf',
+      subjectId: subjectId,
+      timestamp: Date.now(),
+      thumbnailUrl: resource.thumbnail,
+      content: resource.externalUrl || '#'
+    };
+
+    const currentMaterials = currentUser.materials || [];
+    persistUser({
+      ...currentUser,
+      materials: [...currentMaterials, newMaterial]
+    });
+    
+    alert(`Successfully added "${resource.title}" to your classroom! 🎉`);
+  };
+
   const navigateToSubject = (subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
@@ -308,6 +338,10 @@ const App: React.FC = () => {
               <nav className="hidden lg:flex items-center gap-8">
                 <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Home</button>
                 <button onClick={() => scrollToSection('features-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Features</button>
+                <button onClick={() => setCurrentView('public-library')} className="text-blue-500 font-black hover:text-blue-600 transition-colors text-sm uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                  Public Library
+                </button>
                 <button onClick={() => scrollToSection('how-it-works-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">How it Works</button>
                 <button onClick={() => scrollToSection('ai-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">AI & Tools</button>
                 <button onClick={() => scrollToSection('customization-section')} className="text-gray-500 font-bold hover:text-blue-500 transition-colors text-sm uppercase tracking-wider">Customization</button>
@@ -551,6 +585,22 @@ const App: React.FC = () => {
         <Auth onLogin={handleLogin} initialMode={authInitialMode} onBack={() => setCurrentView('landing')} />
       )}
 
+      {currentView === 'public-library' && (
+        <PublicLibrary 
+          onBack={() => {
+            if (currentUser && appMode) {
+              setCurrentView('dashboard');
+            } else {
+              setCurrentView('landing');
+            }
+          }} 
+          onLogin={() => goToAuth('login')}
+          isLoggedIn={!!currentUser}
+          onAddResource={handleAddResourceToClassroom}
+          subjectsList={allSubjects.map(s => ({ id: s.id, title: s.title }))}
+        />
+      )}
+
       {currentUser && (
         <div className="relative">
           {currentView === 'mode-selection' && (
@@ -593,6 +643,7 @@ const App: React.FC = () => {
               onUpdateSongs={handleUpdateSongs}
               onUpdateGames={handleUpdateGames}
               onUpdateCalendarData={handleUpdateCalendarData}
+              onAddResourceToClassroom={handleAddResourceToClassroom}
             />
           )}
           
@@ -632,6 +683,7 @@ const App: React.FC = () => {
               }} 
               onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
               onSelectConcept={(c) => setSelectedConcept(c)}
+              onUpdateMaterials={handleUpdateMaterials}
               userSongs={currentUser.songs || []}
               mode={appMode!}
             />
