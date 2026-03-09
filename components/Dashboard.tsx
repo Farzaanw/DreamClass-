@@ -1102,7 +1102,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="h-12 w-px bg-gray-200 hidden md:block"></div>
           <div className="hidden sm:block"><h1 className="text-2xl font-bold text-gray-800">Hi, {user.username}! 🍎</h1><p className="text-gray-500 text-sm">Welcome to your Teachly dashboard.</p></div>
         </div>
-        <div className="bg-gray-100 p-1.5 rounded-full flex relative shadow-inner border border-gray-200 w-64 h-14">
+        <div className="bg-gray-100 p-1.5 rounded-full flex relative shadow-inner border border-gray-200 w-64 h-14 animate-blue-glow">
           <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-all duration-300 shadow-sm ${appMode === 'classroom' ? 'left-1 bg-blue-500' : 'left-[calc(50%+2px)] bg-purple-500'}`} />
           <button onClick={() => onModeChange('classroom')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'classroom' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">👨‍🏫</span>Classroom</button>
           <button onClick={() => onModeChange('teacher')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'teacher' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">🛠️</span>Teacher</button>
@@ -1263,6 +1263,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       <style>{`
+        @keyframes blue-glow {
+          0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.4), inset 0 0 4px rgba(59, 130, 246, 0.2); }
+          50% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 6px rgba(59, 130, 246, 0.3); }
+        }
+        .animate-blue-glow { animation: blue-glow 3s ease-in-out infinite; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }

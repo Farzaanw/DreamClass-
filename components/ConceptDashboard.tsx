@@ -2398,27 +2398,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               <button onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl">🏠</button>
             </div>
             <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
-            {mode === 'teacher' && (
-              <>
-                <div className="h-12 w-px bg-slate-200" />
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
-                    className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
-                    title="Add Timer"
-                  >
-                    ⏱️
-                  </button>
-                  <button 
-                    onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: [], rotation: 0, isSpinning: false })}
-                    className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
-                    title="Add Wheel Spinner"
-                  >
-                    🎡
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="h-12 w-px bg-slate-200" />
+            <div className="flex gap-2">
+              <button 
+                onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
+                className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
+                title="Add Timer"
+              >
+                ⏱️
+              </button>
+              <button 
+                onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: [], rotation: 0, isSpinning: false })}
+                className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
+                title="Add Wheel Spinner"
+              >
+                🎡
+              </button>
+            </div>
           </div>
         </main>
       </div>
