@@ -90,6 +90,7 @@ export interface ClassroomDesign {
   shelves?: string[]; // list of object emojis/ids
   whiteboards?: Whiteboard[]; // General history
   conceptBoards?: Record<string, Whiteboard>; // Mapping of conceptId -> current saved state
+  spinnerNames?: string[];
 }
 
 export interface User {

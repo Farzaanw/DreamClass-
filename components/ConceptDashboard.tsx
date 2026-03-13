@@ -162,6 +162,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [globalSpinnerNames, setGlobalSpinnerNames] = useState<string[]>(design.spinnerNames || []);
+
+  useEffect(() => {
+    if (design.spinnerNames && JSON.stringify(design.spinnerNames) !== JSON.stringify(globalSpinnerNames)) {
+      setGlobalSpinnerNames(design.spinnerNames);
+    }
+  }, [design.spinnerNames]);
+
+  // Persist global spinner names to design whenever they change
+  useEffect(() => {
+    const currentNames = design.spinnerNames || [];
+    if (JSON.stringify(currentNames) !== JSON.stringify(globalSpinnerNames)) {
+      onSaveDesign({ ...design, spinnerNames: globalSpinnerNames });
+    }
+  }, [globalSpinnerNames, design, onSaveDesign]);
 
   const [customIcons, setCustomIcons] = useState<any[]>([]);
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
@@ -285,7 +300,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
             
             // Play sound when time is up
             if (newTime === 0) {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1017/1017-preview.mp3');
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
               audio.volume = 0.5;
               audio.play().catch(() => {});
             }
@@ -565,6 +580,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
   };
 
   const addItem = (content: string, type: BoardItem['type'] = 'emoji', screenX?: number, screenY?: number, metadata?: any) => {
+    if (type === 'spinner') {
+      metadata = { ...metadata, names: metadata?.names || globalSpinnerNames };
+    }
     if (type === 'sticker') {
       const stickerCount = items.filter(it => it.type === 'sticker').length;
       if (stickerCount >= 8) {
@@ -593,7 +611,28 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
   const updateItemMetadata = (id: string, newMetadata: any, skipUndo = false) => {
     if (!skipUndo) saveToUndoStack();
-    setItems(prev => prev.map(item => item.id === id ? { ...item, metadata: { ...item.metadata, ...newMetadata } } : item));
+    setItems(prev => {
+      const newItems = prev.map(item => item.id === id ? { ...item, metadata: { ...item.metadata, ...newMetadata } } : item);
+      
+      // Sync global spinner names if a spinner was updated
+      const updatedItem = newItems.find(it => it.id === id);
+      if (updatedItem?.type === 'spinner' && newMetadata.names) {
+        setGlobalSpinnerNames(newMetadata.names);
+        
+        // Adjust size if more than 8 names
+        const nameCount = newMetadata.names.length;
+        if (nameCount > 8) {
+          const extra = (nameCount - 8) * 15;
+          updatedItem.width = 300 + extra;
+          updatedItem.height = 400 + extra;
+        } else {
+          updatedItem.width = 300;
+          updatedItem.height = 400;
+        }
+      }
+      
+      return newItems;
+    });
   };
 
   const handleClockHandMouseDown = (e: React.MouseEvent, itemId: string, type: 'hour' | 'minute') => {
@@ -709,10 +748,24 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
     e.preventDefault();
     const content = e.dataTransfer.getData('content');
     const type = e.dataTransfer.getData('type') as BoardItem['type'];
+    const materialId = e.dataTransfer.getData('materialId');
     const metadataStr = e.dataTransfer.getData('metadata');
     const metadata = metadataStr ? JSON.parse(metadataStr) : undefined;
     const rect = e.currentTarget.getBoundingClientRect();
-    if (content) addItem(content, type, e.clientX - rect.left, e.clientY - rect.top, metadata);
+    const dropX = e.clientX - rect.left;
+    const dropY = e.clientY - rect.top;
+
+    if (materialId) {
+      const material = materials.find(m => m.id === materialId);
+      if (material) {
+        setMaterialPos({ x: dropX, y: dropY });
+        setActiveMaterial(material);
+        setLibraryOpen(false);
+      }
+      return;
+    }
+
+    if (content) addItem(content, type, dropX, dropY, metadata);
   };
 
   const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
@@ -1649,7 +1702,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                 className="w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all bg-blue-50 border-2 border-blue-100 text-blue-500 animate-glow-flow hover:scale-105 active:scale-95 shadow-sm"
               >
                 <span className="text-3xl font-black leading-none">➕</span>
-                <span className="text-xs font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
+                <span className="text-sm font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
               </button>
 
               <AnimatePresence>
@@ -1693,7 +1746,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                 }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
-                <span className="text-xs font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+                <span className="text-sm font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
                 
                 {cat.isCustom && mode === 'teacher' && (
                   <button 
@@ -1713,7 +1766,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
         <div className={`absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="px-6 py-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
-            <h3 className="font-black text-slate-400 text-xs tracking-[0.2em] uppercase truncate">
+            <h3 className="font-black text-slate-400 text-sm tracking-[0.2em] uppercase truncate">
               {categories.find(c => c.id === activeCategoryId)?.label || (activeCategoryId === 'SONGS' ? 'Songs' : 'Games')} Library
             </h3>
             <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 transition-colors">✕</button>
@@ -1728,7 +1781,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
 
         {/* MATERIAL LIBRARY (RIGHT) */}
         <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-xs tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
+          <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-sm tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {!filteredMaterials.length ? (
               <div className="text-center py-12 px-4 opacity-50">
@@ -1737,7 +1790,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               </div>
             ) : (
               <div className="space-y-6">
-                <h4 className="px-1 text-xs font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                <h4 className="px-1 text-sm font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${currentSubject?.color || 'bg-blue-400'}`}></span>
                   {currentSubject?.title}
                 </h4>
@@ -1746,12 +1799,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                     <div key={m.id} className="relative group">
                       <button 
                         onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} 
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('materialId', m.id);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
                         className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
                       >
                         <div className="h-28 bg-slate-50 flex items-center justify-center">
                           {m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}
                         </div>
-                        <div className="p-3 text-left font-black text-slate-900 truncate text-xs">{m.name}</div>
+                        <div className="p-3 text-left font-black text-slate-900 truncate text-sm">{m.name}</div>
                       </button>
                       {mode === 'teacher' && (
                         <button 
@@ -1852,7 +1910,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
               </div>
             </div>
           )}
-          <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-xs shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
+          <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
             <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px', backgroundColor: boardBgColor }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
@@ -2153,7 +2211,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                         )}
                       </div>
                     ) : item.type === 'spinner' ? (
-                      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-purple-100 flex flex-col items-center gap-6 min-w-[350px] pointer-events-auto">
+                      <div 
+                        className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-purple-100 flex flex-col items-center gap-6 pointer-events-auto"
+                        style={{ 
+                          minWidth: (item.metadata?.names || []).length > 8 ? 350 + ((item.metadata?.names || []).length - 8) * 20 : 350 
+                        }}
+                      >
                         <div className="flex justify-between w-full items-center">
                           <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Wheel Spinner 🎡</div>
                           <button 
@@ -2165,7 +2228,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                           </button>
                         </div>
                         
-                        <div className="relative w-72 h-72">
+                        <div 
+                          className="relative"
+                          style={{ 
+                            width: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288,
+                            height: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288
+                          }}
+                        >
                           {/* Spinner Ticker */}
                           <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl z-20 drop-shadow-lg">🔻</div>
                           
@@ -2190,11 +2259,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                                         <circle cx="50" cy="50" r="50" fill={colors[0]} />
                                         <text 
                                           x="50" 
-                                          y="50" 
+                                          y="30" 
                                           textAnchor="middle" 
                                           dominantBaseline="middle" 
                                           fill="white" 
-                                          className="font-black text-[10px] drop-shadow-sm"
+                                          className="font-black text-[14px] drop-shadow-sm"
                                         >
                                           {name}
                                         </text>
@@ -2221,8 +2290,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                                   // Text positioning
                                   const textAngle = startAngle + sliceAngle / 2;
                                   const textRad = (textAngle - 90) * Math.PI / 180.0;
-                                  const textX = centerX + (radius * 0.65) * Math.cos(textRad);
-                                  const textY = centerY + (radius * 0.65) * Math.sin(textRad);
+                                  
+                                  // Switch to radial (vertical) text if more than 5 names to avoid overlap
+                                  const isRadial = arr.length > 5;
+                                  const textDist = isRadial ? 0.75 : 0.65;
+                                  const textX = centerX + (radius * textDist) * Math.cos(textRad);
+                                  const textY = centerY + (radius * textDist) * Math.sin(textRad);
+
+                                  // Dynamic Font Size Calculation
+                                  const fontSize = Math.max(3.5, Math.min(isRadial ? 12 : 14, (isRadial ? 90 : 50) / arr.length));
+                                  const rotation = isRadial ? textAngle + 90 : textAngle;
 
                                   return (
                                     <g key={i}>
@@ -2233,8 +2310,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                                         textAnchor="middle" 
                                         dominantBaseline="middle" 
                                         fill="white" 
-                                        className="font-black text-[6px] drop-shadow-sm"
-                                        transform={`rotate(${textAngle}, ${textX}, ${textY})`}
+                                        className="font-black drop-shadow-sm"
+                                        style={{ fontSize: `${fontSize}px` }}
+                                        transform={`rotate(${rotation}, ${textX}, ${textY})`}
                                       >
                                         {name}
                                       </text>
@@ -2265,7 +2343,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                                 const finalRotation = newRotation % 360;
                                 const anglePerSegment = 360 / (item.metadata?.names || []).length;
                                 // Ticker is at top (270 deg). 
-                                const winningAngle = (360 - (finalRotation % 360) + 270) % 360;
+                                const winningAngle = (360 - (finalRotation % 360)) % 360;
                                 const winnerIdx = Math.floor(winningAngle / anglePerSegment);
                                 const winner = item.metadata?.names[winnerIdx];
                                 updateItemMetadata(item.id, { isSpinning: false, selectedName: winner });
@@ -2292,7 +2370,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                               placeholder="Add student name..."
                               value={spinnerInputs[item.id] || ''}
                               onChange={(e) => setSpinnerInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                              className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-sm"
+                              className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-base"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   const name = spinnerInputs[item.id]?.trim();
@@ -2311,7 +2389,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                                   setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
                                 }
                               }}
-                              className="px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-md"
+                              className="px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-base hover:scale-105 active:scale-95 transition-all shadow-md"
                             >
                               Add
                             </button>
@@ -2322,11 +2400,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                               Clear
                             </button>
                           </div>
-                          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-1 custom-scrollbar">
+                          <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar w-full">
                             {(item.metadata?.names || []).map((name: string, i: number) => (
-                              <div key={i} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-black flex items-center gap-2 border border-purple-100">
-                                {name}
-                                <button onClick={() => updateItemMetadata(item.id, { names: (item.metadata?.names || []).filter((_: any, idx: number) => idx !== i) })} className="hover:text-rose-500">✕</button>
+                              <div key={i} className="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-black flex items-center justify-between gap-1 border border-purple-100 min-w-0">
+                                <span className="truncate">{name}</span>
+                                <button onClick={() => updateItemMetadata(item.id, { names: (item.metadata?.names || []).filter((_: any, idx: number) => idx !== i) })} className="hover:text-rose-500 flex-shrink-0">✕</button>
                               </div>
                             ))}
                           </div>
@@ -2384,7 +2462,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
             <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
               {[ {id: 'select', icon: '🖐️'}, {id: 'marker', icon: '✏️'}, {id: 'highlighter', icon: '🖍️'}, {id: 'eraser', icon: '🧼'} ].map(t => (
                 <div key={t.id} className="relative group/tool">
-                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-16 h-16 rounded-full transition-all flex items-center justify-center text-2xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
+                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-16 h-16 rounded-full transition-all flex items-center justify-center text-3xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
                     {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
                   </button>
                   {showColorPicker === t.id && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${ (t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
@@ -2393,23 +2471,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
             </div>
             <div className="h-12 w-px bg-slate-200" />
             <div className="flex gap-2">
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl">➕</button>
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl">➖</button>
-              <button onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-xl">🏠</button>
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">➕</button>
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">➖</button>
+              <button onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">🏠</button>
             </div>
             <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
             <div className="h-12 w-px bg-slate-200" />
             <div className="flex gap-2">
               <button 
                 onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
-                className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
+                className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-4xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
                 title="Add Timer"
               >
                 ⏱️
               </button>
               <button 
-                onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: [], rotation: 0, isSpinning: false })}
-                className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
+                onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
+                className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-4xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
                 title="Add Wheel Spinner"
               >
                 🎡
