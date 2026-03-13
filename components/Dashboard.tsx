@@ -37,6 +37,7 @@ interface DashboardProps {
   onUpdateGames: (games: Game[]) => void;
   onUpdateCalendarData: (calendarData: any) => void;
   onAddResourceToClassroom: (resource: Resource, subjectId: string) => void;
+  initialView?: 'overview' | 'materials' | 'songs' | 'games';
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -81,10 +82,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateSongs,
   onUpdateGames,
   onUpdateCalendarData,
-  onAddResourceToClassroom
+  onAddResourceToClassroom,
+  initialView = 'overview'
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
+  const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>(initialView);
   const [materialSubView, setMaterialSubView] = useState<'my' | 'public'>('my');
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1123,10 +1125,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       </AnimatePresence>
 
       <div className="grid md:grid-cols-3 gap-8">
-        <div onClick={appMode === 'teacher' ? onNavigateDesigner : undefined} className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'}`}>
+        <motion.div 
+          onClick={appMode === 'teacher' ? onNavigateDesigner : undefined} 
+          animate={appMode === 'teacher' ? { y: [0, -8, 0] } : {}}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'}`}
+        >
           <div className="relative z-10"><h2 className="text-4xl font-bold mb-3">{appMode === 'classroom' ? 'Ready for Lessons?' : 'Decorate Your Classrooms'}</h2><p className="text-white/90 max-w-md text-lg">{appMode === 'classroom' ? 'Select a subject below to jump into an interactive session with your students.' : 'Customize colors, stickers, and music to create the perfect magic learning environment.'}</p></div>
           <div className="absolute right-[-30px] bottom-[-30px] text-[12rem] opacity-20 transform -rotate-12 select-none pointer-events-none">{appMode === 'classroom' ? '🎓' : '🏫'}</div>
-        </div>
+        </motion.div>
 
         {appMode === 'classroom' && (
           <div 
@@ -1140,11 +1147,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {appMode === 'teacher' && (
-          <div onClick={() => setView('materials')} className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center group cursor-pointer">
+          <motion.div 
+            onClick={() => setView('materials')} 
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+            className="bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center group cursor-pointer"
+          >
             <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mb-6 group-hover:scale-110 transition-transform shadow-inner">📚</div>
             <h3 className="text-2xl font-black text-slate-800 mb-2">Classroom Material</h3>
             <p className="text-slate-400 text-sm font-bold">Upload and assign your material to specific classrooms and access the public library for more.</p>
-          </div>
+          </motion.div>
         )}
 
         <h3 className="col-span-full text-2xl font-bold text-gray-700 mt-6 mb-2 ml-2 tracking-tight">{appMode === 'classroom' ? 'Select a Subject' : 'Manage Subject Material'}</h3>
@@ -1172,26 +1184,38 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </button>
               </div>
             )}
-            <div onClick={() => onNavigateSubject(subject.id)} className={`${subject.color} p-8 rounded-[2.5rem] shadow-lg cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center text-center border-b-8 border-black/10 h-full`}>
+            <motion.div 
+              onClick={() => onNavigateSubject(subject.id)} 
+              animate={appMode === 'teacher' ? { y: [0, -8, 0] } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.4 + (allSubjects.indexOf(subject) * 0.1) }}
+              className={`${subject.color} p-8 rounded-[2.5rem] shadow-lg cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center text-center border-b-8 border-black/10 h-full`}
+            >
               <div className="bg-white/30 w-24 h-24 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner group-hover:scale-110 transition-transform">{subject.icon || '⭐'}</div>
               <h4 className="text-2xl font-bold text-white mb-2">{subject.title}</h4>
               <p className="text-white/80 text-sm font-medium line-clamp-3">{subject.description || 'Start interactive lesson.'}</p>
-            </div>
+            </motion.div>
           </div>
         ))}
 
         {appMode === 'teacher' && (
-          <div onClick={() => { handleCloseSubjectModal(); setShowSubjectModal(true); }} className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]">
+          <motion.div 
+            onClick={() => { handleCloseSubjectModal(); setShowSubjectModal(true); }} 
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 + (allSubjects.length * 0.1) }}
+            className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]"
+          >
             <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-blue-100 transition-all">➕</div>
             <h4 className="text-xl font-bold text-gray-400 group-hover:text-blue-500">Add New Subject</h4>
-          </div>
+          </motion.div>
         )}
 
         {appMode === 'teacher' && (
           <>
             <h3 className="col-span-full text-2xl font-bold text-gray-700 mt-12 mb-2 ml-2 tracking-tight">Songs Library 🎵</h3>
-            <div 
+            <motion.div 
               onClick={() => setView('songs')} 
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
               className="col-span-full bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-pink-400 hover:-translate-y-2 transition-all flex flex-col md:flex-row items-center gap-10 group cursor-pointer relative overflow-hidden"
             >
                <div className="absolute right-[-40px] top-[-40px] text-[10rem] opacity-5 transform rotate-12 group-hover:rotate-45 transition-transform duration-700">🎵</div>
@@ -1206,11 +1230,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                  </div>
                </div>
                <div className="hidden lg:flex items-center justify-center bg-pink-500 text-white w-14 h-14 rounded-2xl shadow-lg animate-bounce group-hover:animate-none">✨</div>
-            </div>
+            </motion.div>
 
             <h3 className="col-span-full text-2xl font-bold text-gray-700 mt-12 mb-2 ml-2 tracking-tight">Games Library 🎮</h3>
-            <div 
+            <motion.div 
               onClick={() => setView('games')} 
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
               className="col-span-full bg-white p-10 rounded-[3rem] shadow-xl border-b-[12px] border-slate-100 hover:border-emerald-400 hover:-translate-y-2 transition-all flex flex-col md:flex-row items-center gap-10 group cursor-pointer relative overflow-hidden"
             >
                <div className="absolute right-[-40px] top-[-40px] text-[10rem] opacity-5 transform rotate-12 group-hover:rotate-45 transition-transform duration-700">🎮</div>
@@ -1225,7 +1251,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                  </div>
                </div>
                <div className="hidden lg:flex items-center justify-center bg-emerald-500 text-white w-14 h-14 rounded-2xl shadow-lg animate-bounce group-hover:animate-none">✨</div>
-            </div>
+            </motion.div>
           </>
         )}
       </div>

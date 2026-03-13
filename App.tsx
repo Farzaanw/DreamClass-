@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [designingSubjectId, setDesigningSubjectId] = useState<SubjectId | null>(null);
+  const [dashboardInitialView, setDashboardInitialView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
 
   const allSubjects = useMemo(() => {
     if (!currentUser) return SUBJECTS;
@@ -91,10 +92,12 @@ const App: React.FC = () => {
 
   const handleModeSelect = (mode: AppMode) => {
     setAppMode(mode);
+    setDashboardInitialView('overview');
     setCurrentView('dashboard');
   };
 
   const handleBackToModeSelect = () => {
+    setDashboardInitialView('overview');
     setCurrentView('mode-selection');
   };
 
@@ -644,6 +647,7 @@ const App: React.FC = () => {
               onUpdateGames={handleUpdateGames}
               onUpdateCalendarData={handleUpdateCalendarData}
               onAddResourceToClassroom={handleAddResourceToClassroom}
+              initialView={dashboardInitialView}
             />
           )}
           
@@ -684,6 +688,10 @@ const App: React.FC = () => {
               onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
               onSelectConcept={(c) => setSelectedConcept(c)}
               onUpdateMaterials={handleUpdateMaterials}
+              onNavigateToMaterials={() => {
+                setDashboardInitialView('materials');
+                setCurrentView('dashboard');
+              }}
               userSongs={currentUser.songs || []}
               mode={appMode!}
             />

@@ -14,6 +14,7 @@ interface ConceptDashboardProps {
   onSaveDesign: (design: ClassroomDesign) => void;
   onSelectConcept?: (concept: Concept) => void;
   onUpdateMaterials?: (materials: MaterialFile[]) => void;
+  onNavigateToMaterials?: () => void;
   userSongs?: Song[]; // Songs added by the user
   mode: AppMode;
 }
@@ -140,7 +141,20 @@ const getFileIcon = (type: string) => {
   }
 };
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, subjectId, materials, allSubjects, onBack, onSaveDesign, onSelectConcept, onUpdateMaterials, userSongs = [], mode }) => {
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ 
+  concept, 
+  design, 
+  subjectId, 
+  materials, 
+  allSubjects, 
+  onBack, 
+  onSaveDesign, 
+  onSelectConcept, 
+  onUpdateMaterials, 
+  onNavigateToMaterials,
+  userSongs = [], 
+  mode 
+}) => {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
@@ -1784,9 +1798,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
           <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-sm tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {!filteredMaterials.length ? (
-              <div className="text-center py-12 px-4 opacity-50">
-                <div className="text-5xl mb-4">📂</div>
-                <p className="font-black text-slate-400">No subject materials.</p>
+              <div className="text-center py-12 px-4">
+                <div className="opacity-50">
+                  <div className="text-5xl mb-4">📂</div>
+                  <p className="font-black text-slate-400">No subject materials.</p>
+                </div>
+                {mode === 'teacher' && (
+                  <button 
+                    onClick={onNavigateToMaterials}
+                    className="mt-6 w-full bg-blue-500 text-white font-black py-4 rounded-3xl shadow-lg border-b-4 border-blue-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>➕</span> Click here to add
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-6">
@@ -1822,6 +1846,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ concept, design, su
                       )}
                     </div>
                   ))}
+                  
+                  {mode === 'teacher' && (
+                    <button 
+                      onClick={onNavigateToMaterials}
+                      className="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl py-6 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all group"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">➕</span>
+                      <span className="font-black text-xs uppercase tracking-widest">Add Material</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
