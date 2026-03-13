@@ -17,7 +17,7 @@ import {
 
 interface CalendarEvent {
   id: string;
-  type: 'birthday' | 'weather' | 'sticky';
+  type: 'birthday' | 'weather' | 'sticky' | 'holiday' | 'conference';
   icon?: string;
   text?: string;
   studentName?: string;
@@ -37,6 +37,21 @@ const WEATHER_ICONS = [
   { icon: '❄️', label: 'Snowy', color: 'text-cyan-300' },
   { icon: '⛈️', label: 'Stormy', color: 'text-indigo-600' },
   { icon: '🌬️', label: 'Windy', color: 'text-teal-400' },
+];
+
+const HOLIDAYS = [
+  { icon: '🎆', label: "New Year's Day" },
+  { icon: '🕊️', label: 'MLK Day' },
+  { icon: '❤️', label: "Valentine's Day" },
+  { icon: '🍀', label: "St. Patrick's Day" },
+  { icon: '🐣', label: 'Easter' },
+  { icon: '🎖️', label: 'Memorial Day' },
+  { icon: '🇺🇸', label: 'Independence Day' },
+  { icon: '🛠️', label: 'Labor Day' },
+  { icon: '🎃', label: 'Halloween' },
+  { icon: '🎖️', label: "Veterans Day" },
+  { icon: '🦃', label: 'Thanksgiving' },
+  { icon: '🎄', label: 'Christmas' },
 ];
 
 const STICKY_COLORS = [
@@ -79,6 +94,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string, events: CalendarEvent[] } | null>(null);
   const [isAddingBirthday, setIsAddingBirthday] = useState<{ date: string } | null>(null);
   const [isAddingSticky, setIsAddingSticky] = useState<{ date: string } | null>(null);
+  const [isAddingHoliday, setIsAddingHoliday] = useState<{ date: string } | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [expandedSticky, setExpandedSticky] = useState<CalendarEvent | null>(null);
   const [activeWeatherEffect, setActiveWeatherEffect] = useState<string | null>(null);
@@ -130,11 +146,15 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
     onUpdateCalendarData({ events: updatedEvents });
   };
 
-  const handleDrop = (dateStr: string, type: 'birthday' | 'weather' | 'sticky', extra?: any) => {
+  const handleDrop = (dateStr: string, type: 'birthday' | 'weather' | 'sticky' | 'holiday' | 'conference', extra?: any) => {
     if (type === 'birthday') {
       setIsAddingBirthday({ date: dateStr });
     } else if (type === 'sticky') {
       setIsAddingSticky({ date: dateStr });
+    } else if (type === 'holiday') {
+      setIsAddingHoliday({ date: dateStr });
+    } else if (type === 'conference') {
+      handleAddEvent(dateStr, { type: 'conference', icon: '🏫', text: 'Parent-Teacher Conference' });
     } else {
       handleAddEvent(dateStr, { type, ...extra });
       if (type === 'weather' && extra?.text) {
@@ -240,6 +260,16 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                     🎂
                   </div>
                 )}
+                {event.type === 'holiday' && (
+                  <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center text-xs shadow-lg border-2 border-white z-20" title={event.text}>
+                    {event.icon}
+                  </div>
+                )}
+                {event.type === 'conference' && (
+                  <div className="w-7 h-7 bg-indigo-500 rounded-full flex items-center justify-center text-xs shadow-lg border-2 border-white z-20" title="Parent-Teacher Conference">
+                    🏫
+                  </div>
+                )}
                 {event.type === 'weather' && (
                   <div className="w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-blue-100" title={event.text}>
                     {event.icon}
@@ -273,6 +303,8 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
         <div className="w-full md:w-56 bg-slate-50 p-6 border-b-4 md:border-b-0 md:border-r-4 border-slate-100 flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto hide-scrollbar">
           <h3 className="hidden md:block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Calendar Tools</h3>
           <DraggableTool type="birthday" icon="🎂" label="Birthday" />
+          <DraggableTool type="holiday" icon="🎆" label="Holiday" />
+          <DraggableTool type="conference" icon="🏫" label="Conference" />
           <DraggableTool type="sticky" icon="📝" label="Sticky Note" />
           <div className="hidden md:block h-px bg-slate-200 my-2"></div>
           {WEATHER_ICONS.map(w => (
@@ -350,6 +382,18 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                           if (event.type === 'sticky') setExpandedSticky(event);
                         }}>
                           {event.type === 'birthday' && <div className="font-black text-black text-lg">{event.studentName} 🎉</div>}
+                          {event.type === 'holiday' && (
+                            <div className="flex items-center gap-4">
+                              <span className="text-3xl">{event.icon}</span>
+                              <div className="font-black text-orange-600 text-lg">{event.text}</div>
+                            </div>
+                          )}
+                          {event.type === 'conference' && (
+                            <div className="flex items-center gap-4">
+                              <span className="text-3xl">{event.icon}</span>
+                              <div className="font-black text-indigo-600 text-lg">{event.text}</div>
+                            </div>
+                          )}
                           {event.type === 'weather' && (
                             <div className="flex items-center gap-4">
                               <span className="text-3xl">{event.icon}</span>
@@ -377,6 +421,38 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                     ))
                   )}
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isAddingHoliday && (
+            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setIsAddingHoliday(null)}>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 border-8 border-orange-100"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-2xl font-black text-slate-800 mb-6 text-center">Select a Holiday 🎆</h3>
+                <div className="grid grid-cols-3 gap-4 max-h-[400px] overflow-y-auto p-2 custom-scrollbar">
+                  {HOLIDAYS.map(h => (
+                    <button 
+                      key={h.label}
+                      onClick={() => {
+                        handleAddEvent(isAddingHoliday.date, { type: 'holiday', icon: h.icon, text: h.label });
+                        setIsAddingHoliday(null);
+                      }}
+                      className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-orange-50 hover:bg-orange-100 border-2 border-transparent hover:border-orange-200 transition-all group"
+                    >
+                      <span className="text-4xl group-hover:scale-110 transition-transform">{h.icon}</span>
+                      <span className="text-[10px] font-black uppercase tracking-tighter text-orange-600 text-center leading-tight">{h.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setIsAddingHoliday(null)} className="w-full mt-6 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-50 transition-colors text-lg">Cancel</button>
               </motion.div>
             </div>
           )}

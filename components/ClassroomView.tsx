@@ -32,18 +32,13 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const [isMascotCelebrating, setIsMascotCelebrating] = useState(false);
   // Default to false (shown in bold color)
   const [isMascotPeeking, setIsMascotPeeking] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
   const [dragDistance, setDragDistance] = useState(0);
   const velocityRef = useRef<number>(0);
   const lastXRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
-  const momentumRef = useRef<number>(0);
+  const animationFrameRef = useRef<number>(0);
 
-  // Triple the concepts for infinite scroll effect
-  const tripledConcepts = [...subject.concepts, ...subject.concepts, ...subject.concepts];
   const originalCount = subject.concepts.length;
 
   const activeMusic = MUSIC_OPTIONS.find(m => m.id === design.ambientMusic);
@@ -64,7 +59,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
     return () => {
       if (audioRef.current) audioRef.current.pause();
-      cancelAnimationFrame(momentumRef.current);
+      cancelAnimationFrame(animationFrameRef.current);
     };
   }, [design.ambientMusic]);
 
@@ -107,89 +102,76 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
     return 'none';
   };
 
+  const applyMomentum = () => {
+    if (!scrollRef.current || isDragging) return;
+    
+    const container = scrollRef.current;
+    const newScrollLeft = container.scrollLeft - velocityRef.current * 16;
+    
+    // Check boundaries
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    if (newScrollLeft <= 0 || newScrollLeft >= maxScroll) {
+      container.scrollLeft = Math.max(0, Math.min(newScrollLeft, maxScroll));
+      velocityRef.current = 0;
+      return;
+    }
+
+    container.scrollLeft = newScrollLeft;
+    velocityRef.current *= 0.95; // Friction
+    
+    if (Math.abs(velocityRef.current) > 0.1) {
+      animationFrameRef.current = requestAnimationFrame(applyMomentum);
+    } else {
+      velocityRef.current = 0;
+    }
+  };
+
   useEffect(() => {
-    // Initial scroll to the middle set of concepts
-    if (scrollRef.current && originalCount > 0) {
-      const container = scrollRef.current;
-      const cardWidth = container.scrollWidth / 3;
-      container.scrollLeft = cardWidth;
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
     }
   }, [originalCount]);
 
-  const handleInfiniteScroll = () => {
-    if (!scrollRef.current || originalCount === 0) return;
-    
-    const container = scrollRef.current;
-    const { scrollLeft, scrollWidth, clientWidth } = container;
-    const oneSetWidth = scrollWidth / 3;
-
-    // Jump logic: Keep the scroll position within the middle set
-    if (scrollLeft <= 0) {
-      container.scrollLeft = oneSetWidth;
-    } else if (scrollLeft >= scrollWidth - clientWidth) {
-      container.scrollLeft = oneSetWidth * 2 - clientWidth;
-    }
-
-    // Update active index for dots
-    const relativeScroll = (scrollLeft % oneSetWidth);
-    const itemWidth = oneSetWidth / originalCount;
-    const index = Math.round(relativeScroll / itemWidth) % originalCount;
-    setActiveIndex(index);
-  };
-
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (!scrollRef.current) return;
+    if (e.cancelable) e.preventDefault();
+    
+    cancelAnimationFrame(animationFrameRef.current);
     setIsDragging(true);
     const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
-    setStartX(pageX - scrollRef.current.offsetLeft);
-    setScrollLeft(scrollRef.current.scrollLeft);
-    setDragDistance(0);
-    
-    // Reset momentum tracking
-    velocityRef.current = 0;
     lastXRef.current = pageX;
     lastTimeRef.current = Date.now();
-    cancelAnimationFrame(momentumRef.current);
+    velocityRef.current = 0;
+    setDragDistance(0);
   };
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDragging || !scrollRef.current) return;
-    if (e.cancelable) e.preventDefault();
     
     const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
-    const x = pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Scroll speed
-    scrollRef.current.scrollLeft = scrollLeft - walk;
-    setDragDistance(Math.abs(x - startX));
-
-    // Calculate velocity
     const now = Date.now();
     const dt = now - lastTimeRef.current;
+    const dx = pageX - lastXRef.current;
+    
     if (dt > 0) {
-      const dx = pageX - lastXRef.current;
-      velocityRef.current = dx / dt;
+      // Clamp velocity to prevent explosion
+      const instantVelocity = dx / dt;
+      velocityRef.current = Math.max(Math.min(instantVelocity, 50), -50);
     }
+    
+    scrollRef.current.scrollLeft -= dx;
+    setDragDistance(prev => prev + Math.abs(dx));
+    
     lastXRef.current = pageX;
     lastTimeRef.current = now;
   };
 
-  const applyMomentum = () => {
-    if (!scrollRef.current || isDragging) return;
-    
-    scrollRef.current.scrollLeft -= velocityRef.current * 15; // Apply velocity
-    velocityRef.current *= 0.95; // Friction
-
-    if (Math.abs(velocityRef.current) > 0.1) {
-      momentumRef.current = requestAnimationFrame(applyMomentum);
-    }
-  };
-
   const handleMouseUp = () => {
+    if (!isDragging) return;
     setIsDragging(false);
-    // Trigger momentum if we were moving fast enough
-    if (Math.abs(velocityRef.current) > 0.2) {
-      applyMomentum();
-    }
+    
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = requestAnimationFrame(applyMomentum);
   };
 
   const handleCardClick = (e: React.MouseEvent, concept: Concept) => {
@@ -203,15 +185,8 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   };
 
   useEffect(() => {
-    const current = scrollRef.current;
-    if (current) {
-      current.addEventListener('scroll', handleInfiniteScroll);
-      window.addEventListener('resize', handleInfiniteScroll);
-      return () => {
-        current.removeEventListener('scroll', handleInfiniteScroll);
-        window.removeEventListener('resize', handleInfiniteScroll);
-      };
-    }
+    // No infinite scroll listener needed
+    return () => cancelAnimationFrame(animationFrameRef.current);
   }, [originalCount]);
 
   return (
@@ -277,26 +252,26 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           onTouchStart={handleMouseDown}
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}
-          className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center hide-scrollbar ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+          className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center hide-scrollbar select-none overscroll-x-contain ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
-          <div className="flex items-center min-w-max gap-4 sm:gap-8 py-4 px-12 pointer-events-none">
-            {tripledConcepts.map((concept, idx) => (
+          <div className="flex items-center min-w-max py-4 pointer-events-none select-none px-20 m-auto">
+            {subject.concepts.map((concept, idx) => (
               <div 
                 key={`${concept.id}-${idx}`}
                 onClick={(e) => handleCardClick(e, concept)}
-                className="group w-40 h-[180px] sm:w-48 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 snap-center pointer-events-auto"
+                className="group w-40 h-[180px] sm:w-48 sm:h-[220px] cursor-pointer transform transition-all duration-300 flex-shrink-0 pointer-events-auto mx-2 sm:mx-4 select-none"
               >
                 <div 
-                  className="w-full h-full bg-white rounded-[3rem] sm:rounded-[4rem] shadow-xl flex flex-col items-center justify-center p-4 sm:p-6 text-center border-b-[10px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-4 animate-float-card transition-all" 
-                  style={{ animationDelay: `${(idx % originalCount) * 0.4}s` }}
+                  className="w-full h-full bg-white rounded-[3rem] sm:rounded-[4rem] shadow-xl flex flex-col items-center justify-center p-4 sm:p-6 text-center border-b-[10px] border-slate-100 group-hover:border-blue-400 group-hover:-translate-y-4 animate-float-card transition-all select-none" 
+                  style={{ animationDelay: `${idx * 0.4}s` }}
                 >
-                  <div className="w-14 h-14 sm:w-20 sm:h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-4 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-4 ring-black/5">
+                  <div className="w-14 h-14 sm:w-20 sm:h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-4 group-hover:bg-blue-50 group-hover:rotate-6 transition-all shadow-inner ring-4 ring-black/5 select-none">
                     {concept.icon || '📚'}
                   </div>
-                  <h3 className="text-xs sm:text-base font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1">
+                  <h3 className="text-xs sm:text-base font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1 select-none">
                     {concept.title}
                   </h3>
-                  <div className="mt-2 bg-blue-500 text-white text-xs sm:text-[11px] px-4 sm:px-6 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest">
+                  <div className="mt-2 bg-blue-500 text-white text-xs sm:text-[11px] px-4 sm:px-6 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest select-none">
                     Play! 🚀
                   </div>
                 </div>
@@ -339,18 +314,6 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
             </div>
           )}
         </div>
-
-        {/* Scroll Indicator Dots */}
-        {subject.concepts.length > 1 && (
-           <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 flex gap-3 z-40 bg-white/20 backdrop-blur-sm p-3 rounded-full">
-             {subject.concepts.map((_, i) => (
-               <div 
-                key={i} 
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${activeIndex === i ? 'bg-blue-500 scale-125' : 'bg-blue-200'}`}
-               />
-             ))}
-           </div>
-        )}
 
         {/* Lyrics Overlay */}
         {showLyrics && activeMusic?.lyrics && (

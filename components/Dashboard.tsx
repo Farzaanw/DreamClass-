@@ -1245,7 +1245,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
               <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={newName} onChange={(e) => setNewName(e.target.value)} required />
-              <textarea placeholder="Description" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold min-h-[100px] text-black" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-4"><label className="text-sm font-bold text-gray-500">CONCEPTS</label><button type="button" onClick={addConceptField} className="text-blue-500 font-bold text-sm">+ Add</button></div>
                 {concepts.map((concept, idx) => (
@@ -1256,6 +1255,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 ))}
               </div>
+              <textarea placeholder="Description" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold min-h-[100px] text-black" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <button type="submit" className="w-full bg-blue-500 text-white font-bold py-5 rounded-[2.5rem] text-2xl shadow-xl border-b-8 border-blue-700">{editingSubjectId ? 'Update Room' : 'Create Room'}</button>
             </form>
           </div>
