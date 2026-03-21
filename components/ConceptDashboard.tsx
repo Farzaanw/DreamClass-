@@ -14,7 +14,7 @@ interface ConceptDashboardProps {
   onSaveDesign: (design: ClassroomDesign) => void;
   onSelectConcept?: (concept: Concept) => void;
   onUpdateMaterials?: (materials: MaterialFile[]) => void;
-  onNavigateToMaterials?: () => void;
+  onNavigateToMaterials?: (subjectId: string) => void;
   userSongs?: Song[]; // Songs added by the user
   mode: AppMode;
 }
@@ -178,6 +178,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [globalSpinnerNames, setGlobalSpinnerNames] = useState<string[]>(design.spinnerNames || []);
 
+  const onSaveDesignRef = useRef(onSaveDesign);
+  useEffect(() => {
+    onSaveDesignRef.current = onSaveDesign;
+  }, [onSaveDesign]);
+
   useEffect(() => {
     if (design.spinnerNames && JSON.stringify(design.spinnerNames) !== JSON.stringify(globalSpinnerNames)) {
       setGlobalSpinnerNames(design.spinnerNames);
@@ -188,9 +193,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   useEffect(() => {
     const currentNames = design.spinnerNames || [];
     if (JSON.stringify(currentNames) !== JSON.stringify(globalSpinnerNames)) {
-      onSaveDesign({ ...design, spinnerNames: globalSpinnerNames });
+      onSaveDesignRef.current({ ...design, spinnerNames: globalSpinnerNames });
     }
-  }, [globalSpinnerNames, design, onSaveDesign]);
+  }, [globalSpinnerNames, design]);
 
   const [customIcons, setCustomIcons] = useState<any[]>([]);
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
@@ -861,15 +866,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
           : [...existingWhiteboards, newBoard];
 
-        onSaveDesign({
-          ...design,
-          whiteboards: updatedWhiteboards,
-          conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
-        });
+        // Check if data actually changed before saving
+        const currentSavedBoard = design.conceptBoards?.[concept.id];
+        const hasChanged = JSON.stringify(currentSavedBoard) !== JSON.stringify(newBoard);
+
+        if (hasChanged) {
+          onSaveDesignRef.current({
+            ...design,
+            whiteboards: updatedWhiteboards,
+            conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
+          });
+        }
       }, 2000); // 2 second debounce for auto-save
       return () => clearTimeout(timer);
     }
-  }, [items, boardBg, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode]);
+  }, [items, boardBg, boardBgColor, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode, design]);
 
   const handleSaveBoard = (onSuccess?: () => void) => {
     let boardId = currentBoardId;
@@ -1760,7 +1771,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
-                <span className="text-sm font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+                <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
                 
                 {cat.isCustom && mode === 'teacher' && (
                   <button 
@@ -1805,7 +1816,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 </div>
                 {mode === 'teacher' && (
                   <button 
-                    onClick={onNavigateToMaterials}
+                    onClick={() => onNavigateToMaterials?.(subjectId)}
                     className="mt-6 w-full bg-blue-500 text-white font-black py-4 rounded-3xl shadow-lg border-b-4 border-blue-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
                     <span>➕</span> Click here to add
@@ -1849,7 +1860,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   
                   {mode === 'teacher' && (
                     <button 
-                      onClick={onNavigateToMaterials}
+                      onClick={() => onNavigateToMaterials?.(subjectId)}
                       className="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl py-6 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all group"
                     >
                       <span className="text-2xl group-hover:scale-110 transition-transform">➕</span>

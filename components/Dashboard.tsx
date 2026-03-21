@@ -1,6 +1,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Plus, Search, FileText, Music, Gamepad2, Calendar, 
+  Trash2, Edit3, ChevronRight, ChevronDown, Check, 
+  MousePointer2, Crosshair, Hand, Sparkles, HeartPulse,
+  Palette, Maximize2, MousePointer, Pencil, Star, Dog,
+  Cloud, Rocket, Flower2
+} from 'lucide-react';
 import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song, Game } from '../types';
 import CalendarOverlay from './CalendarOverlay';
 import PublicLibrary, { Resource } from './PublicLibrary';
@@ -38,6 +45,14 @@ interface DashboardProps {
   onUpdateCalendarData: (calendarData: any) => void;
   onAddResourceToClassroom: (resource: Resource, subjectId: string) => void;
   initialView?: 'overview' | 'materials' | 'songs' | 'games';
+  initialSubjectId?: string;
+  cursorStyle: {
+    color: string;
+    size: string;
+    style: string;
+    animation: string;
+  };
+  onCursorStyleChange: (style: any) => void;
 }
 
 const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
@@ -83,7 +98,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateGames,
   onUpdateCalendarData,
   onAddResourceToClassroom,
-  initialView = 'overview'
+  initialView = 'overview',
+  initialSubjectId,
+  cursorStyle,
+  onCursorStyleChange
 }) => {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>(initialView);
@@ -95,8 +113,36 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [previewMaterial, setPreviewMaterial] = useState<MaterialFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showCursorMenu, setShowCursorMenu] = useState(false);
   const modalScrollRef = useRef<HTMLDivElement>(null);
   const songFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showCursorMenu && !(event.target as HTMLElement).closest('.cursor-menu-container')) {
+        setShowCursorMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCursorMenu]);
+
+  useEffect(() => {
+    if (view === 'materials' && initialSubjectId) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`subject-section-${initialSubjectId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the section briefly
+          element.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50');
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
+          }, 2000);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [view, initialSubjectId]);
   const [activeSubjectForSongUpload, setActiveSubjectForSongUpload] = useState<string | null>(null);
 
   // Songs State
@@ -1103,11 +1149,158 @@ const Dashboard: React.FC<DashboardProps> = ({
           </button>
           <div className="h-12 w-px bg-gray-200 hidden md:block"></div>
           <div className="hidden sm:block"><h1 className="text-2xl font-bold text-gray-800">Hi, {user.username}! 🍎</h1><p className="text-gray-500 text-sm">Welcome to your Teachly dashboard.</p></div>
+          
+          {appMode === 'classroom' && (
+            <div className="cursor-menu-container relative ml-4">
+              <button 
+                onClick={() => setShowCursorMenu(!showCursorMenu)}
+                className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border-2 border-blue-100 shadow-sm hover:border-blue-300 transition-colors group"
+              >
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                  <MousePointer size={18} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-bold text-blue-500 uppercase tracking-widest leading-none mb-0.5">Cursor Style</span>
+                  <div className="flex items-center gap-1">
+                    <ChevronDown size={12} className={`text-gray-400 transition-transform ${showCursorMenu ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {showCursorMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full left-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border-2 border-blue-50 z-[100] p-4 overflow-hidden"
+                  >
+                    <div className="space-y-4">
+                      {/* Colors */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-blue-500">
+                          <Palette size={16} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Colors</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {['default', 'red', 'blue', 'green', 'purple'].map(c => (
+                            <button 
+                              key={c}
+                              onClick={() => onCursorStyleChange({ ...cursorStyle, color: c })}
+                              className={`w-8 h-8 rounded-full border-2 transition-all ${cursorStyle.color === c ? 'border-blue-500 scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                              style={{ backgroundColor: c === 'default' ? '#000' : (c === 'red' ? '#ef4444' : (c === 'blue' ? '#3b82f6' : (c === 'green' ? '#22c55e' : '#a855f7'))) }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Sizes */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-blue-500">
+                          <Maximize2 size={16} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Size</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['normal', 'large', 'extra-large'].map(s => (
+                            <button 
+                              key={s}
+                              onClick={() => onCursorStyleChange({ ...cursorStyle, size: s })}
+                              className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border-2 ${cursorStyle.size === s ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                            >
+                              {s.replace('-', ' ')}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Styles */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-blue-500">
+                          <MousePointer2 size={16} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Style</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { id: 'arrow', icon: <MousePointer2 size={14} /> },
+                            { id: 'crosshair', icon: <Crosshair size={14} /> },
+                            { id: 'pencil', icon: <Pencil size={14} fill="currentColor" /> },
+                            { id: 'star', icon: <Star size={14} /> }
+                          ].map(st => (
+                            <button 
+                              key={st.id}
+                              onClick={() => onCursorStyleChange({ ...cursorStyle, style: st.id })}
+                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.style === st.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                            >
+                              {st.icon}
+                              <span className="text-[10px] font-bold mt-1 capitalize">{st.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Trails */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-blue-500">
+                          <Cloud size={16} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Trails</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { id: 'none', icon: '🚫' },
+                            { id: 'rainbow', icon: '🌈' },
+                            { id: 'sparkle', icon: '✨' },
+                            { id: 'bubble', icon: '🫧' },
+                            { id: 'flower', icon: '🌸' },
+                            { id: 'rocket', icon: '🚀' },
+                            { id: 'music', icon: '🎵' }
+                          ].map(tr => (
+                            <button 
+                              key={tr.id}
+                              onClick={() => onCursorStyleChange({ ...cursorStyle, trail: tr.id })}
+                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.trail === tr.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                            >
+                              <span className="text-sm">{tr.icon}</span>
+                              <span className="text-[10px] font-bold mt-1 capitalize">{tr.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Animations */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-blue-500">
+                          <Sparkles size={16} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Animation</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'none', icon: '🚫' },
+                            { id: 'glowing', icon: '✨' },
+                            { id: 'pulsing', icon: '💓' }
+                          ].map(ani => (
+                            <button 
+                              key={ani.id}
+                              onClick={() => onCursorStyleChange({ ...cursorStyle, animation: ani.id })}
+                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.animation === ani.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                            >
+                              <span className="text-sm">{ani.icon}</span>
+                              <span className="text-[10px] font-bold mt-1 capitalize">{ani.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
-        <div className="bg-gray-100 p-1.5 rounded-full flex relative shadow-inner border border-gray-200 w-64 h-14 animate-blue-glow">
+        <div className="bg-gray-100 p-1.5 rounded-full flex relative shadow-inner border border-gray-200 w-80 h-16 animate-blue-glow">
           <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-all duration-300 shadow-sm ${appMode === 'classroom' ? 'left-1 bg-blue-500' : 'left-[calc(50%+2px)] bg-purple-500'}`} />
-          <button onClick={() => onModeChange('classroom')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'classroom' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">👨‍🏫</span>Classroom</button>
-          <button onClick={() => onModeChange('teacher')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-sm ${appMode === 'teacher' ? 'text-white' : 'text-gray-500'}`}><span className="text-xl">🛠️</span>Teacher</button>
+          <button onClick={() => onModeChange('classroom')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-lg ${appMode === 'classroom' ? 'text-white' : 'text-gray-500'}`}><span className="text-2xl">👨‍🏫</span>Classroom</button>
+          <button onClick={() => onModeChange('teacher')} className={`flex-1 flex items-center justify-center gap-2 z-10 transition-colors duration-300 font-bold text-lg ${appMode === 'teacher' ? 'text-white' : 'text-gray-500'}`}><span className="text-2xl">🛠️</span>Teacher</button>
         </div>
         <div className="flex gap-4">
           <button onClick={onLogout} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-medium transition-colors border-b-4 border-gray-300">Logout</button>

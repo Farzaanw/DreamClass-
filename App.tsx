@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Pencil, Star, Dog } from 'lucide-react';
 import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song, Game } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
@@ -56,6 +58,196 @@ const ExampleCard: React.FC<{ emoji: string, title: string, color: string }> = (
   </div>
 );
 
+const CursorTrail: React.FC<{ x: number, y: number, type: string, color: string }> = ({ x, y, type, color }) => {
+  const [particles, setParticles] = useState<any[]>([]);
+  const lastPos = useRef({ x, y });
+
+  useEffect(() => {
+    if (type === 'none') {
+      setParticles([]);
+      return;
+    }
+
+    const dist = Math.hypot(x - lastPos.current.x, y - lastPos.current.y);
+    if (dist > 10) {
+      const newParticle = {
+        id: Math.random(),
+        x,
+        y,
+        size: Math.random() * 10 + 10,
+        rotation: Math.random() * 360,
+        vx: (Math.random() - 0.5) * 40,
+        vy: (Math.random() - 0.5) * 40,
+      };
+      setParticles(prev => [...prev.slice(-15), newParticle]);
+      lastPos.current = { x, y };
+    }
+  }, [x, y, type]);
+
+  const removeParticle = (id: number) => {
+    setParticles(prev => prev.filter(p => p.id !== id));
+  };
+
+  const getParticleContent = (p: any) => {
+    switch (type) {
+      case 'rainbow':
+        const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#8b00ff'];
+        return <div className="rounded-full" style={{ width: p.size, height: p.size, backgroundColor: colors[Math.floor(p.id * colors.length) % colors.length] }} />;
+      case 'sparkle':
+        return <span className="text-yellow-400" style={{ fontSize: p.size }}>✨</span>;
+      case 'bubble':
+        return <div className="rounded-full border-2 border-blue-300 bg-blue-100/30" style={{ width: p.size, height: p.size }} />;
+      case 'flower':
+        return <span style={{ fontSize: p.size }}>🌸</span>;
+      case 'rocket':
+        return <span style={{ fontSize: p.size, transform: `rotate(${p.rotation}deg)` }}>🚀</span>;
+      case 'music':
+        return <span className="text-purple-500" style={{ fontSize: p.size }}>🎵</span>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+      <AnimatePresence>
+        {particles.map(p => (
+          <motion.div
+            key={p.id}
+            initial={{ 
+              x: p.x, 
+              y: p.y, 
+              opacity: 1, 
+              scale: 0.5,
+              rotate: p.rotation 
+            }}
+            animate={{ 
+              x: p.x + p.vx, 
+              y: type === 'music' || type === 'bubble' ? p.y - 100 : p.y + p.vy,
+              opacity: 0,
+              scale: 1.5,
+              rotate: p.rotation + 90
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ 
+              duration: 0.8, 
+              ease: "easeOut" 
+            }}
+            onAnimationComplete={() => removeParticle(p.id)}
+            className="absolute"
+            style={{
+              left: 0,
+              top: 0,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            {getParticleContent(p)}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const CursorFollower: React.FC<{ style: any }> = ({ style }) => {
+  const [pos, setPos] = useState({ x: -100, y: -100 });
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setPos({ x: e.clientX, y: e.clientY });
+      if (!visible) setVisible(true);
+    };
+    const handleMouseLeave = () => setVisible(false);
+    const handleMouseEnter = () => setVisible(true);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseenter', handleMouseEnter);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mouseenter', handleMouseEnter);
+    };
+  }, [visible]);
+
+  const getColor = () => {
+    switch (style.color) {
+      case 'red': return '#ef4444';
+      case 'blue': return '#3b82f6';
+      case 'green': return '#22c55e';
+      case 'purple': return '#a855f7';
+      default: return '#000000';
+    }
+  };
+
+  const getSize = () => {
+    switch (style.size) {
+      case 'large': return 48;
+      case 'extra-large': return 72;
+      default: return 24;
+    }
+  };
+
+  const getIcon = () => {
+    const size = getSize();
+    const color = getColor();
+    
+    if (style.style === 'crosshair') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+          <line x1="12" y1="2" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+      );
+    }
+    
+    if (style.style === 'pencil') {
+      return <Pencil size={size} color={color} fill={color} strokeWidth={2.5} />;
+    }
+
+    if (style.style === 'star') {
+      return <Star size={size} fill={color} color={color} />;
+    }
+
+    // Default Arrow
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="white" strokeWidth="1">
+        <path d="M7 2l12 11.2-5.8.8 3.3 7.3-2.2 1-3.2-7.4L7 19V2z" />
+      </svg>
+    );
+  };
+
+  const getOffset = () => {
+    if (style.style === 'crosshair') return `translate(-50%, -50%)`;
+    if (style.style === 'star') return `translate(-50%, -50%)`;
+    if (style.style === 'pencil') return `translate(0, -100%)`; // Tip is at bottom-left
+    // Default Arrow: Tip is at (7, 2) in a 24x24 grid
+    return `translate(-29%, -8%)`; // -7/24 ≈ -29%, -2/24 ≈ -8%
+  };
+
+  if (!visible) return null;
+
+  return (
+    <>
+      <CursorTrail x={pos.x} y={pos.y} type={style.trail || 'none'} color={getColor()} />
+      <div 
+        className={`fixed pointer-events-none z-[10000] transition-transform duration-75 ease-out ${style.animation === 'pulsing' ? 'animate-cursor-pulse' : ''} ${style.animation === 'glowing' ? 'animate-cursor-glow' : ''}`}
+        style={{ 
+          left: pos.x, 
+          top: pos.y, 
+          transform: getOffset(),
+          color: getColor()
+        }}
+      >
+        {getIcon()}
+      </div>
+    </>
+  );
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('landing');
@@ -65,6 +257,21 @@ const App: React.FC = () => {
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [designingSubjectId, setDesigningSubjectId] = useState<SubjectId | null>(null);
   const [dashboardInitialView, setDashboardInitialView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
+  const [dashboardInitialSubjectId, setDashboardInitialSubjectId] = useState<string | null>(null);
+  const [cursorStyle, setCursorStyle] = useState(() => {
+    const saved = localStorage.getItem('teachly_cursor_style');
+    return saved ? JSON.parse(saved) : {
+      color: 'default',
+      size: 'normal',
+      style: 'arrow',
+      animation: 'none',
+      trail: 'none'
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('teachly_cursor_style', JSON.stringify(cursorStyle));
+  }, [cursorStyle]);
 
   const allSubjects = useMemo(() => {
     if (!currentUser) return SUBJECTS;
@@ -90,23 +297,64 @@ const App: React.FC = () => {
     localStorage.setItem('dreamclass_user', JSON.stringify(user));
   };
 
-  const handleModeSelect = (mode: AppMode) => {
+  const handleModeSelect = useCallback((mode: AppMode) => {
     setAppMode(mode);
+    if (mode === 'teacher') {
+      setCursorStyle({
+        color: 'default',
+        size: 'normal',
+        style: 'arrow',
+        animation: 'none',
+        trail: 'none'
+      });
+    }
     setDashboardInitialView('overview');
+    setDashboardInitialSubjectId(null);
     setCurrentView('dashboard');
-  };
+  }, []);
 
-  const handleBackToModeSelect = () => {
+  const handleModeChange = useCallback((mode: AppMode) => {
+    setAppMode(mode);
+    if (mode === 'teacher') {
+      setCursorStyle({
+        color: 'default',
+        size: 'normal',
+        style: 'arrow',
+        animation: 'none',
+        trail: 'none'
+      });
+    }
+  }, []);
+
+  const handleBackToModeSelect = useCallback(() => {
     setDashboardInitialView('overview');
+    setDashboardInitialSubjectId(null);
     setCurrentView('mode-selection');
-  };
+  }, []);
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setAppMode(null);
-    setCurrentView('landing');
-    localStorage.removeItem('dreamclass_user');
-  };
+  const persistUser = useCallback((updatedUser: Partial<User>) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      return { ...prev, ...updatedUser };
+    });
+  }, []);
+
+  const updateClassroom = useCallback((subjectId: SubjectId, design: ClassroomDesign) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      return { 
+        ...prev, 
+        classroomDesigns: {
+          ...prev.classroomDesigns,
+          [subjectId]: {
+            ...design,
+            whiteboards: design.whiteboards || [],
+            conceptBoards: design.conceptBoards || {}
+          }
+        } 
+      };
+    });
+  }, []);
 
   // Centralized persistence effect
   useEffect(() => {
@@ -124,31 +372,20 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
-  const persistUser = (updatedUser: Partial<User>) => {
-    setCurrentUser(prev => {
-      if (!prev) return prev;
-      return { ...prev, ...updatedUser };
-    });
-  };
+  const handleLogout = useCallback(() => {
+    setCurrentUser(null);
+    setAppMode(null);
+    setCurrentView('landing');
+    localStorage.removeItem('dreamclass_user');
+  }, []);
 
-  const updateClassroom = (subjectId: SubjectId, design: ClassroomDesign) => {
-    setCurrentUser(prev => {
-      if (!prev) return prev;
-      return { 
-        ...prev, 
-        classroomDesigns: {
-          ...prev.classroomDesigns,
-          [subjectId]: {
-            ...design,
-            whiteboards: design.whiteboards || [],
-            conceptBoards: design.conceptBoards || {}
-          }
-        } 
-      };
-    });
-  };
+  const handleSaveDesign = useCallback((newDesign: ClassroomDesign) => {
+    if (selectedSubject) {
+      updateClassroom(selectedSubject.id, newDesign);
+    }
+  }, [selectedSubject, updateClassroom]);
 
-  const handleAddSubject = (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
+  const handleAddSubject = useCallback((subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser || !subjectData.name.trim()) return;
     const newId = `custom-${Date.now()}`;
     const colors = ['bg-pink-400', 'bg-orange-400', 'bg-indigo-400', 'bg-teal-400', 'bg-rose-400'];
@@ -177,9 +414,9 @@ const App: React.FC = () => {
       }
     };
     persistUser(updatedUser);
-  };
+  }, [currentUser, persistUser]);
 
-  const handleEditSubject = (subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
+  const handleEditSubject = useCallback((subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser) return;
     const existing = allSubjects.find(s => s.id === subjectId);
     if (!existing) return;
@@ -195,9 +432,9 @@ const App: React.FC = () => {
       ...currentUser,
       customSubjects: [...otherCustom, updatedSubject]
     });
-  };
+  }, [currentUser, allSubjects, persistUser]);
 
-  const handleDeleteSubject = (subjectId: SubjectId) => {
+  const handleDeleteSubject = useCallback((subjectId: SubjectId) => {
     if (!currentUser) return;
     
     const updatedHidden = Array.from(new Set([...(currentUser.hiddenSubjectIds || []), subjectId]));
@@ -213,41 +450,41 @@ const App: React.FC = () => {
     };
     
     persistUser(updatedUser);
-  };
+  }, [currentUser, persistUser]);
 
-  const handleUpdateMaterials = (materials: MaterialFile[]) => {
+  const handleUpdateMaterials = useCallback((materials: MaterialFile[]) => {
     if (!currentUser) return;
     persistUser({
       ...currentUser,
       materials
     });
-  };
+  }, [currentUser, persistUser]);
 
-  const handleUpdateSongs = (songs: Song[]) => {
+  const handleUpdateSongs = useCallback((songs: Song[]) => {
     if (!currentUser) return;
     persistUser({
       ...currentUser,
       songs
     });
-  };
+  }, [currentUser, persistUser]);
 
-  const handleUpdateGames = (games: Game[]) => {
+  const handleUpdateGames = useCallback((games: Game[]) => {
     if (!currentUser) return;
     persistUser({
       ...currentUser,
       games
     });
-  };
+  }, [currentUser, persistUser]);
 
-  const handleUpdateCalendarData = (calendarData: any) => {
+  const handleUpdateCalendarData = useCallback((calendarData: any) => {
     if (!currentUser) return;
     persistUser({
       ...currentUser,
       calendarData
     });
-  };
+  }, [currentUser, persistUser]);
 
-  const handleAddResourceToClassroom = (resource: Resource, subjectId: string) => {
+  const handleAddResourceToClassroom = useCallback((resource: Resource, subjectId: string) => {
     if (!currentUser) return;
     
     const typeMap: Record<string, 'pdf' | 'slides' | 'video'> = {
@@ -273,10 +510,11 @@ const App: React.FC = () => {
       materials: [...currentMaterials, newMaterial]
     });
     
-    alert(`Successfully added "${resource.title}" to your classroom! 🎉`);
-  };
+    // Using a custom toast would be better, but for now we'll just log it
+    console.log(`Successfully added "${resource.title}" to your classroom! 🎉`);
+  }, [currentUser, persistUser]);
 
-  const navigateToSubject = (subjectId: SubjectId) => {
+  const navigateToSubject = useCallback((subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
     if (appMode === 'teacher' && subject && subject.concepts.length > 0) {
@@ -285,7 +523,7 @@ const App: React.FC = () => {
     } else {
       setCurrentView('classroom');
     }
-  };
+  }, [allSubjects, appMode]);
 
   const startDesigning = (subjectId: SubjectId) => {
     setDesigningSubjectId(subjectId);
@@ -319,7 +557,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900">
+    <div className={`min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900 ${cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none' ? 'custom-cursor-active' : ''}`}>
+      {/* Custom Cursor Element */}
+      {currentUser && (cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none') && (
+        <CursorFollower style={cursorStyle} />
+      )}
       {/* Visual Mode Overlay: Teacher (Blue Tint) vs Classroom (Clear) */}
       {currentUser && appMode && (
         <div 
@@ -634,7 +876,7 @@ const App: React.FC = () => {
               user={currentUser} 
               appMode={appMode} 
               allSubjects={allSubjects} 
-              onModeChange={setAppMode} 
+              onModeChange={handleModeChange} 
               onLogout={handleLogout} 
               onBackToMode={handleBackToModeSelect} 
               onNavigateDesigner={() => setCurrentView('designer-select')} 
@@ -648,6 +890,9 @@ const App: React.FC = () => {
               onUpdateCalendarData={handleUpdateCalendarData}
               onAddResourceToClassroom={handleAddResourceToClassroom}
               initialView={dashboardInitialView}
+              initialSubjectId={dashboardInitialSubjectId || undefined}
+              cursorStyle={cursorStyle}
+              onCursorStyleChange={setCursorStyle}
             />
           )}
           
@@ -685,11 +930,12 @@ const App: React.FC = () => {
                   setCurrentView('classroom');
                 }
               }} 
-              onSaveDesign={(newDesign) => updateClassroom(selectedSubject.id, newDesign)} 
+              onSaveDesign={handleSaveDesign} 
               onSelectConcept={(c) => setSelectedConcept(c)}
               onUpdateMaterials={handleUpdateMaterials}
-              onNavigateToMaterials={() => {
+              onNavigateToMaterials={(subId) => {
                 setDashboardInitialView('materials');
+                setDashboardInitialSubjectId(subId);
                 setCurrentView('dashboard');
               }}
               userSongs={currentUser.songs || []}
@@ -710,6 +956,28 @@ const App: React.FC = () => {
         .animate-bounce-gentle { animation: bounce-gentle 2.5s ease-in-out infinite; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .custom-cursor-active, .custom-cursor-active * {
+          cursor: none !important;
+        }
+
+        @keyframes cursor-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.2); }
+        }
+
+        @keyframes cursor-glow {
+          0%, 100% { filter: drop-shadow(0 0 5px currentColor); }
+          50% { filter: drop-shadow(0 0 15px currentColor); }
+        }
+
+        .animate-cursor-pulse {
+          animation: cursor-pulse 1s ease-in-out infinite;
+        }
+
+        .animate-cursor-glow {
+          animation: cursor-glow 1.5s ease-in-out infinite;
+        }
       `}</style>
     </div>
   );
