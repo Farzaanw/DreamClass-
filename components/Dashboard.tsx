@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, Search, FileText, Music, Gamepad2, Calendar, 
-  Trash2, Edit3, ChevronRight, ChevronDown, Check, 
+  Trash2, Edit3, ChevronRight, ChevronDown, ChevronUp, Check, 
   MousePointer2, Crosshair, Hand, Sparkles, HeartPulse,
   Palette, Maximize2, MousePointer, Pencil, Star, Dog,
   Cloud, Rocket, Flower2
@@ -55,7 +55,18 @@ interface DashboardProps {
   onCursorStyleChange: (style: any) => void;
 }
 
-const EMOJI_OPTIONS = ['🍎', '➕', '🔬', '🚀', '🎨', '🧩', '🎸', '🦁', '🌿', '🪐', '🧠', '🔤', '🔢', '🧪', '🌍', '📐', '🎭', '🏀', '☀️', '💡'];
+const EMOJI_OPTIONS = [
+  // Learning & School
+  '🍎', '📚', '✏️', '🎨', '🔬', '🚀', '🌍', '➕', '🔢', '🧩', '🎸', '🧠', '🔤', '🧪', '📐', '🎭', '🏫', '🎒', '💻',
+  // Animals (One representative)
+  '🦁',
+  // Plants (One representative)
+  '🌱',
+  // Weather & Environment
+  '☀️', '☁️', '❄️', '🌈', '🌋', '🌊',
+  // Food & Health
+  '🍕', '🍦', '🍓', '❤️', '🩺'
+];
 
 const PUBLIC_SONG_POOL: Song[] = [
   { id: 'p1', title: 'Twinkle, Twinkle Little Star', icon: '⭐', category: 'Quiet Time', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
@@ -167,6 +178,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [concepts, setConcepts] = useState<{ title: string; icon: string; description: string }[]>([
     { title: '', icon: '✨', description: '' }
   ]);
+  const [visibleEmojiCount, setVisibleEmojiCount] = useState(9);
 
   useEffect(() => {
     if (toast) {
@@ -245,6 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       icon: c.icon,
       description: c.description
     })));
+    setVisibleEmojiCount(20);
     setShowSubjectModal(true);
   };
 
@@ -1233,7 +1246,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.style === st.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
                               {st.icon}
-                              <span className="text-[10px] font-bold mt-1 capitalize">{st.id}</span>
+                              <span className="text-[11px] font-bold mt-1 capitalize">{st.id}</span>
                             </button>
                           ))}
                         </div>
@@ -1261,7 +1274,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.trail === tr.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
                               <span className="text-sm">{tr.icon}</span>
-                              <span className="text-[10px] font-bold mt-1 capitalize">{tr.id}</span>
+                              <span className="text-[11px] font-bold mt-1 capitalize">{tr.id}</span>
                             </button>
                           ))}
                         </div>
@@ -1285,7 +1298,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.animation === ani.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
                               <span className="text-sm">{ani.icon}</span>
-                              <span className="text-[10px] font-bold mt-1 capitalize">{ani.id}</span>
+                              <span className="text-[11px] font-bold mt-1 capitalize">{ani.id}</span>
                             </button>
                           ))}
                         </div>
@@ -1392,7 +1405,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         {appMode === 'teacher' && (
           <motion.div 
-            onClick={() => { handleCloseSubjectModal(); setShowSubjectModal(true); }} 
+            onClick={() => { handleCloseSubjectModal(); setVisibleEmojiCount(20); setShowSubjectModal(true); }} 
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 + (allSubjects.length * 0.1) }}
             className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]"
@@ -1458,9 +1471,29 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-500 ml-4">ICON</label>
                 <div className="flex flex-wrap gap-2 p-4 bg-blue-50 rounded-3xl justify-center">
-                  {EMOJI_OPTIONS.map(emoji => (
+                  {EMOJI_OPTIONS.slice(0, visibleEmojiCount).map(emoji => (
                     <button key={emoji} type="button" onClick={() => setNewIcon(emoji)} className={`text-2xl p-2 rounded-xl ${newIcon === emoji ? 'bg-white shadow-md border-2 border-blue-400' : 'opacity-50'}`}>{emoji}</button>
                   ))}
+                  <div className="w-full flex justify-center gap-4 mt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setVisibleEmojiCount(prev => Math.max(9, prev - 9))}
+                      disabled={visibleEmojiCount <= 9}
+                      className={`p-2 rounded-xl border-2 transition-all ${visibleEmojiCount <= 9 ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'border-blue-100 text-blue-500 hover:bg-blue-100'}`}
+                      title="Show Less"
+                    >
+                      <ChevronUp size={24} />
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setVisibleEmojiCount(prev => Math.min(EMOJI_OPTIONS.length, prev + 9))}
+                      disabled={visibleEmojiCount >= EMOJI_OPTIONS.length}
+                      className={`p-2 rounded-xl border-2 transition-all ${visibleEmojiCount >= EMOJI_OPTIONS.length ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'border-blue-100 text-blue-500 hover:bg-blue-100'}`}
+                      title="Show More"
+                    >
+                      <ChevronDown size={24} />
+                    </button>
+                  </div>
                 </div>
               </div>
               <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={newName} onChange={(e) => setNewName(e.target.value)} required />

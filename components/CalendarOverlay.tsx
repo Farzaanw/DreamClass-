@@ -12,7 +12,8 @@ import {
   Snowflake, 
   StickyNote, 
   Trash2,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 
 interface CalendarEvent {
@@ -95,6 +96,8 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [isAddingBirthday, setIsAddingBirthday] = useState<{ date: string } | null>(null);
   const [isAddingSticky, setIsAddingSticky] = useState<{ date: string } | null>(null);
   const [isAddingHoliday, setIsAddingHoliday] = useState<{ date: string } | null>(null);
+  const [isAddingConference, setIsAddingConference] = useState<{ date: string } | null>(null);
+  const [isEditingSticky, setIsEditingSticky] = useState<{ date: string, event: CalendarEvent } | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [expandedSticky, setExpandedSticky] = useState<CalendarEvent | null>(null);
   const [activeWeatherEffect, setActiveWeatherEffect] = useState<string | null>(null);
@@ -146,6 +149,15 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
     onUpdateCalendarData({ events: updatedEvents });
   };
 
+  const handleUpdateEvent = (dateStr: string, eventId: string, updates: Partial<CalendarEvent>) => {
+    const dayEvents = events[dateStr] || [];
+    const updatedEvents = {
+      ...events,
+      [dateStr]: dayEvents.map(e => e.id === eventId ? { ...e, ...updates } : e)
+    };
+    onUpdateCalendarData({ events: updatedEvents });
+  };
+
   const handleDrop = (dateStr: string, type: 'birthday' | 'weather' | 'sticky' | 'holiday' | 'conference', extra?: any) => {
     if (type === 'birthday') {
       setIsAddingBirthday({ date: dateStr });
@@ -154,7 +166,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
     } else if (type === 'holiday') {
       setIsAddingHoliday({ date: dateStr });
     } else if (type === 'conference') {
-      handleAddEvent(dateStr, { type: 'conference', icon: '🏫', text: 'Parent-Teacher Conference' });
+      setIsAddingConference({ date: dateStr });
     } else {
       handleAddEvent(dateStr, { type, ...extra });
       if (type === 'weather' && extra?.text) {
@@ -197,8 +209,8 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
       weatherAudioRef.current = audio;
     }
 
-    // Standardize duration to 3000ms and ensure audio stops when effect ends
-    const duration = 3000;
+    // Standardize duration to 6000ms and ensure audio stops when effect ends
+    const duration = 6000;
     setTimeout(() => {
       setActiveWeatherEffect(null);
       if (weatherAudioRef.current) {
@@ -323,7 +335,6 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl shadow-inner">📅</div>
               <div>
                 <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{monthName} {year}</h2>
-                <p className="text-blue-100 font-bold text-base sm:text-lg">Interactive Classroom Calendar 🍎</p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
@@ -389,9 +400,14 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                             </div>
                           )}
                           {event.type === 'conference' && (
-                            <div className="flex items-center gap-4">
-                              <span className="text-3xl">{event.icon}</span>
-                              <div className="font-black text-indigo-600 text-lg">{event.text}</div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-4">
+                                <span className="text-3xl">{event.icon}</span>
+                                <div className="font-black text-indigo-600 text-lg">{event.text}</div>
+                              </div>
+                              {event.studentName && (
+                                <div className="text-black font-bold ml-12">Student: {event.studentName}</div>
+                              )}
                             </div>
                           )}
                           {event.type === 'weather' && (
@@ -404,19 +420,34 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                             <div className="font-bold text-slate-700 whitespace-pre-wrap text-lg line-clamp-2">{event.text}</div>
                           )}
                         </div>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveEvent(selectedDayEvents.date, event.id);
-                            setSelectedDayEvents({
-                              ...selectedDayEvents,
-                              events: selectedDayEvents.events.filter(e => e.id !== event.id)
-                            });
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 transition-all p-2"
-                        >
-                          <Trash2 size={22} />
-                        </button>
+                        <div className="flex gap-2">
+                          {event.type === 'sticky' && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStickyText(event.text || '');
+                                setStickyColor(event.color || STICKY_COLORS[0]);
+                                setIsEditingSticky({ date: selectedDayEvents.date, event });
+                              }}
+                              className="opacity-0 group-hover:opacity-100 text-blue-400 hover:text-blue-600 transition-all p-2"
+                            >
+                              <Pencil size={22} />
+                            </button>
+                          )}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveEvent(selectedDayEvents.date, event.id);
+                              setSelectedDayEvents({
+                                ...selectedDayEvents,
+                                events: selectedDayEvents.events.filter(e => e.id !== event.id)
+                              });
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 transition-all p-2"
+                          >
+                            <Trash2 size={22} />
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -448,11 +479,130 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                       className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-orange-50 hover:bg-orange-100 border-2 border-transparent hover:border-orange-200 transition-all group"
                     >
                       <span className="text-4xl group-hover:scale-110 transition-transform">{h.icon}</span>
-                      <span className="text-[10px] font-black uppercase tracking-tighter text-orange-600 text-center leading-tight">{h.label}</span>
+                      <span className="text-[11px] font-black uppercase tracking-tighter text-orange-600 text-center leading-tight">{h.label}</span>
                     </button>
                   ))}
                 </div>
                 <button onClick={() => setIsAddingHoliday(null)} className="w-full mt-6 py-4 rounded-2xl font-black text-slate-400 hover:bg-slate-50 transition-colors text-lg">Cancel</button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isAddingConference && (
+            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setIsAddingConference(null)}>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 border-8 border-indigo-100"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-2xl font-black text-slate-800 mb-6 text-center">Parent-Teacher Conference 🏫</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Student Name (Optional)</label>
+                    <input 
+                      type="text"
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      placeholder="Enter student name..."
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-4 border-slate-100 focus:border-indigo-300 outline-none font-bold text-lg"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      onClick={() => setIsAddingConference(null)}
+                      className="flex-1 py-4 rounded-2xl font-black text-slate-400 bg-slate-100 hover:bg-slate-200 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => {
+                        handleAddEvent(isAddingConference.date, { 
+                          type: 'conference', 
+                          icon: '🏫', 
+                          text: 'Parent-Teacher Conference',
+                          studentName: studentName.trim() || undefined
+                        });
+                        setStudentName('');
+                        setIsAddingConference(null);
+                      }}
+                      className="flex-1 py-4 rounded-2xl font-black text-white bg-indigo-500 hover:bg-indigo-600 shadow-xl shadow-indigo-200 transition-all"
+                    >
+                      Add Event
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isEditingSticky && (
+            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setIsEditingSticky(null)}>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className={`w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border-8 ${stickyColor}`}
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-2xl font-black text-slate-800 mb-6 text-center">Edit Sticky Note 📝</h3>
+                <div className="flex justify-center gap-3 mb-6">
+                  {STICKY_COLORS.map(color => (
+                    <button 
+                      key={color}
+                      onClick={() => setStickyColor(color)}
+                      className={`w-8 h-8 rounded-full border-2 ${color} ${stickyColor === color ? 'ring-2 ring-blue-400 scale-110' : 'opacity-60 hover:opacity-100'}`}
+                    />
+                  ))}
+                </div>
+                <textarea 
+                  value={stickyText}
+                  onChange={(e) => setStickyText(e.target.value)}
+                  placeholder="Type your note here..."
+                  className="w-full h-40 p-6 rounded-2xl bg-white/50 border-4 border-white/20 focus:border-white/40 outline-none font-bold text-lg resize-none placeholder:text-slate-400"
+                  autoFocus
+                />
+                <div className="flex gap-4 mt-6">
+                  <button 
+                    onClick={() => setIsEditingSticky(null)}
+                    className="flex-1 py-4 rounded-2xl font-black text-slate-500 bg-white/30 hover:bg-white/50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (stickyText.trim()) {
+                        handleUpdateStickyText(isEditingSticky.date, isEditingSticky.event.id, stickyText.trim());
+                        // Also update color if it changed
+                        handleUpdateEvent(isEditingSticky.date, isEditingSticky.event.id, { color: stickyColor });
+                        
+                        // Update selectedDayEvents to reflect changes in the list
+                        if (selectedDayEvents) {
+                          setSelectedDayEvents({
+                            ...selectedDayEvents,
+                            events: selectedDayEvents.events.map(e => 
+                              e.id === isEditingSticky.event.id 
+                                ? { ...e, text: stickyText.trim(), color: stickyColor } 
+                                : e
+                            )
+                          });
+                        }
+                        
+                        setStickyText('');
+                        setIsEditingSticky(null);
+                      }
+                    }}
+                    className="flex-1 py-4 rounded-2xl font-black text-white bg-slate-800 hover:bg-slate-900 shadow-xl transition-all"
+                  >
+                    Update
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}
@@ -565,7 +715,6 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                 onClick={e => e.stopPropagation()}
               >
                 <button onClick={() => setExpandedSticky(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><X size={32} /></button>
-                <div className="text-6xl mb-8">📝</div>
                 <div className="text-3xl font-black text-slate-800 whitespace-pre-wrap leading-relaxed">
                   {expandedSticky.text}
                 </div>
@@ -645,8 +794,60 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
               )}
               {activeWeatherEffect === 'Windy' && (
                 <div className="absolute inset-0 overflow-hidden">
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="absolute text-4xl animate-wind" style={{ top: `${Math.random() * 100}%`, animation: `wind-blow ${2 + Math.random() * 2}s linear infinite`, animationDelay: `${Math.random() * 2}s` }}>🍃</div>
+                  {/* Breeze lines */}
+                  {[...Array(15)].map((_, i) => (
+                    <motion.div
+                      key={`breeze-${i}`}
+                      initial={{ x: "-20vw", opacity: 0, y: `${Math.random() * 100}%` }}
+                      animate={{ 
+                        x: ["-20vw", "120vw"],
+                        opacity: [0, 0.2, 0.2, 0],
+                        y: [
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`
+                        ]
+                      }}
+                      transition={{ 
+                        duration: 3 + Math.random() * 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: Math.random() * 2
+                      }}
+                      className="absolute h-1 w-64 bg-white/30 blur-sm rounded-full"
+                    />
+                  ))}
+                  {/* Whirling leaves */}
+                  {[...Array(20)].map((_, i) => (
+                    <motion.div
+                      key={`leaf-${i}`}
+                      initial={{ 
+                        x: "-10vw", 
+                        y: `${Math.random() * 100}%`,
+                        rotate: 0,
+                        scale: 0.5 + Math.random() * 0.7
+                      }}
+                      animate={{ 
+                        x: "110vw",
+                        y: [
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`, 
+                          `${Math.random() * 100}%`
+                        ],
+                        rotate: [0, 360, 720, 1080],
+                      }}
+                      transition={{ 
+                        duration: 4 + Math.random() * 4,
+                        repeat: Infinity,
+                        ease: "linear",
+                        delay: Math.random() * 3
+                      }}
+                      className="absolute text-4xl drop-shadow-sm"
+                    >
+                      🍃
+                    </motion.div>
                   ))}
                 </div>
               )}

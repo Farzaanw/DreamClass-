@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile, Subject, Song, AppMode } from '../types';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { STICKERS, VC_WORDS, CV_WORDS, REGULAR_SIGHT_WORDS, IRREGULAR_SIGHT_WORDS, CONSONANT_DIGRAPHS, VOWEL_DIGRAPHS } from '../constants';
 
 interface ConceptDashboardProps {
@@ -84,47 +85,16 @@ const ALL_TOPIC_ICONS = [
   { label: 'Thermometer', content: 'thermometer', type: 'shape', display: '🌡️', metadata: { temp: 70 } },
   { label: 'Calendar', content: 'calendar', type: 'shape', display: '📅', metadata: { month: 2, year: 2026, selectedDays: [] } },
   // Science
-  { label: 'Living', content: '🌱', type: 'sticker' },
+  { label: 'Plant', content: '🌱', type: 'sticker' },
   { label: 'Non-Living', content: '🪨', type: 'sticker' },
   { label: 'Water', content: '💧', type: 'sticker' },
   { label: 'Sun', content: '☀️', type: 'sticker' },
   { label: 'Air', content: '💨', type: 'sticker' },
   { label: 'Shelter', content: '🏠', type: 'sticker' },
   { label: 'Food', content: '🍎', type: 'sticker' },
-  { label: 'Tree', content: '🌳', type: 'sticker' },
-  { label: 'Fungi', content: '🍄', type: 'sticker' },
-  { label: 'Microbe', content: '🦠', type: 'sticker' },
-  { label: 'Shell', content: '🐚', type: 'sticker' },
-  { label: 'Bone', content: '🦴', type: 'sticker' },
-  { label: 'Forest', content: '🌲', type: 'sticker' },
   { label: 'Ocean', content: '🌊', type: 'sticker' },
-  { label: 'Desert', content: '🏜️', type: 'sticker' },
-  { label: 'Arctic', content: '❄️', type: 'sticker' },
-  { label: 'Jungle', content: '🎋', type: 'sticker' },
-  { label: 'Mammal', content: '🐕', type: 'sticker' },
-  { label: 'Bird', content: '🐦', type: 'sticker' },
-  { label: 'Fish', content: '🐟', type: 'sticker' },
-  { label: 'Reptile', content: '🦎', type: 'sticker' },
-  { label: 'Amphibian', content: '🐸', type: 'sticker' },
-  { label: 'Insect', content: '🐜', type: 'sticker' },
-  { label: 'Dinosaur', content: '🦖', type: 'sticker' },
-  { label: 'T-Rex', content: '🦖', type: 'sticker' },
-  { label: 'Brachio', content: '🦕', type: 'sticker' },
-  { label: 'Pterosaur', content: '🐉', type: 'sticker' },
-  { label: 'Fossil', content: '🦴', type: 'sticker' },
+  { label: 'Animal', content: '🦁', type: 'sticker' },
   { label: 'Volcano', content: '🌋', type: 'sticker' },
-  { label: 'Rabbit', content: '🐇', type: 'sticker' },
-  { label: 'Fox', content: '🦊', type: 'sticker' },
-  { label: 'Turtle', content: '🐢', type: 'sticker' },
-  { label: 'Shark', content: '🦈', type: 'sticker' },
-  { label: 'Elephant', content: '🐘', type: 'sticker' },
-  { label: 'Lion', content: '🦁', type: 'sticker' },
-  { label: 'Giraffe', content: '🦒', type: 'sticker' },
-  { label: 'Zebra', content: '🦓', type: 'sticker' },
-  { label: 'Panda', content: '🐼', type: 'sticker' },
-  { label: 'Koala', content: '🐨', type: 'sticker' },
-  { label: 'Whale', content: '🐳', type: 'sticker' },
-  { label: 'Octopus', content: '🐙', type: 'sticker' },
   { label: 'Hygiene', content: '🪥', type: 'sticker' },
   { label: 'Nutrition', content: '🥗', type: 'sticker' },
   { label: 'Emotions', content: '😊', type: 'sticker' },
@@ -139,6 +109,22 @@ const getFileIcon = (type: string) => {
     case 'video': return '🎬';
     default: return '📁';
   }
+};
+
+const SUBJECT_CATEGORY_MAP: Record<string, string[]> = {
+  'reading': ['UPPER', 'LOWER', 'BLENDS', 'SIGHT', 'DIGRAPHS', 'VOCAB', 'GRAMMAR', 'SPEAKING'],
+  'literacy': ['UPPER', 'LOWER', 'BLENDS', 'SIGHT', 'DIGRAPHS', 'VOCAB', 'GRAMMAR', 'SPEAKING'],
+  'phonics': ['UPPER', 'LOWER', 'BLENDS', 'SIGHT', 'DIGRAPHS'],
+  'math': ['NUMBERS', 'SYMBOLS', 'SHAPES', 'MEASURE', 'MONEY', 'CALENDAR', 'MANIPULATIVES'],
+  'science': ['LIVING', 'ANIMALS', 'ECOSYSTEMS', 'WEATHER', 'SPACE', 'GEOGRAPHY'],
+  'nature': ['LIVING', 'ANIMALS', 'ECOSYSTEMS', 'WEATHER'],
+  'social studies': ['GEOGRAPHY', 'CULTURE', 'HISTORY'],
+  'geography': ['GEOGRAPHY'],
+  'history': ['HISTORY'],
+  'art': ['ART_TOOLS', 'COLORS', 'CRAFTS', 'ARTISTS'],
+  'music': ['INSTRUMENTS', 'MUSIC_NOTES'],
+  'health': ['HEALTH'],
+  'pe': ['HEALTH'],
 };
 
 const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ 
@@ -198,9 +184,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, [globalSpinnerNames, design]);
 
   const [customIcons, setCustomIcons] = useState<any[]>([]);
+  const [visibleAssetCount, setVisibleAssetCount] = useState(9);
+  const [hiddenDrawerItems, setHiddenDrawerItems] = useState<string[]>([]);
+  const [deletedItemsHistory, setDeletedItemsHistory] = useState<string[]>([]);
+  const [customDrawerLabels, setCustomDrawerLabels] = useState<Record<string, string[]>>({});
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const [iconSearchQuery, setIconSearchQuery] = useState('');
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
+
   const [showTransition, setShowTransition] = useState(false);
   const [showAddArrow, setShowAddArrow] = useState(mode === 'teacher');
   const [showLibraryArrow, setShowLibraryArrow] = useState(mode === 'teacher');
@@ -242,41 +233,44 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [songPlaying, setSongPlaying] = useState(false);
   const songAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  const currentSubject = useMemo(() => {
+    return allSubjects.find(s => s.id === subjectId) || allSubjects.find(s => s.title?.toLowerCase() === subjectId?.toLowerCase());
+  }, [allSubjects, subjectId]);
+
   const categories = useMemo(() => {
     const commonTail = [
       { id: 'STICKERS', label: 'Stickers', icon: '✨' },
+      { id: 'SONGS', label: 'Songs', icon: '🎵' },
       { id: 'GAMES', label: 'Games', icon: '🎮' },
       { id: 'HISTORY', label: 'History', icon: '🕰️' }
     ];
 
-    const isDefaultSubject = ['phonics', 'math', 'science'].includes(subjectId);
+    const subjectName = currentSubject?.title?.toLowerCase() || subjectId?.toLowerCase() || '';
     
-    let baseCategories: any[] = [];
-    if (isDefaultSubject) {
-      if (subjectId === 'phonics') {
-        baseCategories = [
-          { id: 'UPPER', label: 'ABC', icon: '🅰️' },
-          { id: 'LOWER', label: 'abc', icon: '🔡' },
-          { id: 'BLENDS', label: 'Blends', icon: '🔗' },
-          { id: 'SIGHT', label: 'Sight', icon: '👁️' },
-          { id: 'DIGRAPHS', label: 'Digraph', icon: '🔈' },
-        ];
-      } else if (subjectId === 'math') {
-        baseCategories = [
-          { id: 'NUMBERS', label: '123', icon: '🔢' },
-          { id: 'SYMBOLS', label: 'Symbols', icon: '➗' },
-          { id: 'MEASURE', label: 'Measure', icon: '📏' },
-          { id: 'CALENDAR', label: 'Calendar', icon: '📅' },
-          { id: 'SHAPES', label: 'Shapes', icon: '🟦' },
-        ];
-      } else if (subjectId === 'science') {
-        baseCategories = [
-          { id: 'LIVING', label: 'Living', icon: '🌱' },
-          { id: 'ANIMALS', label: 'Animals', icon: '🦁' },
-          { id: 'ECOSYSTEMS', label: 'Eco', icon: '🌎' },
-        ];
+    let relevantCategoryIds: string[] = [];
+    
+    // Check for keywords in subject name
+    for (const [keyword, catIds] of Object.entries(SUBJECT_CATEGORY_MAP)) {
+      if (subjectName.includes(keyword)) {
+        relevantCategoryIds = [...new Set([...relevantCategoryIds, ...catIds])];
       }
     }
+
+    // Default categories if no keywords found
+    if (relevantCategoryIds.length === 0) {
+      if (subjectId === 'phonics' || subjectName.includes('reading') || subjectName.includes('literacy')) {
+        relevantCategoryIds = ['UPPER', 'LOWER', 'BLENDS', 'SIGHT', 'DIGRAPHS'];
+      } else if (subjectId === 'math' || subjectName.includes('math') || subjectName.includes('number')) {
+        relevantCategoryIds = ['NUMBERS', 'SYMBOLS', 'MEASURE', 'CALENDAR', 'SHAPES'];
+      } else if (subjectId === 'science' || subjectName.includes('science') || subjectName.includes('nature')) {
+        relevantCategoryIds = ['LIVING', 'ANIMALS', 'ECOSYSTEMS', 'WEATHER'];
+      } else {
+        // Fallback for unknown subjects: show a mix of basic categories
+        relevantCategoryIds = ['UPPER', 'LOWER', 'NUMBERS', 'SHAPES', 'STICKERS'];
+      }
+    }
+
+    const baseCategories = CATEGORY_TEMPLATES.filter(cat => relevantCategoryIds.includes(cat.id));
 
     const customCats = customIcons.map(ci => ({
       id: ci.id,
@@ -287,15 +281,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
     const addMaterialBtn = mode === 'teacher' ? [{ id: 'ADD_MATERIAL', label: 'Add', icon: '➕' }] : [];
 
+    // Ensure we don't duplicate commonTail if they are already in baseCategories
+    const filteredCommonTail = commonTail.filter(ct => !relevantCategoryIds.includes(ct.id));
+
     return [
       ...addMaterialBtn,
       ...baseCategories,
       ...customCats,
-      ...commonTail
+      ...filteredCommonTail
     ];
-  }, [subjectId, customIcons, mode]);
+  }, [subjectId, currentSubject, customIcons, mode]);
 
   const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0]?.id || 'STICKERS');
+
+  useEffect(() => {
+    setVisibleAssetCount(10);
+  }, [activeCategoryId, activeSubCategoryId]);
 
   useEffect(() => {
     setActiveSubCategoryId(null);
@@ -336,6 +337,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+
+  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-200 active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
+  const letterBaseClass = stickerBaseClass.replace('text-5xl', 'text-4xl');
+  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-200 active:scale-95 transition-all cursor-pointer text-center truncate min-h-[64px]";
+  const headerClass = "col-span-4 mt-8 mb-4 text-lg font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
   const lastTouchDistance = useRef<number | null>(null);
@@ -370,6 +376,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           setCurrentBoardId(savedState.id);
           setCurrentBoardName(savedState.name);
           if (savedState.customIcons) setCustomIcons(savedState.customIcons);
+          if (savedState.hiddenDrawerItems) setHiddenDrawerItems(savedState.hiddenDrawerItems);
+          if (savedState.customDrawerLabels) setCustomDrawerLabels(savedState.customDrawerLabels);
           
           if (savedState.drawingData) {
             const img = new Image();
@@ -389,6 +397,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           setCurrentBoardId(null);
           setCurrentBoardName(null);
           setCustomIcons([]);
+          setHiddenDrawerItems([]);
+          setDeletedItemsHistory([]);
+          setCustomDrawerLabels({});
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
       }
@@ -450,13 +461,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, []);
 
   const handlePlaySong = (song: Song) => {
-    if (activeSong?.id === song.id && songPlaying) {
-      songAudioRef.current?.pause();
-      setSongPlaying(false);
+    if (activeSong?.id === song.id) {
+      if (songPlaying) {
+        songAudioRef.current?.pause();
+        setSongPlaying(false);
+      } else {
+        songAudioRef.current?.play();
+        setSongPlaying(true);
+      }
     } else {
-      if (songAudioRef.current) songAudioRef.current.pause();
+      if (songAudioRef.current) {
+        songAudioRef.current.pause();
+        songAudioRef.current = null;
+      }
       const audio = new Audio(song.url);
-      audio.play();
+      audio.play().catch(err => console.error("Playback failed:", err));
       songAudioRef.current = audio;
       setActiveSong(song);
       setSongPlaying(true);
@@ -592,6 +611,102 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     });
   };
 
+  const hideItem = (categoryId: string, itemKey: string) => {
+    const fullKey = `${categoryId}:${itemKey}`;
+    setHiddenDrawerItems(prev => [...prev, fullKey]);
+    setDeletedItemsHistory(prev => [...prev, fullKey]);
+  };
+
+  const undoHideItem = () => {
+    if (deletedItemsHistory.length === 0) return;
+    const lastDeleted = deletedItemsHistory[deletedItemsHistory.length - 1];
+    setHiddenDrawerItems(prev => prev.filter(item => item !== lastDeleted));
+    setDeletedItemsHistory(prev => prev.slice(0, -1));
+  };
+
+  const addCustomLabel = (categoryId: string) => {
+    const label = window.prompt("Enter text for your custom label:");
+    if (label) {
+      setCustomDrawerLabels(prev => ({
+        ...prev,
+        [categoryId]: [...(prev[categoryId] || []), label]
+      }));
+    }
+  };
+
+  const removeCustomLabel = (categoryId: string, index: number) => {
+    setCustomDrawerLabels(prev => ({
+      ...prev,
+      [categoryId]: prev[categoryId].filter((_, i) => i !== index)
+    }));
+  };
+
+  const renderDrawerItem = (categoryId: string, itemKey: string, content: string, type: string, label?: string, metadata?: any, isCustom = false, customIndex?: number) => {
+    const fullKey = `${categoryId}:${itemKey}`;
+    if (hiddenDrawerItems.includes(fullKey)) return null;
+
+    const baseClass = type === 'text' ? wordBaseClass : stickerBaseClass;
+
+    return (
+      <div key={fullKey} className="relative group/drawer-item flex flex-col items-center gap-1">
+        <button 
+          draggable 
+          onDragStart={(e) => handleDragStartAsset(e, content, type as any, metadata)} 
+          onClick={() => addItem(content, type as any, undefined, undefined, metadata)} 
+          className={baseClass}
+        >
+          {content}
+        </button>
+        {label && <span className="text-base font-bold text-slate-400 uppercase text-center leading-tight">{label}</span>}
+        
+        {mode === 'teacher' && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isCustom && customIndex !== undefined) {
+                removeCustomLabel(categoryId, customIndex);
+              } else {
+                hideItem(categoryId, itemKey);
+              }
+            }}
+            className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg opacity-0 group-hover/drawer-item:opacity-100 transition-opacity z-10"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderDrawerControls = (categoryId: string) => {
+    if (mode !== 'teacher') return null;
+    const hasDeleted = deletedItemsHistory.some(h => h.startsWith(`${categoryId}:`));
+    
+    return (
+      <div className="col-span-4 flex items-center gap-2 mb-4">
+        <button 
+          onClick={() => addCustomLabel(categoryId)}
+          className="flex-1 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-xs uppercase tracking-widest border-2 border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+        >
+          <span>➕ Add Label</span>
+        </button>
+        {hasDeleted && (
+          <button 
+            onClick={undoHideItem}
+            className="px-4 py-2 bg-slate-50 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest border-2 border-slate-100 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+          >
+            <span>↩️ Undo</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderCustomLabels = (categoryId: string) => {
+    const labels = customDrawerLabels[categoryId] || [];
+    return labels.map((l, i) => renderDrawerItem(categoryId, `custom-${i}`, l, 'text', undefined, undefined, true, i));
+  };
+
   const getScreenCoordinates = (event: any) => {
     const rect = canvasRef.current?.closest('main')?.getBoundingClientRect() || { left: 0, top: 0 };
     if (event.touches && event.touches.length > 0) return { sx: event.touches[0].clientX - rect.left, sy: event.touches[0].clientY - rect.top };
@@ -610,7 +725,18 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       }
     }
     saveToUndoStack();
-    const worldPos = screenToWorld(screenX !== undefined ? screenX : window.innerWidth / 2, screenY !== undefined ? screenY : window.innerHeight / 2);
+    
+    // Improved non-stacking logic: Use a grid-like sequence for default placement
+    const gridCols = 4;
+    const spacing = 120;
+    const index = items.length % 12; // Cycle through 12 positions
+    const col = index % gridCols;
+    const row = Math.floor(index / gridCols);
+    
+    const defaultX = (window.innerWidth * 0.4) + (col * spacing);
+    const defaultY = (window.innerHeight * 0.3) + (row * spacing);
+    
+    const worldPos = screenToWorld(screenX !== undefined ? screenX : defaultX, screenY !== undefined ? screenY : defaultY);
     const newItem: BoardItem = { id: Math.random().toString(36).substr(2, 9), content, type, x: worldPos.wx, y: worldPos.wy, scale: 1, rotation: 0, metadata };
     setItems(prev => [...prev, newItem]);
     // Removed auto-selection to satisfy user request: "Only show the delete button on the icon if the user reclicks on the icon"
@@ -910,7 +1036,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       bgColor: boardBgColor,
       drawingData: drawingSnapshot, 
       viewport: { ...viewport },
-      customIcons: [...customIcons]
+      customIcons: [...customIcons],
+      hiddenDrawerItems: [...hiddenDrawerItems],
+      customDrawerLabels: { ...customDrawerLabels }
     };
 
     const existingWhiteboards = design.whiteboards || [];
@@ -961,22 +1089,104 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const renderCategoryContent = () => {
-    const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-3xl flex items-center justify-center hover:scale-110 hover:border-blue-200 active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
-    const letterBaseClass = stickerBaseClass.replace('text-3xl', 'text-2xl');
-    const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-sm py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-200 active:scale-95 transition-all cursor-pointer text-center truncate min-h-[56px]";
-    const headerClass = "col-span-4 mt-8 mb-4 text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
+  const renderAssetList = (categoryId: string, items: any[], renderFn: (item: any) => React.ReactNode) => {
+    const slicedItems = items.slice(0, visibleAssetCount);
+    return (
+      <>
+        {slicedItems.map(renderFn)}
+        <div className="col-span-4 mt-4 flex justify-center gap-4">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setVisibleAssetCount(prev => Math.max(9, prev - 9)); }} 
+            disabled={visibleAssetCount <= 9}
+            className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center ${visibleAssetCount <= 9 ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}
+            title="Show Less"
+          >
+            <ChevronUp size={24} />
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setVisibleAssetCount(prev => Math.min(items.length, prev + 9)); }} 
+            disabled={visibleAssetCount >= items.length}
+            className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center ${visibleAssetCount >= items.length ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}
+            title="Show More"
+          >
+            <ChevronDown size={24} />
+          </button>
+        </div>
+      </>
+    );
+  };
 
+  const renderCategoryContent = () => {
     const effectiveCategoryId = activeSubCategoryId || activeCategoryId;
 
-    if (effectiveCategoryId === 'UPPER') return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => <button key={l} draggable onDragStart={(e) => handleDragStartAsset(e, l, 'text')} onClick={() => addItem(l, 'text')} className={letterBaseClass}>{l}</button>);
-    if (effectiveCategoryId === 'LOWER') return "abcdefghijklmnopqrstuvwxyz".split("").map(l => <button key={l} draggable onDragStart={(e) => handleDragStartAsset(e, l, 'text')} onClick={() => addItem(l, 'text')} className={letterBaseClass}>{l}</button>);
-    if (effectiveCategoryId === 'BLENDS') return <>{[{label: 'Vowel-First (VC)', words: VC_WORDS}, {label: 'Consonant-First (CV)', words: CV_WORDS}].map(g => <React.Fragment key={g.label}><div className={headerClass}><span>{g.label}</span></div>{g.words.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>)}</React.Fragment>)}</>;
-    if (effectiveCategoryId === 'SIGHT') return <>{[{label: 'Phonics Words', words: REGULAR_SIGHT_WORDS}, {label: 'Irregular Words', words: IRREGULAR_SIGHT_WORDS}].map(g => <React.Fragment key={g.label}><div className={headerClass}><span>{g.label}</span></div>{g.words.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>)}</React.Fragment>)}</>;
-    if (effectiveCategoryId === 'DIGRAPHS') return <>{[{label: 'Consonant Teams', words: CONSONANT_DIGRAPHS}, {label: 'Vowel Teams', words: VOWEL_DIGRAPHS}].map(g => <React.Fragment key={g.label}><div className={headerClass}><span>{g.label}</span></div>{g.words.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>)}</React.Fragment>)}</>;
-    if (effectiveCategoryId === 'NUMBERS') return Array.from({length: 50}, (_, i) => i + 1).map(n => <button key={n} draggable onDragStart={(e) => handleDragStartAsset(e, n.toString(), 'text')} onClick={() => addItem(n.toString(), 'text')} className={stickerBaseClass.replace('text-3xl', 'text-2xl')}>{n}</button>);
+    if (effectiveCategoryId === 'UPPER') return (
+      <>
+        {renderDrawerControls(effectiveCategoryId)}
+        {renderAssetList(effectiveCategoryId, "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), (l) => renderDrawerItem(effectiveCategoryId, l, l, 'text'))}
+        {renderCustomLabels(effectiveCategoryId)}
+      </>
+    );
+    if (effectiveCategoryId === 'LOWER') return (
+      <>
+        {renderDrawerControls(effectiveCategoryId)}
+        {renderAssetList(effectiveCategoryId, "abcdefghijklmnopqrstuvwxyz".split(""), (l) => renderDrawerItem(effectiveCategoryId, l, l, 'text'))}
+        {renderCustomLabels(effectiveCategoryId)}
+      </>
+    );
+    if (effectiveCategoryId === 'BLENDS') {
+      const allItems = [
+        ...VC_WORDS.map(w => ({ e: w, l: w, t: 'text' })),
+        ...CV_WORDS.map(w => ({ e: w, l: w, t: 'text' }))
+      ];
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
+    if (effectiveCategoryId === 'SIGHT') {
+      const allItems = [
+        ...REGULAR_SIGHT_WORDS.map(w => ({ e: w, l: w, t: 'text' })),
+        ...IRREGULAR_SIGHT_WORDS.map(w => ({ e: w, l: w, t: 'text' }))
+      ];
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
+    if (effectiveCategoryId === 'DIGRAPHS') {
+      const allItems = [
+        ...CONSONANT_DIGRAPHS.map(w => ({ e: w, l: w, t: 'text' })),
+        ...VOWEL_DIGRAPHS.map(w => ({ e: w, l: w, t: 'text' }))
+      ];
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
+    if (effectiveCategoryId === 'NUMBERS') return (
+      <>
+        {renderDrawerControls(effectiveCategoryId)}
+        {renderAssetList(effectiveCategoryId, Array.from({length: 100}, (_, i) => i + 1), (n) => renderDrawerItem(effectiveCategoryId, n.toString(), n.toString(), 'text'))}
+        {renderCustomLabels(effectiveCategoryId)}
+      </>
+    );
     
-    if (effectiveCategoryId === 'SYMBOLS') return ['➕', '➖', '✖️', '➗', '=', '<', '>', '≤', '≥', '(', ')', '%', '√', 'π', '∞'].map(s => <button key={s} draggable onDragStart={(e) => handleDragStartAsset(e, s, 'text')} onClick={() => addItem(s, 'text')} className={stickerBaseClass}>{s}</button>);
+    if (effectiveCategoryId === 'SYMBOLS') return (
+      <>
+        {renderDrawerControls(effectiveCategoryId)}
+        {renderAssetList(effectiveCategoryId, ['➕', '➖', '✖️', '➗', '=', '<', '>', '≤', '≥', '(', ')', '%', '√', 'π', '∞'], (s) => renderDrawerItem(effectiveCategoryId, s, s, 'text'))}
+        {renderCustomLabels(effectiveCategoryId)}
+      </>
+    );
     
     if (effectiveCategoryId === 'LIVING') {
       const items = [
@@ -993,12 +1203,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🐚', l: 'Shell', t: 'sticker' },
         { e: '🦴', l: 'Bone', t: 'sticker' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'ANIMALS') {
@@ -1028,7 +1239,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       ];
       const specific = [
         { e: '🐇', l: 'Rabbit', t: 'sticker' },
-        { e: ' foxes', l: 'Fox', t: 'sticker' },
+        { e: '🦊', l: 'Fox', t: 'sticker' },
         { e: '🐢', l: 'Turtle', t: 'sticker' },
         { e: '🦈', l: 'Shark', t: 'sticker' },
         { e: '🐘', l: 'Elephant', t: 'sticker' },
@@ -1047,18 +1258,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🦴', l: 'Fossil', t: 'sticker' },
         { e: '🌋', l: 'Volcano', t: 'sticker' },
       ];
+      const allItems = [...bgs, ...types, ...cycles, ...specific, ...dinosaurs];
       return (
         <>
-          <div className={headerClass}><span>Backgrounds</span></div>
-          {bgs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
-          <div className={headerClass}><span>Classifications</span></div>
-          {types.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
-          <div className={headerClass}><span>Life Cycles</span></div>
-          {cycles.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
-          <div className={headerClass}><span>Animals</span></div>
-          {specific.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
-          <div className={headerClass}><span>Dinosaurs</span></div>
-          {dinosaurs.map(i => <div key={i.l} className="flex flex-col items-center gap-1"><button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button><span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span></div>)}
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
         </>
       );
     }
@@ -1081,12 +1286,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🦌', l: 'Prey', t: 'sticker' },
         { e: '🪵', l: 'Decomposer', t: 'sticker' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'MANIPULATIVES') {
@@ -1104,12 +1310,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🥧', l: '1/4 Circle', t: 'sticker', c: '🥧' },
         { e: '📏', l: 'Number Line', t: 'shape', c: 'number-line' }
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'MEASURE') {
@@ -1120,12 +1327,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🌡️', l: 'Thermometer', t: 'shape', c: 'thermometer', m: { temp: 70 } },
         { e: '⚖️', l: 'Scale', t: 'sticker', c: '⚖️' }
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any, i.m)} onClick={() => addItem(i.c, i.t as any, undefined, undefined, i.m)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'MONEY') {
@@ -1141,25 +1349,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🛒', l: 'Shop', t: 'sticker', c: '🛒' },
         { e: '🏷️', l: 'Price Tag', t: 'sticker', c: '🏷️' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'VOCAB') {
       const words = ['Apple', 'Ball', 'Cat', 'Dog', 'Elephant', 'Fish', 'Goat', 'Hat', 'Ice', 'Jar', 'Kite', 'Lion', 'Moon', 'Nest', 'Owl', 'Pig', 'Queen', 'Rabbit', 'Sun', 'Tiger', 'Umbrella', 'Van', 'Web', 'Xylophone', 'Yo-yo', 'Zebra'];
       return (
         <>
-          <div className={headerClass}><span>Spelling Words</span></div>
-          {words.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>)}
-          <div className={headerClass}><span>Tools</span></div>
-          <div className="flex flex-col items-center gap-1">
-            <button draggable onDragStart={(e) => handleDragStartAsset(e, '📖', 'sticker')} onClick={() => addItem('📖', 'sticker')} className={stickerBaseClass}>📖</button>
-            <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">Dictionary</span>
-          </div>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, words, (w) => renderDrawerItem(effectiveCategoryId, w, w, 'text'))}
+          {renderCustomLabels(effectiveCategoryId)}
         </>
       );
     }
@@ -1177,12 +1382,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '"', l: 'Quotes', t: 'text', c: '"' },
         { e: 'A', l: 'Capital', t: 'text', c: 'ABC' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'SPEAKING') {
@@ -1196,12 +1402,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🤝', l: 'Agree', t: 'sticker', c: '🤝' },
         { e: '❓', l: 'Ask', t: 'sticker', c: '❓' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'WEATHER') {
@@ -1220,12 +1427,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🍂', l: 'Fall', t: 'sticker', c: '🍂' },
         { e: '⛄', l: 'Winter', t: 'sticker', c: '⛄' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any, i.m)} onClick={() => addItem(i.c, i.t as any, undefined, undefined, i.m)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'SPACE') {
@@ -1241,12 +1449,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🔭', l: 'Telescope', t: 'sticker', c: '🔭' },
         { e: '👨‍🚀', l: 'Astronaut', t: 'sticker', c: '👨‍🚀' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'GEOGRAPHY') {
@@ -1262,12 +1471,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🏙️', l: 'City', t: 'sticker', c: '🏙️' },
         { e: '🏡', l: 'Town', t: 'sticker', c: '🏡' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'CULTURE') {
@@ -1281,12 +1491,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🗿', l: 'Statue', t: 'sticker', c: '🗿' },
         { e: '🌍', l: 'World', t: 'sticker', c: '🌍' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'ART_TOOLS') {
@@ -1300,12 +1511,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '📐', l: 'Ruler', t: 'sticker', c: '📐' },
         { e: '🧼', l: 'Eraser', t: 'sticker', c: '🧼' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'COLORS') {
@@ -1323,12 +1535,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🏁', l: 'Check', t: 'sticker', c: '🏁' },
         { e: '💠', l: 'Pattern', t: 'sticker', c: '💠' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'CRAFTS') {
@@ -1342,12 +1555,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🪁', l: 'Kite', t: 'sticker', c: '🪁' },
         { e: '🎈', l: 'Balloon', t: 'sticker', c: '🎈' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'ARTISTS') {
@@ -1359,12 +1573,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '📸', l: 'Photo', t: 'sticker', c: '📸' },
         { e: '🎥', l: 'Film', t: 'sticker', c: '🎥' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'INSTRUMENTS') {
@@ -1380,12 +1595,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🪈', l: 'Flute', t: 'sticker', c: '🪈' },
         { e: '🔔', l: 'Bell', t: 'sticker', c: '🔔' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'MUSIC_NOTES') {
@@ -1399,12 +1615,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         { e: '🔈', l: 'Sound', t: 'sticker', c: '🔈' },
         { e: '🔇', l: 'Mute', t: 'sticker', c: '🔇' },
       ];
-      return items.map(i => (
-        <div key={i.l} className="flex flex-col items-center gap-1">
-          <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-          <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-        </div>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, items, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
 
     if (effectiveCategoryId === 'HEALTH') {
@@ -1481,20 +1698,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           ]
         }
       ];
-
+      const allItems = groups.flatMap(g => g.items);
       return (
         <>
-          {groups.map(g => (
-            <React.Fragment key={g.label}>
-              <div className={headerClass}><span>{g.label}</span></div>
-              {g.items.map(i => (
-                <div key={i.l} className="flex flex-col items-center gap-1">
-                  <button draggable onDragStart={(e) => handleDragStartAsset(e, i.c, i.t as any)} onClick={() => addItem(i.c, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-                  <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-                </div>
-              ))}
-            </React.Fragment>
-          ))}
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
         </>
       );
     }
@@ -1510,67 +1719,91 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       const timeWords = ['Hour', 'Minute', 'Second', 'Day', 'Week', 'Month', 'Year'];
+      const allItems = [
+        { e: '📅', l: 'Calendar', t: 'shape', c: 'calendar', m: { month: 2, year: 2026, selectedDays: [] } },
+        ...stickers,
+        ...days.map(d => ({ e: d, l: d, t: 'text' })),
+        ...months.map(m => ({ e: m, l: m, t: 'text' })),
+        ...timeWords.map(t => ({ e: t, l: t, t: 'text' }))
+      ];
       
       return (
         <>
-          <div className={headerClass}><span>Tools</span></div>
-          <div className="flex flex-col items-center gap-1">
-            <button draggable onDragStart={(e) => handleDragStartAsset(e, 'calendar', 'shape', { month: 2, year: 2026, selectedDays: [] })} onClick={() => addItem('calendar', 'shape', undefined, undefined, { month: 2, year: 2026, selectedDays: [] })} className={stickerBaseClass}>📅</button>
-            <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">Interactive Calendar</span>
-          </div>
-          <div className={headerClass}><span>Stickers</span></div>
-          {stickers.map(i => (
-            <div key={i.l} className="flex flex-col items-center gap-1">
-              <button draggable onDragStart={(e) => handleDragStartAsset(e, i.e, i.t as any)} onClick={() => addItem(i.e, i.t as any)} className={stickerBaseClass}>{i.e}</button>
-              <span className="text-xs font-bold text-slate-400 uppercase text-center leading-tight">{i.l}</span>
-            </div>
-          ))}
-          <div className={headerClass}><span>Day Cards</span></div>
-          {days.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass.replace('bg-slate-50', 'bg-blue-50 border-blue-100 text-blue-700')}>{w}</button>)}
-          <div className={headerClass}><span>Month Strip</span></div>
-          {months.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass.replace('bg-slate-50', 'bg-pink-50 border-pink-100 text-pink-700')}>{w}</button>)}
-          <div className={headerClass}><span>Time Words</span></div>
-          {timeWords.map(w => <button key={w} draggable onDragStart={(e) => handleDragStartAsset(e, w, 'text')} onClick={() => addItem(w, 'text')} className={wordBaseClass}>{w}</button>)}
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, allItems, (i) => renderDrawerItem(effectiveCategoryId, i.l, i.e, i.t as any, i.l))}
+          {renderCustomLabels(effectiveCategoryId)}
         </>
       );
     }
 
     if (effectiveCategoryId === 'STICKERS') {
-      const groups = [ 
-        { label: 'Favorites', s: 0, e: 26 }, 
-        { label: 'Animals', s: 26, e: 36 }, 
-        { label: 'Vehicles', s: 36, e: 45 }, 
-        { label: 'Faces', s: 45, e: 52 }, 
-        { label: 'Food', s: 52, e: 61 }, 
-        { label: 'Nature', s: 61, e: 71 }, 
-        { label: 'Symbols', s: 71, e: 79 } 
-      ];
-      return groups.map(g => (
-        <React.Fragment key={g.label}>
-          <div className={headerClass}><span>{g.label}</span></div>
-          {STICKERS.slice(g.s, g.e).map(s => (
-            <button key={s.id} draggable onDragStart={(e) => handleDragStartAsset(e, s.emoji, 'sticker')} onClick={() => addItem(s.emoji, 'sticker')} className={stickerBaseClass}>
-              {s.emoji}
-            </button>
-          ))}
-        </React.Fragment>
-      ));
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, STICKERS, (s) => renderDrawerItem(effectiveCategoryId, s.id, s.emoji, 'sticker', s.emoji))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
     }
-    if (effectiveCategoryId === 'SHAPES') return [
-      '⭕', '⬜', '🔺', '⭐', '❤️', '🟦', '🔶', '🔷', '🛑', '💠', '🪁', '🌙', '☁️', '⚡', '🟢', '🟡', '🟠', '🟣', '🟤', '🖤', '🤍', '🟥', '🟧', '🟨', '🟩', '🟪',
-      '💎', '📦', '🔮', '📍', '🚩', '🏁', '🎯', '🎈', '🎨', '🧩', '🧸', '🎲', '♟️', '🃏'
-    ].map(s => <button key={s} draggable onDragStart={(e) => handleDragStartAsset(e, s, 'shape')} onClick={() => addItem(s, 'shape')} className={stickerBaseClass}>{s}</button>);
+
+    if (effectiveCategoryId === 'SONGS') {
+      const filteredSongs = (userSongs || []).filter(s => s.assignedSubjectIds?.includes(subjectId));
+      if (filteredSongs.length === 0) return <div className="col-span-4 text-center py-12 text-slate-300 font-bold px-4">No songs in your library for this subject. 🎵</div>;
+      
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {filteredSongs.map(s => (
+            <div key={s.id} className="col-span-4 flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl hover:border-blue-200 transition-all shadow-sm group">
+              <button 
+                onClick={() => handlePlaySong(s)}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${activeSong?.id === s.id && songPlaying ? 'bg-blue-500 text-white animate-pulse' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}
+              >
+                {activeSong?.id === s.id && songPlaying ? '⏸️' : '▶️'}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="font-black text-slate-800 truncate text-base">{s.title}</div>
+                <div className="text-sm text-slate-400 font-bold uppercase tracking-wider">{s.category}</div>
+              </div>
+              <span className="text-2xl opacity-40 group-hover:opacity-100 transition-opacity">{s.icon}</span>
+            </div>
+          ))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
+
+    if (effectiveCategoryId === 'SHAPES') {
+      const shapes = [
+        '⭕', '⬜', '🔺', '⭐', '❤️', '🟦', '🔶', '🔷', '🛑', '💠', '🪁', '🌙', '☁️', '⚡', '🟢', '🟡', '🟠', '🟣', '🟤', '🖤', '🤍', '🟥', '🟧', '🟨', '🟩', '🟪',
+        '💎', '📦', '🔮', '📍', '🚩', '🏁', '🎯', '🎈', '🎨', '🧩', '🧸', '🎲', '♟️', '🃏'
+      ];
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, shapes, (s) => renderDrawerItem(effectiveCategoryId, s, s, 'shape', s))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
     if (effectiveCategoryId === 'GAMES') return <div className="col-span-4 text-center py-20 text-slate-300 font-bold px-4"><div className="text-6xl mb-4 opacity-50">🎮</div>Games Library coming soon! ✨</div>;
 
     if (activeCategoryId === 'HISTORY') {
       const hist = (design.whiteboards || []).filter(b => b.conceptId === concept.id);
       if (!hist.length) return <div className="col-span-4 text-center py-12 text-slate-300 font-bold px-4">No history yet. 🕰️</div>;
-      return [...hist].reverse().map(b => <div key={b.id} className="col-span-4 flex items-stretch gap-2 mb-2"><button onClick={() => restoreBoardState(b)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-300 shadow-sm transition-all overflow-hidden"><div className="font-black text-slate-800 truncate text-sm">{b.name}</div><div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">{new Date(b.timestamp).toLocaleDateString()}</div></button><button onClick={() => deleteFromHistory(b.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button></div>);
+      return [...hist].reverse().map(b => (
+        <div key={b.id} className="col-span-4 flex items-stretch gap-2 mb-2">
+          <button onClick={() => restoreBoardState(b)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-300 shadow-sm transition-all overflow-hidden">
+            <div className="font-black text-slate-800 truncate text-base">{b.name}</div>
+            <div className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-wider">{new Date(b.timestamp).toLocaleDateString()}</div>
+          </button>
+          <button onClick={() => deleteFromHistory(b.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button>
+        </div>
+      ));
     }
   };
 
   const filteredMaterials = materials.filter(m => m.subjectId === subjectId);
-  const currentSubject = allSubjects.find(s => s.id === subjectId);
   const subjectConcepts = currentSubject?.concepts || [];
 
   return (
@@ -1791,7 +2024,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
         <div className={`absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="px-6 py-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
-            <h3 className="font-black text-slate-400 text-sm tracking-[0.2em] uppercase truncate">
+            <h3 className="font-black text-slate-400 text-base tracking-[0.2em] uppercase truncate">
               {categories.find(c => c.id === activeCategoryId)?.label || (activeCategoryId === 'SONGS' ? 'Songs' : 'Games')} Library
             </h3>
             <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 transition-colors">✕</button>
@@ -1806,7 +2039,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
         {/* MATERIAL LIBRARY (RIGHT) */}
         <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-sm tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
+          <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-base tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {!filteredMaterials.length ? (
               <div className="text-center py-12 px-4">
@@ -2308,7 +2541,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                                           textAnchor="middle" 
                                           dominantBaseline="middle" 
                                           fill="white" 
-                                          className="font-black text-[14px] drop-shadow-sm"
+                                          className="font-black text-[15px] drop-shadow-sm"
                                         >
                                           {name}
                                         </text>
@@ -2586,7 +2819,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       className={`aspect-square rounded-3xl border-4 transition-all flex flex-col items-center justify-center gap-2 relative group ${isAlreadyAdded ? 'border-blue-400 bg-blue-50 shadow-inner' : 'border-slate-100 bg-white hover:border-blue-200 hover:scale-105 shadow-sm'}`}
                     >
                       <span className="text-4xl">{cat.icon}</span>
-                      <span className="text-xs font-black uppercase text-slate-400 tracking-tighter text-center px-1 truncate w-full">{cat.label}</span>
+                      <span className="text-sm font-black uppercase text-slate-400 tracking-tighter text-center px-1 truncate w-full">{cat.label}</span>
                       {isAlreadyAdded && (
                         <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg border-2 border-white">✓</div>
                       )}

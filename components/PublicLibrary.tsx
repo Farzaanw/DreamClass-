@@ -254,14 +254,14 @@ const PublicLibrary: React.FC<PublicLibraryProps> = ({
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-4 left-4 flex gap-2">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg ${
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest text-white shadow-lg ${
                       res.source === 'Community' ? 'bg-purple-500' : 'bg-blue-500'
                     }`}>
                       {res.source === 'Community' ? '👥 Community' : '🌐 External'}
                     </span>
                   </div>
                   <div className="absolute bottom-4 right-4">
-                    <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm">
+                    <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[11px] font-black uppercase tracking-widest text-slate-700 shadow-sm">
                       {res.type}
                     </span>
                   </div>

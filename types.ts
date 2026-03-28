@@ -46,6 +46,8 @@ export interface Whiteboard {
     zoom: number;
   };
   customIcons?: any[];
+  hiddenDrawerItems?: string[];
+  customDrawerLabels?: Record<string, string[]>;
 }
 
 export interface MaterialFile {

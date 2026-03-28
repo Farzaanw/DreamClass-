@@ -266,7 +266,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Email Address</label>
+              <label className="text-[11px] sm:text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Email Address</label>
               <input
                 type="email"
                 placeholder="example@school.com"

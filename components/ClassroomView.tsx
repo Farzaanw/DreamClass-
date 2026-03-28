@@ -271,7 +271,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
                   <h3 className="text-xs sm:text-base font-black text-slate-800 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight text-center px-1 select-none">
                     {concept.title}
                   </h3>
-                  <div className="mt-2 bg-blue-500 text-white text-xs sm:text-[11px] px-4 sm:px-6 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest select-none">
+                  <div className="mt-2 bg-blue-500 text-white text-xs sm:text-[12px] px-4 sm:px-6 py-1 sm:py-1.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 uppercase tracking-widest select-none">
                     Play! 🚀
                   </div>
                 </div>
