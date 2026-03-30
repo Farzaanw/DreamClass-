@@ -93,6 +93,7 @@ export interface ClassroomDesign {
   whiteboards?: Whiteboard[]; // General history
   conceptBoards?: Record<string, Whiteboard>; // Mapping of conceptId -> current saved state
   spinnerNames?: string[];
+  availableCustomIcons?: any[];
 }
 
 export interface User {

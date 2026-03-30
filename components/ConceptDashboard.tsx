@@ -184,12 +184,38 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, [globalSpinnerNames, design]);
 
   const [customIcons, setCustomIcons] = useState<any[]>([]);
+  const [availableCustomIcons, setAvailableCustomIcons] = useState<any[]>(design.availableCustomIcons || []);
   const [visibleAssetCount, setVisibleAssetCount] = useState(9);
   const [hiddenDrawerItems, setHiddenDrawerItems] = useState<string[]>([]);
   const [deletedItemsHistory, setDeletedItemsHistory] = useState<string[]>([]);
   const [customDrawerLabels, setCustomDrawerLabels] = useState<Record<string, string[]>>({});
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const [iconSearchQuery, setIconSearchQuery] = useState('');
+  const [isCreatingCustomIcon, setIsCreatingCustomIcon] = useState(false);
+  const [activeEmojiPicker, setActiveEmojiPicker] = useState<'main' | 'item' | null>(null);
+  const [textItemInput, setTextItemInput] = useState('');
+  const [customIconForm, setCustomIconForm] = useState<{
+    icon: string;
+    label: string;
+    items: { type: 'text' | 'sticker'; content: string; label: string }[];
+  }>({
+    icon: '⭐',
+    label: '',
+    items: []
+  });
+
+  const EMOJI_LIST = [
+    '⭐', '🌟', '✨', '🔥', '🌈', '🎨', '🎭', '🎪', '🎫', '🎬', 
+    '🍎', '🍋', '🍇', '🍓', '🍕', '🍔', '🍦', '🍩', '🍪', '🍫',
+    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+    '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸',
+    '🚗', '🚕', '🚙', '🚌', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚',
+    '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪',
+    '💻', '🖥️', '🖨️', '⌨️', '🖱️', 'trackball', '🕹️', '🗜️', '💽', '💾',
+    '📚', '📖', '📒', '📔', '📕', '📗', '📘', '📙', '📓', '📋',
+    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇'
+  ];
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
 
   const [showTransition, setShowTransition] = useState(false);
@@ -276,7 +302,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       id: ci.id,
       label: ci.label,
       icon: ci.icon,
-      isCustom: true
+      isCustom: true,
+      items: ci.items
     }));
 
     const addMaterialBtn = mode === 'teacher' ? [{ id: 'ADD_MATERIAL', label: 'Add', icon: '➕' }] : [];
@@ -1090,28 +1117,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const renderAssetList = (categoryId: string, items: any[], renderFn: (item: any) => React.ReactNode) => {
-    const slicedItems = items.slice(0, visibleAssetCount);
     return (
       <>
-        {slicedItems.map(renderFn)}
-        <div className="col-span-4 mt-4 flex justify-center gap-4">
-          <button 
-            onClick={(e) => { e.stopPropagation(); setVisibleAssetCount(prev => Math.max(9, prev - 9)); }} 
-            disabled={visibleAssetCount <= 9}
-            className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center ${visibleAssetCount <= 9 ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}
-            title="Show Less"
-          >
-            <ChevronUp size={24} />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); setVisibleAssetCount(prev => Math.min(items.length, prev + 9)); }} 
-            disabled={visibleAssetCount >= items.length}
-            className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center ${visibleAssetCount >= items.length ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}
-            title="Show More"
-          >
-            <ChevronDown size={24} />
-          </button>
-        </div>
+        {items.map(renderFn)}
       </>
     );
   };
@@ -1741,6 +1749,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         <>
           {renderDrawerControls(effectiveCategoryId)}
           {renderAssetList(effectiveCategoryId, STICKERS, (s) => renderDrawerItem(effectiveCategoryId, s.id, s.emoji, 'sticker', s.emoji))}
+          {renderCustomLabels(effectiveCategoryId)}
+        </>
+      );
+    }
+
+    const customCat = customIcons.find(ci => ci.id === effectiveCategoryId);
+    if (customCat && customCat.items) {
+      return (
+        <>
+          {renderDrawerControls(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, customCat.items, (i) => renderDrawerItem(effectiveCategoryId, i.label, i.content, i.type, i.label))}
           {renderCustomLabels(effectiveCategoryId)}
         </>
       );
@@ -2798,10 +2817,205 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-700 focus:outline-none focus:border-blue-400 transition-all"
                 />
               </div>
+
+              <AnimatePresence>
+                {isCreatingCustomIcon && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="mt-6 overflow-hidden"
+                  >
+                    <div className="p-6 bg-blue-50/50 rounded-[2rem] border-2 border-blue-100 space-y-4">
+                      <div className="flex gap-4">
+                        <div className="flex flex-col gap-2 relative">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-2">Icon</label>
+                          <button 
+                            onClick={() => setActiveEmojiPicker(activeEmojiPicker === 'main' ? null : 'main')}
+                            className="w-20 h-20 bg-white border-2 border-blue-100 rounded-3xl text-4xl flex items-center justify-center text-center focus:outline-none focus:border-blue-400 shadow-sm hover:bg-blue-50 transition-all"
+                          >
+                            {customIconForm.icon}
+                          </button>
+                          {activeEmojiPicker === 'main' && (
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white border-2 border-blue-100 rounded-2xl shadow-2xl p-4 z-[100] grid grid-cols-5 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
+                              {EMOJI_LIST.map(emoji => (
+                                <button 
+                                  key={emoji}
+                                  onClick={() => {
+                                    setCustomIconForm(prev => ({ ...prev, icon: emoji }));
+                                    setActiveEmojiPicker(null);
+                                  }}
+                                  className="text-2xl hover:bg-blue-50 p-1 rounded-lg transition-all"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 flex flex-col gap-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-2">Topic Label</label>
+                          <input 
+                            type="text"
+                            value={customIconForm.label}
+                            onChange={(e) => setCustomIconForm(prev => ({ ...prev, label: e.target.value }))}
+                            placeholder="e.g. My Custom Topic"
+                            className="w-full h-20 px-6 bg-white border-2 border-blue-100 rounded-3xl font-bold text-xl text-slate-700 focus:outline-none focus:border-blue-400 shadow-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-2">Content Items</label>
+                        <div className="flex flex-wrap gap-2 p-4 bg-white/50 rounded-2xl border-2 border-dashed border-blue-100 min-h-[80px]">
+                          {customIconForm.items.map((item, idx) => (
+                            <div key={idx} className="bg-white px-3 py-2 rounded-xl border-2 border-blue-100 flex items-center gap-2 shadow-sm group">
+                              <span className="text-xl">{item.type === 'text' ? '🔤' : '🖼️'}</span>
+                              <span className="font-bold text-slate-600">{item.content}</span>
+                              <button 
+                                onClick={() => setCustomIconForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }))}
+                                className="text-rose-400 hover:text-rose-600 transition-colors"
+                              >✕</button>
+                            </div>
+                          ))}
+                          {customIconForm.items.length === 0 && (
+                            <div className="flex-1 flex items-center justify-center text-slate-300 font-bold italic text-sm">No items added yet</div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex gap-3">
+                            <div className="flex-1 flex flex-col gap-2">
+                              <input 
+                                type="text"
+                                value={textItemInput}
+                                onChange={(e) => setTextItemInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && textItemInput) {
+                                    setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
+                                    setTextItemInput('');
+                                  }
+                                }}
+                                placeholder="Type text item..."
+                                className="w-full py-3 px-4 bg-white border-2 border-blue-100 rounded-2xl font-bold text-sm text-slate-700 focus:outline-none focus:border-blue-400 shadow-sm"
+                              />
+                            </div>
+                            <button 
+                              onClick={() => {
+                                if (textItemInput) {
+                                  setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
+                                  setTextItemInput('');
+                                }
+                              }}
+                              className="px-6 py-3 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md"
+                            >
+                              Add Text
+                            </button>
+                          </div>
+                          
+                          <div className="relative">
+                            <button 
+                              onClick={() => setActiveEmojiPicker(activeEmojiPicker === 'item' ? null : 'item')}
+                              className="w-full py-3 bg-white border-2 border-blue-100 rounded-2xl font-black text-blue-500 text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center gap-2"
+                            >
+                              <span>🖼️</span> Add Image Item (Emoji)
+                            </button>
+                            
+                            {activeEmojiPicker === 'item' && (
+                              <div className="absolute bottom-full left-0 mb-2 w-full bg-white border-2 border-blue-100 rounded-2xl shadow-2xl p-4 z-[100] grid grid-cols-8 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                {EMOJI_LIST.map(emoji => (
+                                  <button 
+                                    key={emoji}
+                                    onClick={() => {
+                                      setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'sticker', content: emoji, label: emoji }] }));
+                                      setActiveEmojiPicker(null);
+                                    }}
+                                    className="text-2xl hover:bg-blue-50 p-1 rounded-lg transition-all"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button 
+                          onClick={() => {
+                            if (!customIconForm.label) return alert('Please enter a label');
+                            const newId = `CUSTOM_${Date.now()}`;
+                            const newCat = {
+                              id: newId,
+                              label: customIconForm.label,
+                              icon: customIconForm.icon,
+                              type: 'category',
+                              items: customIconForm.items,
+                              isCustom: true
+                            };
+                            setAvailableCustomIcons(prev => {
+                              const updated = [...prev, newCat];
+                              onSaveDesignRef.current({ ...design, availableCustomIcons: updated });
+                              return updated;
+                            });
+                            setCustomIcons(prev => [...prev, newCat]);
+                            setIsCreatingCustomIcon(false);
+                            setCustomIconForm({ icon: '⭐', label: '', items: [] });
+                          }}
+                          className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:bg-blue-700 transition-all"
+                        >
+                          Save Topic
+                        </button>
+                        <button 
+                          onClick={() => setIsCreatingCustomIcon(false)}
+                          className="flex-1 py-4 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-sm shadow-md hover:bg-slate-300 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               <div className="grid grid-cols-6 gap-4">
+                <button 
+                  onClick={() => setIsCreatingCustomIcon(true)}
+                  className={`aspect-square rounded-3xl border-4 border-dashed transition-all flex flex-col items-center justify-center gap-2 relative group ${isCreatingCustomIcon ? 'border-blue-400 bg-blue-50 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-white hover:scale-105 shadow-sm hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`}
+                >
+                  <div className="absolute inset-0 rounded-3xl border-4 border-blue-400/30 animate-ping pointer-events-none" />
+                  <div className="absolute inset-0 rounded-3xl shadow-[0_0_25px_rgba(59,130,246,0.5)] animate-pulse pointer-events-none" />
+                  <span className="text-4xl">✨</span>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter text-center px-1">Create Your Own</span>
+                </button>
+
+                {availableCustomIcons.filter(cat => 
+                  cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
+                ).map((cat, idx) => {
+                  const isAlreadyAdded = customIcons.some(ci => ci.id === cat.id);
+                  return (
+                    <button 
+                      key={`custom-${idx}`}
+                      onClick={() => {
+                        if (isAlreadyAdded) {
+                          setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                        } else {
+                          setCustomIcons(prev => [...prev, cat]);
+                        }
+                      }}
+                      className={`aspect-square rounded-3xl border-4 transition-all flex flex-col items-center justify-center gap-2 relative group ${isAlreadyAdded ? 'border-blue-400 bg-blue-50 shadow-inner' : 'border-slate-100 bg-white hover:border-blue-200 hover:scale-105 shadow-sm'}`}
+                    >
+                      <span className="text-4xl">{cat.icon}</span>
+                      <span className="text-sm font-black uppercase text-slate-400 tracking-tighter text-center px-1 truncate w-full">{cat.label}</span>
+                      {isAlreadyAdded && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg border-2 border-white">✓</div>
+                      )}
+                    </button>
+                  );
+                })}
+
                 {CATEGORY_TEMPLATES.filter(cat => 
                   cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
                 ).map((cat, idx) => {
