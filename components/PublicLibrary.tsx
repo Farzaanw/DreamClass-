@@ -243,7 +243,7 @@ const PublicLibrary: React.FC<PublicLibraryProps> = ({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white rounded-[2.5rem] shadow-xl border-b-8 border-slate-100 overflow-hidden flex flex-col group hover:-translate-y-2 transition-all"
+                className={`bg-white rounded-[2.5rem] shadow-xl border-b-8 overflow-hidden flex flex-col group hover:-translate-y-2 transition-all ${assigningResourceId === res.id ? 'ring-4 ring-blue-500 border-blue-500' : 'border-slate-100'}`}
               >
                 {/* Thumbnail */}
                 <div className="relative h-48 overflow-hidden">
@@ -334,7 +334,7 @@ const PublicLibrary: React.FC<PublicLibraryProps> = ({
                               setSuccessMessage("Successfully Added!");
                               setTimeout(() => setSuccessMessage(null), 3000);
                             }}
-                            className="w-full p-3 rounded-xl border-2 border-slate-100 hover:border-blue-400 hover:bg-blue-50 transition-all text-left font-bold text-slate-700 text-sm flex items-center justify-between group"
+                            className="w-full p-3 rounded-xl border-2 transition-all text-left font-bold text-sm flex items-center justify-between group border-slate-100 hover:border-blue-400 hover:bg-blue-50 text-slate-700"
                           >
                             <span>{sub.title}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">➕</span>

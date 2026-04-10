@@ -616,13 +616,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="mb-8 p-1.5 bg-slate-100 rounded-[1.5rem] inline-flex shadow-inner">
           <button 
             onClick={() => setMaterialSubView('my')}
-            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'my' ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'my' ? 'bg-white shadow-md text-blue-600 ring-2 ring-blue-400 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
           >
             My Material
           </button>
           <button 
             onClick={() => setMaterialSubView('public')}
-            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'public' ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 rounded-xl font-black transition-all ${materialSubView === 'public' ? 'bg-white shadow-md text-blue-600 ring-2 ring-blue-400 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Public Library
           </button>

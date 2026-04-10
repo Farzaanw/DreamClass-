@@ -40,7 +40,7 @@ export const SUBJECTS: Subject[] = [
 // Phonics Content
 export const VC_WORDS = ['at', 'am', 'an', 'as', 'it', 'in', 'is', 'up', 'us', 'on', 'ox', 'if'];
 export const CV_WORDS = ['ba', 'be', 'bi', 'bo', 'bu', 'ca', 'co', 'cu', 'da', 'de', 'di', 'do', 'du', 'fa', 'fe', 'fi', 'fo', 'fu', 'ga', 'ge', 'gi', 'go', 'gu', 'ha', 'he', 'hi', 'ho', 'hu'];
-export const REGULAR_SIGHT_WORDS = ['cat', 'dog', 'run', 'play', 'big', 'and', 'can', 'see', 'look', 'jump', 'red', 'one', 'two', 'three', 'away', 'come', 'find', 'for', 'help', 'here', 'make', 'me', 'my', 'not', 'said'];
+export const REGULAR_SIGHT_WORDS = ['cat', 'dog', 'run', 'play', 'big', 'and', 'can', 'see', 'look', 'jump', 'red', 'two', 'three', 'away', 'find', 'for', 'help', 'here', 'make', 'me', 'my', 'not'];
 export const IRREGULAR_SIGHT_WORDS = ['the', 'was', 'were', 'to', 'do', 'you', 'your', 'said', 'where', 'what', 'who', 'some', 'come', 'one', 'once', 'eye', 'son', 'love', 'door', 'floor', 'poor'];
 export const CONSONANT_DIGRAPHS = ['ch', 'sh', 'th', 'wh', 'ph', 'ck', 'ng', 'qu', 'kn', 'wr'];
 export const VOWEL_DIGRAPHS = ['ee', 'ea', 'ai', 'ay', 'oa', 'ow', 'oo', 'ou', 'oi', 'oy', 'au', 'aw', 'ie', 'ei'];

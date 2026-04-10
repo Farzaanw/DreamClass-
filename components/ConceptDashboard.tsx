@@ -192,6 +192,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const [iconSearchQuery, setIconSearchQuery] = useState('');
   const [isCreatingCustomIcon, setIsCreatingCustomIcon] = useState(false);
+  const [customIconTab, setCustomIconTab] = useState<'text' | 'image'>('text');
   const [activeEmojiPicker, setActiveEmojiPicker] = useState<'main' | 'item' | null>(null);
   const [textItemInput, setTextItemInput] = useState('');
   const [customIconForm, setCustomIconForm] = useState<{
@@ -211,7 +212,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸',
     '🚗', '🚕', '🚙', '🚌', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚',
     '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪',
-    '💻', '🖥️', '🖨️', '⌨️', '🖱️', 'trackball', '🕹️', '🗜️', '💽', '💾',
+    '💻', '🖥️', '🖨️', '⌨️', '🖱️', '🖱️', '🕹️', '🗜️', '💽', '💾',
     '📚', '📖', '📒', '📔', '📕', '📗', '📘', '📙', '📓', '📋',
     '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
     '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇'
@@ -365,9 +366,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
-  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-200 active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
+  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
   const letterBaseClass = stickerBaseClass.replace('text-5xl', 'text-4xl');
-  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-200 active:scale-95 transition-all cursor-pointer text-center truncate min-h-[64px]";
+  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 transition-all cursor-pointer text-center truncate min-h-[64px]";
   const headerClass = "col-span-4 mt-8 mb-4 text-lg font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
@@ -684,7 +685,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         >
           {content}
         </button>
-        {label && <span className="text-base font-bold text-slate-400 uppercase text-center leading-tight">{label}</span>}
+        {label && label.toLowerCase() !== content.toLowerCase() && type !== 'sticker' && type !== 'image' && <span className="text-base font-bold text-slate-400 uppercase text-center leading-tight">{label}</span>}
         
         {mode === 'teacher' && (
           <button 
@@ -706,7 +707,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const renderDrawerControls = (categoryId: string) => {
-    if (mode !== 'teacher') return null;
+    if (mode !== 'teacher' || categoryId === 'STICKERS') return null;
     const hasDeleted = deletedItemsHistory.some(h => h.startsWith(`${categoryId}:`));
     
     return (
@@ -730,7 +731,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const renderCustomLabels = (categoryId: string) => {
-    const labels = customDrawerLabels[categoryId] || [];
+    const labels = (customDrawerLabels[categoryId] || []).filter(l => {
+      const forbidden = ['one', 'come', 'said', 'sad'];
+      return !forbidden.includes(l.toLowerCase().trim());
+    });
     return labels.map((l, i) => renderDrawerItem(categoryId, `custom-${i}`, l, 'text', undefined, undefined, true, i));
   };
 
@@ -1747,19 +1751,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (effectiveCategoryId === 'STICKERS') {
       return (
         <>
-          {renderDrawerControls(effectiveCategoryId)}
-          {renderAssetList(effectiveCategoryId, STICKERS, (s) => renderDrawerItem(effectiveCategoryId, s.id, s.emoji, 'sticker', s.emoji))}
-          {renderCustomLabels(effectiveCategoryId)}
+          {renderAssetList(effectiveCategoryId, STICKERS, (s) => renderDrawerItem(effectiveCategoryId, s.id, s.emoji, 'sticker'))}
         </>
       );
     }
 
     const customCat = customIcons.find(ci => ci.id === effectiveCategoryId);
     if (customCat && customCat.items) {
+      const filteredItems = (customCat.items || []).filter((i: any) => {
+        const forbidden = ['one', 'come', 'said', 'sad'];
+        const content = typeof i.content === 'string' ? i.content.toLowerCase().trim() : '';
+        const label = typeof i.label === 'string' ? i.label.toLowerCase().trim() : '';
+        return !forbidden.includes(content) && !forbidden.includes(label);
+      });
       return (
         <>
           {renderDrawerControls(effectiveCategoryId)}
-          {renderAssetList(effectiveCategoryId, customCat.items, (i) => renderDrawerItem(effectiveCategoryId, i.label, i.content, i.type, i.label))}
+          {renderAssetList(effectiveCategoryId, filteredItems, (i) => renderDrawerItem(effectiveCategoryId, i.label, i.content, i.type, i.label))}
           {renderCustomLabels(effectiveCategoryId)}
         </>
       );
@@ -1891,7 +1899,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     }}
                     className={`px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${
                       c.title === concept.title 
-                        ? 'bg-white text-blue-600 shadow-sm ring-2 ring-blue-100' 
+                        ? 'bg-white text-blue-600 shadow-md ring-4 ring-blue-400 scale-110' 
                         : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
                     }`}
                   >
@@ -2018,12 +2026,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 }} 
                 className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${
                   activeCategoryId === cat.id && drawerOpen 
-                    ? 'bg-white shadow-lg text-blue-500 ring-2 ring-blue-100 scale-105' 
+                    ? 'bg-white shadow-lg text-blue-600 ring-4 ring-blue-400 scale-105' 
                     : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
                 }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
-                <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1">{cat.label}</span>
+                <span className={`text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all ${activeCategoryId === cat.id && drawerOpen ? 'bg-blue-100 text-blue-700' : ''}`}>{cat.label}</span>
                 
                 {cat.isCustom && mode === 'teacher' && (
                   <button 
@@ -2883,51 +2891,58 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           )}
                         </div>
                         <div className="flex flex-col gap-3">
-                          <div className="flex gap-3">
-                            <div className="flex-1 flex flex-col gap-2">
-                              <input 
-                                type="text"
-                                value={textItemInput}
-                                onChange={(e) => setTextItemInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && textItemInput) {
+                          <div className="flex border-b-2 border-blue-100 mb-2">
+                            <button 
+                              onClick={() => setCustomIconTab('text')}
+                              className={`flex-1 py-2 font-black text-[10px] uppercase tracking-widest transition-all ${customIconTab === 'text' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              Add Text Item
+                            </button>
+                            <button 
+                              onClick={() => setCustomIconTab('image')}
+                              className={`flex-1 py-2 font-black text-[10px] uppercase tracking-widest transition-all ${customIconTab === 'image' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              Add Image Item
+                            </button>
+                          </div>
+
+                          {customIconTab === 'text' ? (
+                            <div className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                              <div className="flex-1 flex flex-col gap-2">
+                                <input 
+                                  type="text"
+                                  value={textItemInput}
+                                  onChange={(e) => setTextItemInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && textItemInput) {
+                                      setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
+                                      setTextItemInput('');
+                                    }
+                                  }}
+                                  placeholder="Type text item..."
+                                  className="w-full py-3 px-4 bg-white border-2 border-blue-100 rounded-2xl font-bold text-sm text-slate-700 focus:outline-none focus:border-blue-400 shadow-sm"
+                                />
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  if (textItemInput) {
                                     setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
                                     setTextItemInput('');
                                   }
                                 }}
-                                placeholder="Type text item..."
-                                className="w-full py-3 px-4 bg-white border-2 border-blue-100 rounded-2xl font-bold text-sm text-slate-700 focus:outline-none focus:border-blue-400 shadow-sm"
-                              />
+                                className="px-6 py-3 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md"
+                              >
+                                Add Text
+                              </button>
                             </div>
-                            <button 
-                              onClick={() => {
-                                if (textItemInput) {
-                                  setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
-                                  setTextItemInput('');
-                                }
-                              }}
-                              className="px-6 py-3 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md"
-                            >
-                              Add Text
-                            </button>
-                          </div>
-                          
-                          <div className="relative">
-                            <button 
-                              onClick={() => setActiveEmojiPicker(activeEmojiPicker === 'item' ? null : 'item')}
-                              className="w-full py-3 bg-white border-2 border-blue-100 rounded-2xl font-black text-blue-500 text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center gap-2"
-                            >
-                              <span>🖼️</span> Add Image Item (Emoji)
-                            </button>
-                            
-                            {activeEmojiPicker === 'item' && (
-                              <div className="absolute bottom-full left-0 mb-2 w-full bg-white border-2 border-blue-100 rounded-2xl shadow-2xl p-4 z-[100] grid grid-cols-8 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                          ) : (
+                            <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-right-2 duration-300">
+                              <div className="bg-white border-2 border-blue-100 rounded-2xl shadow-sm p-4 grid grid-cols-8 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                                 {EMOJI_LIST.map(emoji => (
                                   <button 
                                     key={emoji}
                                     onClick={() => {
                                       setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'sticker', content: emoji, label: emoji }] }));
-                                      setActiveEmojiPicker(null);
                                     }}
                                     className="text-2xl hover:bg-blue-50 p-1 rounded-lg transition-all"
                                   >
@@ -2935,8 +2950,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                                   </button>
                                 ))}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
