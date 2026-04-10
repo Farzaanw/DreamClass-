@@ -77,7 +77,7 @@ const ALL_TOPIC_ICONS = [
   ...("ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => ({ label: `Letter ${l}`, content: l, type: 'text' }))),
   ...("abcdefghijklmnopqrstuvwxyz".split("").map(l => ({ label: `Letter ${l}`, content: l, type: 'text' }))),
   // Math
-  ...(Array.from({length: 50}, (_, i) => ({ label: `Number ${i+1}`, content: (i+1).toString(), type: 'text' }))),
+  ...(Array.from({ length: 50 }, (_, i) => ({ label: `Number ${i + 1}`, content: (i + 1).toString(), type: 'text' }))),
   ...(['➕', '➖', '✖️', '➗', '=', '<', '>', '≤', '≥', '(', ')', '%', '√', 'π', '∞'].map(s => ({ label: `Symbol ${s}`, content: s, type: 'text' }))),
   { label: 'Ruler', content: 'ruler', type: 'shape', display: '📏', metadata: { vertical: false } },
   { label: 'Clock', content: 'clock', type: 'shape', display: '🕒', metadata: { hour: 10, minute: 10 } },
@@ -103,7 +103,7 @@ const ALL_TOPIC_ICONS = [
 ];
 
 const getFileIcon = (type: string) => {
-  switch(type) {
+  switch (type) {
     case 'pdf': return '📄';
     case 'slides': return '📊';
     case 'video': return '🎬';
@@ -127,33 +127,34 @@ const SUBJECT_CATEGORY_MAP: Record<string, string[]> = {
   'pe': ['HEALTH'],
 };
 
-const ConceptDashboard: React.FC<ConceptDashboardProps> = ({ 
-  concept, 
-  design, 
-  subjectId, 
-  materials, 
-  allSubjects, 
-  onBack, 
-  onSaveDesign, 
-  onSelectConcept, 
-  onUpdateMaterials, 
+const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
+  concept,
+  design,
+  subjectId,
+  materials,
+  allSubjects,
+  onBack,
+  onSaveDesign,
+  onSelectConcept,
+  onUpdateMaterials,
   onNavigateToMaterials,
-  userSongs = [], 
-  mode 
+  userSongs = [],
+  mode
 }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
-  
+
   const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser' | 'boxSelect'>('select');
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0].value);
   const [highlighterColor, setHighlightColor] = useState(HIGHLIGHTER_COLORS[0].value);
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
-  
+
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
   const [boardBgColor, setBoardBgColor] = useState<string>('#ffffff');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [droppedItemId, setDroppedItemId] = useState<string | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<MaterialFile | null>(null);
   const [itemToRemove, setItemToRemove] = useState<MaterialFile | null>(null);
   const [materialUrl, setMaterialUrl] = useState<string | null>(null);
@@ -162,13 +163,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [historyLimit, setHistoryLimit] = useState(20);
   const [globalSpinnerNames, setGlobalSpinnerNames] = useState<string[]>(design.spinnerNames || []);
 
   // Group box state
-  const [groups, setGroups] = useState<{id: string, itemIds: string[], minimized: boolean}[]>([]);
-  const [boxSelectRect, setBoxSelectRect] = useState<{x1: number, y1: number, x2: number, y2: number} | null>(null);
+  const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
+  const [boxSelectRect, setBoxSelectRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
   const isBoxSelectingRef = useRef(false);
-  const boxSelectStartRef = useRef<{wx: number, wy: number} | null>(null);
+  const boxSelectStartRef = useRef<{ wx: number, wy: number } | null>(null);
 
   const onSaveDesignRef = useRef(onSaveDesign);
   useEffect(() => {
@@ -212,7 +214,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   });
 
   const EMOJI_LIST = [
-    '⭐', '🌟', '✨', '🔥', '🌈', '🎨', '🎭', '🎪', '🎫', '🎬', 
+    '⭐', '🌟', '✨', '🔥', '🌈', '🎨', '🎭', '🎪', '🎫', '🎬',
     '🍎', '🍋', '🍇', '🍓', '🍕', '🍔', '🍦', '🍩', '🍪', '🍫',
     '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
     '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸',
@@ -279,9 +281,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     ];
 
     const subjectName = currentSubject?.title?.toLowerCase() || subjectId?.toLowerCase() || '';
-    
+
     let relevantCategoryIds: string[] = [];
-    
+
     // Check for keywords in subject name
     for (const [keyword, catIds] of Object.entries(SUBJECT_CATEGORY_MAP)) {
       if (subjectName.includes(keyword)) {
@@ -351,14 +353,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           if (item.type === 'timer' && item.metadata?.isRunning && item.metadata?.timeLeft > 0) {
             hasChanges = true;
             const newTime = item.metadata.timeLeft - 1;
-            
+
             // Play sound when time is up
             if (newTime === 0) {
               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
               audio.volume = 0.5;
-              audio.play().catch(() => {});
+              audio.play().catch(() => { });
             }
-            
+
             return { ...item, metadata: { ...item.metadata, timeLeft: newTime, isRunning: newTime > 0 } };
           }
           return item;
@@ -394,8 +396,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   useEffect(() => {
     if (canvasRef.current) {
       const canvas = canvasRef.current;
-      canvas.width = 20000; 
-      canvas.height = 20000;
+      canvas.width = 15000;
+      canvas.height = 15000;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
         ctx.lineCap = 'round';
@@ -413,7 +415,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           if (savedState.customIcons) setCustomIcons(savedState.customIcons);
           if (savedState.hiddenDrawerItems) setHiddenDrawerItems(savedState.hiddenDrawerItems);
           if (savedState.customDrawerLabels) setCustomDrawerLabels(savedState.customDrawerLabels);
-          
+
           if (savedState.drawingData) {
             const img = new Image();
             img.onload = () => {
@@ -570,6 +572,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         if (updatedConceptBoards[key].id === boardId) delete updatedConceptBoards[key];
       });
       onSaveDesign({ ...design, whiteboards: updatedWhiteboards, conceptBoards: updatedConceptBoards });
+
+      // Reset active whiteboard space to default blank
+      setItems([]);
+      if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      setViewport({ x: 0, y: 0, zoom: 1 });
+      setUndoStack([]);
+      setSelectedItemId(null);
+      setCurrentBoardId(null);
+      setCurrentBoardName(null);
     }
   };
 
@@ -622,8 +633,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const performInteraction = (getEvent: any) => {
     const nativeEvent = getEvent.nativeEvent || getEvent;
     if (nativeEvent.type === 'mousemove' && !(nativeEvent.buttons & 1)) {
-        if (isDrawingRef.current) stopInteraction();
-        return;
+      if (isDrawingRef.current) stopInteraction();
+      return;
     }
     const coords = getScreenCoordinates(nativeEvent);
     if (isBoxSelectingRef.current && boxSelectStartRef.current) {
@@ -664,7 +675,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     isDrawingRef.current = false;
   };
 
-  const handleGroupMouseDown = (e: React.MouseEvent, group: {id: string, itemIds: string[], minimized: boolean}) => {
+  const handleGroupMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
     if (group.minimized) return;
     saveToUndoStack();
@@ -692,14 +703,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleGroupResizeMouseDown = (e: React.MouseEvent, group: {id: string, itemIds: string[], minimized: boolean}) => {
+  const handleGroupResizeMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
     if (group.minimized) return;
     saveToUndoStack();
     const startX = e.clientX;
     const initialItems = items.filter(it => group.itemIds.includes(it.id));
     if (initialItems.length === 0) return;
-    
+
     // Find the center of the group
     const xs = initialItems.map(it => it.x);
     const ys = initialItems.map(it => it.y);
@@ -727,7 +738,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const getGroupBounds = (group: {id: string, itemIds: string[]}) => {
+  const getGroupBounds = (group: { id: string, itemIds: string[] }) => {
     const groupItems = items.filter(it => group.itemIds.includes(it.id));
     if (groupItems.length === 0) return null;
     const padding = 60;
@@ -787,18 +798,18 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
     return (
       <div key={fullKey} className="relative group/drawer-item flex flex-col items-center gap-1">
-        <button 
-          draggable 
-          onDragStart={(e) => handleDragStartAsset(e, content, type as any, metadata)} 
-          onClick={() => addItem(content, type as any, undefined, undefined, metadata)} 
+        <button
+          draggable
+          onDragStart={(e) => handleDragStartAsset(e, content, type as any, metadata)}
+          onClick={() => addItem(content, type as any, undefined, undefined, metadata)}
           className={baseClass}
         >
           {content}
         </button>
         {label && label.toLowerCase() !== content.toLowerCase() && type !== 'sticker' && type !== 'image' && <span className="text-base font-bold text-slate-400 uppercase text-center leading-tight">{label}</span>}
-        
+
         {mode === 'teacher' && (
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               if (isCustom && customIndex !== undefined) {
@@ -819,17 +830,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const renderDrawerControls = (categoryId: string) => {
     if (mode !== 'teacher' || categoryId === 'STICKERS') return null;
     const hasDeleted = deletedItemsHistory.some(h => h.startsWith(`${categoryId}:`));
-    
+
     return (
       <div className="col-span-4 flex items-center gap-2 mb-4">
-        <button 
+        <button
           onClick={() => addCustomLabel(categoryId)}
           className="flex-1 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-xs uppercase tracking-widest border-2 border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
         >
           <span>➕ Add Label</span>
         </button>
         {hasDeleted && (
-          <button 
+          <button
             onClick={undoHideItem}
             className="px-4 py-2 bg-slate-50 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest border-2 border-slate-100 hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
           >
@@ -866,20 +877,26 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       }
     }
     saveToUndoStack();
-    
+
     // Improved non-stacking logic: Use a grid-like sequence for default placement
     const gridCols = 4;
     const spacing = 120;
     const index = items.length % 12; // Cycle through 12 positions
     const col = index % gridCols;
     const row = Math.floor(index / gridCols);
-    
+
     const defaultX = (window.innerWidth * 0.4) + (col * spacing);
     const defaultY = (window.innerHeight * 0.3) + (row * spacing);
-    
+
     const worldPos = screenToWorld(screenX !== undefined ? screenX : defaultX, screenY !== undefined ? screenY : defaultY);
     const newItem: BoardItem = { id: Math.random().toString(36).substr(2, 9), content, type, x: worldPos.wx, y: worldPos.wy, scale: 1, rotation: 0, metadata };
     setItems(prev => [...prev, newItem]);
+
+    // Briefly highlight dropped item
+    setDroppedItemId(newItem.id);
+    setTimeout(() => {
+      setDroppedItemId(prev => prev === newItem.id ? null : prev);
+    }, 1500);
     // Removed auto-selection to satisfy user request: "Only show the delete button on the icon if the user reclicks on the icon"
   };
 
@@ -899,12 +916,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (!skipUndo) saveToUndoStack();
     setItems(prev => {
       const newItems = prev.map(item => item.id === id ? { ...item, metadata: { ...item.metadata, ...newMetadata } } : item);
-      
+
       // Sync global spinner names if a spinner was updated
       const updatedItem = newItems.find(it => it.id === id);
       if (updatedItem?.type === 'spinner' && newMetadata.names) {
         setGlobalSpinnerNames(newMetadata.names);
-        
+
         // Adjust size if more than 8 names
         const nameCount = newMetadata.names.length;
         if (nameCount > 8) {
@@ -916,7 +933,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           updatedItem.height = 400;
         }
       }
-      
+
       return newItems;
     });
   };
@@ -996,7 +1013,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     while (queue.length > 0) {
       const current = queue.shift()!;
       cluster.push(current);
-      
+
       cubes.forEach(other => {
         if (!visited.has(other.id)) {
           const dx = Math.abs(current.x - other.x);
@@ -1056,36 +1073,36 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
     if (activeTool === 'select' && !isPanningRef.current) {
-        e.stopPropagation();
-        setSelectedItemId(item.id);
-        
-        // Bring to front
-        setItems(prev => {
-          const itemToMove = prev.find(it => it.id === item.id);
-          if (!itemToMove) return prev;
-          return [...prev.filter(it => it.id !== item.id), itemToMove];
-        });
+      e.stopPropagation();
+      setSelectedItemId(item.id);
 
-        saveToUndoStack();
-        const startX = e.clientX, startY = e.clientY, initialX = item.x, initialY = item.y;
-        const handleMouseMove = (mv: MouseEvent) => {
-          let newX = initialX + (mv.clientX - startX) / viewport.zoom;
-          let newY = initialY + (mv.clientY - startY) / viewport.zoom;
-          
-          if (item.content === 'unit-cube') {
-            const gridSize = 40;
-            newX = Math.round(newX / gridSize) * gridSize;
-            newY = Math.round(newY / gridSize) * gridSize;
-          }
+      // Bring to front
+      setItems(prev => {
+        const itemToMove = prev.find(it => it.id === item.id);
+        if (!itemToMove) return prev;
+        return [...prev.filter(it => it.id !== item.id), itemToMove];
+      });
 
-          setItems(prev => prev.map(it => it.id === item.id ? { ...it, x: newX, y: newY } : it));
-        };
-        const handleMouseUp = () => {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-        };
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
+      saveToUndoStack();
+      const startX = e.clientX, startY = e.clientY, initialX = item.x, initialY = item.y;
+      const handleMouseMove = (mv: MouseEvent) => {
+        let newX = initialX + (mv.clientX - startX) / viewport.zoom;
+        let newY = initialY + (mv.clientY - startY) / viewport.zoom;
+
+        if (item.content === 'unit-cube') {
+          const gridSize = 40;
+          newX = Math.round(newX / gridSize) * gridSize;
+          newY = Math.round(newY / gridSize) * gridSize;
+        }
+
+        setItems(prev => prev.map(it => it.id === item.id ? { ...it, x: newX, y: newY } : it));
+      };
+      const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
     }
   };
 
@@ -1113,7 +1130,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
         const boardId = currentBoardId || `auto-${concept.id}`;
         const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
-        
+
         const newBoard: Whiteboard = {
           id: boardId,
           conceptId: concept.id,
@@ -1144,7 +1161,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
           });
         }
-      }, 2000); // 2 second debounce for auto-save
+      }, 5000); // 5 second debounce for auto-save
       return () => clearTimeout(timer);
     }
   }, [items, boardBg, boardBgColor, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode, design]);
@@ -1167,15 +1184,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     // Capture the full state including the drawing layer
     const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : undefined;
 
-    const newBoard: Whiteboard = { 
-      id: boardId, 
-      conceptId: concept.id, 
-      name: boardName!, 
-      timestamp: Date.now(), 
-      items: [...items], 
-      bg: boardBg, 
+    const newBoard: Whiteboard = {
+      id: boardId,
+      conceptId: concept.id,
+      name: boardName!,
+      timestamp: Date.now(),
+      items: [...items],
+      bg: boardBg,
       bgColor: boardBgColor,
-      drawingData: drawingSnapshot, 
+      drawingData: drawingSnapshot,
       viewport: { ...viewport },
       customIcons: [...customIcons],
       hiddenDrawerItems: [...hiddenDrawerItems],
@@ -1187,14 +1204,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
       : [...existingWhiteboards, newBoard];
 
-    const updatedDesign = { 
-      ...design, 
-      whiteboards: updatedWhiteboards, 
-      conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard } 
+    const updatedDesign = {
+      ...design,
+      whiteboards: updatedWhiteboards,
+      conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
     };
 
     onSaveDesign(updatedDesign);
-    
+
     setSaveStatus('saved');
     if (onSuccess) {
       setTimeout(onSuccess, 800);
@@ -1297,11 +1314,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (effectiveCategoryId === 'NUMBERS') return (
       <>
         {renderDrawerControls(effectiveCategoryId)}
-        {renderAssetList(effectiveCategoryId, Array.from({length: 100}, (_, i) => i + 1), (n) => renderDrawerItem(effectiveCategoryId, n.toString(), n.toString(), 'text'))}
+        {renderAssetList(effectiveCategoryId, Array.from({ length: 100 }, (_, i) => i + 1), (n) => renderDrawerItem(effectiveCategoryId, n.toString(), n.toString(), 'text'))}
         {renderCustomLabels(effectiveCategoryId)}
       </>
     );
-    
+
     if (effectiveCategoryId === 'SYMBOLS') return (
       <>
         {renderDrawerControls(effectiveCategoryId)}
@@ -1309,7 +1326,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         {renderCustomLabels(effectiveCategoryId)}
       </>
     );
-    
+
     if (effectiveCategoryId === 'LIVING') {
       const items = [
         { e: '🌱', l: 'Living', t: 'sticker' },
@@ -1848,7 +1865,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         ...months.map(m => ({ e: m, l: m, t: 'text' })),
         ...timeWords.map(t => ({ e: t, l: t, t: 'text' }))
       ];
-      
+
       return (
         <>
           {renderDrawerControls(effectiveCategoryId)}
@@ -1886,13 +1903,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (effectiveCategoryId === 'SONGS') {
       const filteredSongs = (userSongs || []).filter(s => s.assignedSubjectIds?.includes(subjectId));
       if (filteredSongs.length === 0) return <div className="col-span-4 text-center py-12 text-slate-300 font-bold px-4">No songs in your library for this subject. 🎵</div>;
-      
+
       return (
         <>
           {renderDrawerControls(effectiveCategoryId)}
           {filteredSongs.map(s => (
             <div key={s.id} className="col-span-4 flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl hover:border-blue-200 transition-all shadow-sm group">
-              <button 
+              <button
                 onClick={() => handlePlaySong(s)}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${activeSong?.id === s.id && songPlaying ? 'bg-blue-500 text-white animate-pulse' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}
               >
@@ -1928,15 +1945,58 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (activeCategoryId === 'HISTORY') {
       const hist = (design.whiteboards || []).filter(b => b.conceptId === concept.id);
       if (!hist.length) return <div className="col-span-4 text-center py-12 text-slate-300 font-bold px-4">No history yet. 🕰️</div>;
-      return [...hist].reverse().map(b => (
-        <div key={b.id} className="col-span-4 flex items-stretch gap-2 mb-2">
-          <button onClick={() => restoreBoardState(b)} className="flex-1 p-4 bg-white border-2 rounded-2xl text-left hover:border-blue-300 shadow-sm transition-all overflow-hidden">
-            <div className="font-black text-slate-800 truncate text-base">{b.name}</div>
-            <div className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-wider">{new Date(b.timestamp).toLocaleDateString()}</div>
-          </button>
-          <button onClick={() => deleteFromHistory(b.id)} className="w-10 bg-rose-50 border-2 border-rose-100 rounded-xl text-rose-300 hover:text-rose-600 transition-colors flex items-center justify-center">✕</button>
-        </div>
-      ));
+
+      const reversedHist = [...hist].reverse();
+      const displayedHist = reversedHist.slice(0, historyLimit);
+
+      const updateHistoryBoardName = (boardId: string, newName: string) => {
+        const updatedWhiteboards = (design.whiteboards || []).map(b => b.id === boardId ? { ...b, name: newName } : b);
+        onSaveDesign({ ...design, whiteboards: updatedWhiteboards });
+        if (currentBoardId === boardId) setCurrentBoardName(newName);
+      };
+
+      return (
+        <>
+          {displayedHist.map(b => (
+            <div key={b.id} className="col-span-4 relative mb-3 group">
+              <button
+                onClick={() => restoreBoardState(b)}
+                className="w-full p-4 bg-white border-4 border-slate-100 rounded-3xl text-left hover:border-blue-400 shadow-sm transition-all flex flex-col gap-1 active:scale-95"
+              >
+                <div className="flex w-full">
+                  <input
+                    type="text"
+                    value={b.name || ''}
+                    placeholder="Untitled"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => updateHistoryBoardName(b.id, e.target.value)}
+                    className="flex-1 font-black text-slate-800 text-lg bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-blue-400 outline-none transition-colors px-1 -ml-1 placeholder:text-slate-300"
+                  />
+                </div>
+                <div className="text-sm text-slate-400 font-bold tracking-wider px-1">
+                  Created: {new Date(b.timestamp).toLocaleDateString()}, {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteFromHistory(b.id); }}
+                className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all z-10"
+                title="Delete Snapshot"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {hist.length > historyLimit && (
+            <button
+              onClick={() => setHistoryLimit(prev => prev + 20)}
+              className="col-span-4 py-3 mt-2 bg-blue-50 text-blue-600 font-black rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors uppercase text-xs tracking-widest leading-none drop-shadow-sm active:scale-95"
+            >
+              Show More ({hist.length - historyLimit} left)
+            </button>
+          )}
+        </>
+      );
     }
   };
 
@@ -1944,7 +2004,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const subjectConcepts = currentSubject?.concepts || [];
 
   return (
-    <div 
+    <div
       className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']"
       onClick={() => {
         setShowAddArrow(false);
@@ -1979,7 +2039,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     exit={{ opacity: 0 }}
                     className="absolute top-full left-1/2 -translate-x-1/2 mt-4 z-[100] flex flex-col items-center pointer-events-none"
                   >
-                    <motion.span 
+                    <motion.span
                       animate={{ y: [0, -5, 0] }}
                       transition={{ repeat: Infinity, duration: 1.5 }}
                       className="text-3xl drop-shadow-md mb-1"
@@ -1992,7 +2052,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   </motion.div>
                 )}
               </AnimatePresence>
-              <div 
+              <div
                 ref={conceptSwitcherRef}
                 onMouseDown={handleSwitcherMouseDown}
                 onMouseMove={handleSwitcherMouseMove}
@@ -2008,11 +2068,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         onSelectConcept?.(c);
                       }
                     }}
-                    className={`px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${
-                      c.title === concept.title 
-                        ? 'bg-white text-blue-600 shadow-md ring-4 ring-blue-400 scale-110' 
+                    className={`px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${c.title === concept.title
+                        ? 'bg-white text-blue-600 shadow-md ring-4 ring-blue-400 scale-110'
                         : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
-                    }`}
+                      }`}
                   >
                     {c.icon} {c.title}
                   </button>
@@ -2026,13 +2085,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         </div>
         <div className="flex items-center gap-4">
           {mode === 'teacher' ? (
-            <button 
-              onClick={() => handleSaveBoard(() => onBack())} 
-              className={`px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${
-                saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
-                saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
-                'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
-              }`}
+            <button
+              onClick={() => handleSaveBoard(() => onBack())}
+              className={`px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                  saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
+                    'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
+                }`}
               disabled={saveStatus === 'saving'}
             >
               <span className="text-lg">{saveStatus === 'saved' ? '✅' : '💾'}</span>
@@ -2040,43 +2098,42 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </button>
           ) : (
             <div className="flex items-center gap-4">
-              <button 
-                onClick={handleClearEverything} 
+              <button
+                onClick={handleClearEverything}
                 className="px-4 py-1.5 bg-slate-100 rounded-lg font-black text-slate-900 text-xs border-b-2 border-slate-200 active:translate-y-0.5 active:border-b-0 transition-all"
               >
                 ✨ New
               </button>
-              <button 
-                onClick={handleSaveBoard} 
-                className={`px-5 py-1.5 rounded-lg font-black text-xs border-b-2 transition-all shadow-md flex items-center gap-2 ${
-                  saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
-                  saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
-                  'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
-                }`}
+              <button
+                onClick={handleSaveBoard}
+                className={`px-5 py-1.5 rounded-lg font-black text-xs border-b-2 transition-all shadow-md flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                    saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
+                      'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
+                  }`}
                 disabled={saveStatus === 'saving'}
               >
                 {saveStatus === 'saved' ? '✅ Saved!' : saveStatus === 'saving' ? '⏳ Saving...' : '💾 Save'}
               </button>
               <div className="flex gap-2 ml-4 bg-slate-100 p-1.5 rounded-xl">
-                 {(['plain', 'lined', 'grid'] as const).map(b => (
-                   <button 
-                    key={b} 
-                    onClick={() => setBoardBg(b)} 
+                {(['plain', 'lined', 'grid'] as const).map(b => (
+                  <button
+                    key={b}
+                    onClick={() => setBoardBg(b)}
                     className={`p-3 rounded-xl transition-all ${boardBg === b ? 'bg-white shadow-sm ring-2 ring-blue-400' : 'hover:bg-white/50'}`}
                     title={`${b.charAt(0).toUpperCase() + b.slice(1)} Paper`}
-                   >
-                     <span className="text-xl">{b === 'plain' ? '⬜' : b === 'lined' ? '📝' : '📊'}</span>
-                   </button>
-                 ))}
-                 <div className="w-px h-8 bg-slate-200 mx-1 self-center" />
-                 {['#ffffff', '#fefce8', '#f0fdf4', '#eff6ff', '#fdf2f8', '#faf5ff'].map(color => (
-                   <button 
-                    key={color} 
-                    onClick={() => setBoardBgColor(color)} 
+                  >
+                    <span className="text-xl">{b === 'plain' ? '⬜' : b === 'lined' ? '📝' : '📊'}</span>
+                  </button>
+                ))}
+                <div className="w-px h-8 bg-slate-200 mx-1 self-center" />
+                {['#ffffff', '#fefce8', '#f0fdf4', '#eff6ff', '#fdf2f8', '#faf5ff'].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setBoardBgColor(color)}
                     className={`w-10 h-10 rounded-lg border-2 transition-all ${boardBgColor === color ? 'border-blue-400 scale-110 shadow-sm' : 'border-transparent hover:scale-105'}`}
                     style={{ backgroundColor: color }}
-                   />
-                 ))}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -2089,7 +2146,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           {/* Fixed Add Button at Top (Teacher Mode) */}
           {mode === 'teacher' && (
             <div className="p-4 flex flex-col items-center border-b-2 border-slate-100 relative z-[80]">
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsSearchingIcons(true);
@@ -2109,7 +2166,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     exit={{ opacity: 0, scale: 0.8 }}
                     className="absolute left-full ml-4 z-[100] flex items-center pointer-events-none"
                   >
-                    <motion.span 
+                    <motion.span
                       animate={{ x: [0, 10, 0] }}
                       transition={{ repeat: Infinity, duration: 1.5 }}
                       className="text-4xl drop-shadow-lg"
@@ -2128,24 +2185,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           {/* Scrollable Categories */}
           <div className="flex-1 overflow-y-auto py-4 flex flex-col items-center gap-3 custom-scrollbar">
             {categories.filter(cat => cat.id !== 'ADD_MATERIAL').map((cat) => (
-              <button 
-                key={cat.id} 
-                onClick={(e) => { 
+              <button
+                key={cat.id}
+                onClick={(e) => {
                   e.stopPropagation();
-                  setActiveCategoryId(cat.id); 
-                  setDrawerOpen(true); 
-                }} 
-                className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${
-                  activeCategoryId === cat.id && drawerOpen 
-                    ? 'bg-white shadow-lg text-blue-600 ring-4 ring-blue-400 scale-105' 
+                  setActiveCategoryId(cat.id);
+                  setDrawerOpen(true);
+                }}
+                className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${activeCategoryId === cat.id && drawerOpen
+                    ? 'bg-white shadow-lg text-blue-600 ring-4 ring-blue-400 scale-105'
                     : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
-                }`}
+                  }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
                 <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all">{cat.label}</span>
-                
+
                 {cat.isCustom && mode === 'teacher' && (
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
@@ -2186,7 +2242,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   <p className="font-black text-slate-400">No subject materials.</p>
                 </div>
                 {mode === 'teacher' && (
-                  <button 
+                  <button
                     onClick={() => onNavigateToMaterials?.(subjectId)}
                     className="mt-6 w-full bg-blue-500 text-white font-black py-4 rounded-3xl shadow-lg border-b-4 border-blue-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
@@ -2203,8 +2259,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 <div className="space-y-4">
                   {filteredMaterials.map(m => (
                     <div key={m.id} className="relative group">
-                      <button 
-                        onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }} 
+                      <button
+                        onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }}
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData('materialId', m.id);
@@ -2230,7 +2286,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         <div className="p-3 text-left font-black text-slate-900 truncate text-sm">{m.name}</div>
                       </button>
                       {mode === 'teacher' && (
-                        <button 
+                        <button
                           onClick={(e) => { e.stopPropagation(); setItemToRemove(m); }}
                           className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg transition-all border-2 border-white z-10 hover:scale-110 active:scale-90"
                           title="Delete Material"
@@ -2240,9 +2296,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       )}
                     </div>
                   ))}
-                  
+
                   {mode === 'teacher' && (
-                    <button 
+                    <button
                       onClick={() => onNavigateToMaterials?.(subjectId)}
                       className="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl py-6 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all group"
                     >
@@ -2254,12 +2310,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </div>
             )}
           </div>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               setLibraryOpen(!libraryOpen);
               setShowLibraryArrow(false);
-            }} 
+            }}
             className="absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px]"
           >
             {libraryOpen ? '➡️' : '📚'}
@@ -2275,7 +2331,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2 animate-bounce-gentle">
                     Classroom Materials
                   </div>
-                  <motion.span 
+                  <motion.span
                     animate={{ x: [0, -10, 0] }}
                     transition={{ repeat: Infinity, duration: 1.5 }}
                     className="text-4xl drop-shadow-lg"
@@ -2292,7 +2348,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" onDrop={handleDropOnBoard} onDragOver={(e) => e.preventDefault()} onWheel={(e) => { e.preventDefault(); handleZoomAt({ sx: e.clientX, sy: e.clientY }, Math.pow(1.1, e.deltaY > 0 ? -1 : 1)); }}>
           <AnimatePresence>
             {showTransition && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 1.1, y: -20 }}
@@ -2317,8 +2373,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     {mode === 'teacher' && (
-                      <button 
-                        onClick={() => setItemToRemove(activeMaterial)} 
+                      <button
+                        onClick={() => setItemToRemove(activeMaterial)}
                         className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all"
                         title="Delete Material"
                       >
@@ -2339,8 +2395,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           )}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
-          <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
-            <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '20000px', height: '20000px', backgroundColor: boardBgColor }}>
+          <div 
+            className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`} 
+            onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} 
+            style={{ 
+              touchAction: 'none',
+              backgroundColor: boardBgColor,
+              backgroundImage: boardBg === 'grid' 
+                ? 'radial-gradient(#cbd5e1 2px, transparent 2px)' 
+                : boardBg === 'lined' 
+                  ? 'repeating-linear-gradient(transparent, transparent 48px, #cbd5e1 48px, #cbd5e1 50px)' 
+                  : 'none',
+              backgroundSize: boardBg === 'grid' ? `${50 * viewport.zoom}px ${50 * viewport.zoom}px` : `100% ${50 * viewport.zoom}px`,
+              backgroundPosition: `${viewport.x}px ${viewport.y}px`
+            }}
+          >
+            <div className="absolute top-0 left-0 origin-top-left" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, width: '15000px', height: '15000px' }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
               {items.filter(item => {
                 const parentGroup = groups.find(g => g.itemIds.includes(item.id));
@@ -2348,547 +2418,548 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               }).map(item => {
                 const inGroup = groups.some(g => g.itemIds.includes(item.id));
                 return (
-                <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }}>
-                  <div className={`relative p-4 rounded-3xl border-4 transition-all ${selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
-                    {item.type === 'song' ? (
-                      <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border-4 border-pink-100 flex items-center gap-6 min-w-[320px] pointer-events-auto">
-                        <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-inner ${activeSong?.id === item.id && songPlaying ? 'bg-pink-100 animate-bounce-gentle' : 'bg-slate-50'}`}>
-                          {item.metadata?.icon || '🎵'}
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <div className="font-black text-slate-800 truncate text-lg">{item.metadata?.title || 'Song'}</div>
-                          <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">{item.metadata?.artist || 'Artist'}</div>
-                        </div>
-                        <button 
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlaySong({ id: item.id, url: item.content, title: item.metadata.title, icon: item.metadata.icon, category: '' });
-                          }}
-                          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all ${activeSong?.id === item.id && songPlaying ? 'bg-pink-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-pink-50 hover:text-pink-500'}`}
-                        >
-                          {activeSong?.id === item.id && songPlaying ? '⏸️' : '▶️'}
-                        </button>
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'ten-frame' ? (
-                      <div className="w-[400px] h-[160px] border-4 border-slate-300 grid grid-cols-5 grid-rows-2 bg-white shadow-inner rounded-xl overflow-hidden">
-                        {Array.from({length: 10}).map((_, i) => (
-                          <div key={i} className="border-2 border-slate-100 flex items-center justify-center" />
-                        ))}
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'number-line' ? (
-                      <div className="w-[800px] h-20 flex flex-col items-center justify-center pointer-events-none">
-                        <div className="w-full h-1 bg-slate-400 relative">
-                          {Array.from({length: 21}).map((_, i) => (
-                            <div key={i} className="absolute top-0 w-0.5 h-4 bg-slate-400 -translate-y-1/2" style={{ left: `${(i / 20) * 100}%` }}>
-                              <span className="absolute top-6 left-1/2 -translate-x-1/2 text-sm font-bold text-slate-500">{i}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'clock' ? (
-                      <div className="w-64 h-64 bg-white rounded-full border-8 border-slate-800 relative shadow-2xl flex items-center justify-center pointer-events-auto clock-container">
-                        {/* Remove Button */}
-                        <button 
-                          onMouseDown={e => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                          className="absolute -top-4 -right-4 w-8 h-8 bg-white rounded-full shadow-lg border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all z-50"
-                        >
-                          ✕
-                        </button>
-                        {/* Minute Ticks */}
-                        {Array.from({length: 60}).map((_, i) => {
-                          const angle = i * 6 * (Math.PI / 180);
-                          const isFiveMin = i % 5 === 0;
-                          const length = isFiveMin ? 12 : 6;
-                          const thickness = isFiveMin ? 'w-1' : 'w-0.5';
-                          const x = Math.sin(angle) * (110 - length / 2);
-                          const y = -Math.cos(angle) * (110 - length / 2);
-                          return (
-                            <div 
-                              key={i} 
-                              className={`absolute ${thickness} bg-slate-300 rounded-full`} 
-                              style={{ 
-                                height: `${length}px`,
-                                transform: `translate(${x}px, ${y}px) rotate(${i * 6}deg)` 
-                              }} 
-                            />
-                          );
-                        })}
-                        {/* Clock Numbers */}
-                        {Array.from({length: 12}).map((_, i) => {
-                          const angle = (i + 1) * 30 * (Math.PI / 180);
-                          const x = Math.sin(angle) * 90;
-                          const y = -Math.cos(angle) * 90;
-                          return (
-                            <div key={i} className="absolute font-black text-slate-800 text-xl pointer-events-none" style={{ transform: `translate(${x}px, ${y}px)` }}>
-                              {i + 1}
-                            </div>
-                          );
-                        })}
-                        {/* Hour Hand */}
-                        <div 
-                          onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'hour')}
-                          className="absolute w-4 h-20 bg-slate-800 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-600 z-20" 
-                          style={{ transform: `rotate(${(item.metadata?.hour || 0) * 30 + (item.metadata?.minute || 0) * 0.5}deg)` }} 
-                        />
-                        {/* Minute Hand */}
-                        <div 
-                          onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'minute')}
-                          className="absolute w-2.5 h-28 bg-slate-500 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-400 z-20" 
-                          style={{ transform: `rotate(${(item.metadata?.minute || 0) * 6}deg)` }} 
-                        />
-                        <div className="absolute w-6 h-6 bg-slate-800 rounded-full z-30" />
-                        
-                        {selectedItemId === item.id && (
-                          <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
-                            Drag hands to set time! 🕒
+                  <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }}>
+                    <div className={`relative p-4 rounded-3xl border-4 transition-all duration-700 ${droppedItemId === item.id ? 'ring-8 ring-blue-400/50 bg-blue-400/20 border-blue-400 scale-105' : selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
+                      {item.type === 'song' ? (
+                        <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border-4 border-pink-100 flex items-center gap-6 min-w-[320px] pointer-events-auto">
+                          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-inner ${activeSong?.id === item.id && songPlaying ? 'bg-pink-100 animate-bounce-gentle' : 'bg-slate-50'}`}>
+                            {item.metadata?.icon || '🎵'}
                           </div>
-                        )}
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'ruler' ? (
-                      <div 
-                        className={`bg-yellow-100 border-2 border-yellow-300 shadow-lg relative pointer-events-auto transition-all duration-300 rounded-lg ${item.metadata?.vertical ? 'w-20 h-[600px]' : 'w-[600px] h-20'}`}
-                      >
-                        {/* Ruler Marks */}
-                        <div className={`absolute inset-0 flex ${item.metadata?.vertical ? 'flex-col' : 'flex-row'}`}>
-                          {Array.from({length: item.metadata?.vertical ? 24 : 12}).map((_, i) => (
-                            <div key={i} className={`flex-1 border-slate-400/30 flex ${item.metadata?.vertical ? 'border-b flex-row justify-between items-center px-2' : 'border-r flex-col justify-between items-center py-2'}`}>
-                              <span className="text-xs font-black text-slate-500">{i}</span>
-                              <div className={`flex ${item.metadata?.vertical ? 'flex-col gap-1' : 'flex-row gap-1'}`}>
-                                {Array.from({length: 4}).map((_, j) => (
-                                  <div key={j} className={`bg-slate-400/50 ${item.metadata?.vertical ? 'h-px w-2' : 'w-px h-2'}`} />
-                                ))}
-                              </div>
-                            </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="font-black text-slate-800 truncate text-lg">{item.metadata?.title || 'Song'}</div>
+                            <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">{item.metadata?.artist || 'Artist'}</div>
+                          </div>
+                          <button
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlaySong({ id: item.id, url: item.content, title: item.metadata.title, icon: item.metadata.icon, category: '' });
+                            }}
+                            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all ${activeSong?.id === item.id && songPlaying ? 'bg-pink-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-pink-50 hover:text-pink-500'}`}
+                          >
+                            {activeSong?.id === item.id && songPlaying ? '⏸️' : '▶️'}
+                          </button>
+                        </div>
+                      ) : item.type === 'shape' && item.content === 'ten-frame' ? (
+                        <div className="w-[400px] h-[160px] border-4 border-slate-300 grid grid-cols-5 grid-rows-2 bg-white shadow-inner rounded-xl overflow-hidden">
+                          {Array.from({ length: 10 }).map((_, i) => (
+                            <div key={i} className="border-2 border-slate-100 flex items-center justify-center" />
                           ))}
                         </div>
-                        <div className={`absolute ${item.metadata?.vertical ? 'top-2 right-2' : 'bottom-2 right-2'} flex gap-2`}>
-                           <button 
-                            onMouseDown={e => e.stopPropagation()}
-                            onClick={() => updateItemMetadata(item.id, { vertical: !item.metadata?.vertical })}
-                            className="bg-white/80 backdrop-blur p-2 rounded-xl shadow-sm border border-slate-200 text-xs hover:bg-white transition-all"
-                           >
-                             🔄 Rotate
-                           </button>
-                        </div>
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'unit-cube' ? (
-                      <div className={`w-10 h-10 ${item.metadata?.color || 'bg-blue-400'} border-2 border-white/50 shadow-md rounded-sm flex items-center justify-center pointer-events-auto relative`}>
-                        <div className="w-6 h-6 border border-white/20 rounded-sm shadow-inner" />
-                        {(() => {
-                          const info = getCubeClusterInfo(item);
-                          if (info && info.isTopLeft) {
-                            return (
-                              <div className="absolute -top-8 left-0 bg-slate-800 text-white px-2 py-0.5 rounded-md text-xs font-black whitespace-nowrap shadow-xl z-50">
-                                {info.width > 1 && info.height > 1 ? `${info.width} × ${info.height} = ${info.total}` : info.total}
+                      ) : item.type === 'shape' && item.content === 'number-line' ? (
+                        <div className="w-[800px] h-20 flex flex-col items-center justify-center pointer-events-none">
+                          <div className="w-full h-1 bg-slate-400 relative">
+                            {Array.from({ length: 21 }).map((_, i) => (
+                              <div key={i} className="absolute top-0 w-0.5 h-4 bg-slate-400 -translate-y-1/2" style={{ left: `${(i / 20) * 100}%` }}>
+                                <span className="absolute top-6 left-1/2 -translate-x-1/2 text-sm font-bold text-slate-500">{i}</span>
                               </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'thermometer' ? (
-                      <div className="w-16 h-64 bg-slate-100 rounded-full border-4 border-slate-300 relative shadow-xl flex flex-col items-center py-4 pointer-events-auto thermometer-container">
-                        <div 
-                          onMouseDown={(e) => handleThermometerMouseDown(e, item.id)}
-                          className="w-6 flex-1 bg-white rounded-full relative overflow-hidden border-2 border-slate-200 cursor-ns-resize thermo-tube"
-                        >
-                          <div 
-                            className="absolute bottom-0 w-full bg-red-500 transition-all duration-75" 
-                            style={{ height: `${item.metadata?.temp || 0}%` }} 
-                          />
-                          {/* Scale Marks */}
-                          <div className="absolute inset-0 flex flex-col justify-between py-2 pointer-events-none opacity-20">
-                            {Array.from({length: 11}).map((_, i) => (
-                              <div key={i} className="w-full h-px bg-slate-900" />
                             ))}
                           </div>
                         </div>
-                        <div className="w-10 h-10 bg-red-500 rounded-full mt-[-6px] border-4 border-slate-100 shadow-md z-10" />
-                        
-                        {selectedItemId === item.id && (
-                          <div className="absolute -right-16 top-1/2 -translate-y-1/2 flex flex-col items-center bg-slate-800 text-white p-2 rounded-xl shadow-2xl border border-slate-700 pointer-events-none">
-                            <span className="text-sm font-black">{item.metadata?.temp || 0}°</span>
-                            <span className="text-xs uppercase font-bold text-slate-400">Temp</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'measuring-cup' ? (
-                      <div className="w-32 h-40 bg-white/30 backdrop-blur-sm border-4 border-slate-300 rounded-b-3xl relative shadow-xl pointer-events-auto flex flex-col-reverse overflow-hidden">
-                        <div 
-                          className="bg-blue-400/60 transition-all duration-500" 
-                          style={{ height: `${((item.metadata?.fill || 0) / (item.metadata?.capacity || 1)) * 100}%` }} 
-                        />
-                        <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
-                          <div className="text-xs font-black text-slate-500 uppercase">{item.metadata?.capacity} Cup</div>
-                          <div className="flex-1 border-l-2 border-slate-300/50 my-2 relative">
-                            <div className="absolute top-1/4 left-0 w-2 h-px bg-slate-300" />
-                            <div className="absolute top-1/2 left-0 w-4 h-px bg-slate-300" />
-                            <div className="absolute top-3/4 left-0 w-2 h-px bg-slate-300" />
-                          </div>
-                        </div>
-                        {selectedItemId === item.id && (
-                          <div className="absolute -right-12 top-0 bottom-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-slate-100" onMouseDown={e => e.stopPropagation()}>
-                            <input 
-                              type="range" 
-                              min="0" 
-                              max={item.metadata?.capacity || 1} 
-                              step="0.0625"
-                              value={item.metadata?.fill || 0} 
-                              onChange={(e) => updateItemMetadata(item.id, { fill: parseFloat(e.target.value) }, true)}
-                              className="h-24 appearance-none bg-slate-200 rounded-full w-2"
-                              style={{ WebkitAppearance: 'slider-vertical' } as any}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ) : item.type === 'shape' && item.content === 'calendar' ? (
-                      <div className="w-[400px] bg-white rounded-3xl shadow-2xl border-4 border-slate-100 overflow-hidden pointer-events-auto">
-                        <div className="bg-slate-800 p-4 text-white flex justify-between items-center">
-                          <button onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { month: ((item.metadata?.month || 1) + 10) % 12 + 1 }); }} className="hover:scale-110 transition-transform">◀️</button>
-                          <div className="text-center">
-                            <div className="text-xs font-black uppercase tracking-widest text-slate-400">
-                              {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][(item.metadata?.month || 1) - 1]}
-                            </div>
-                            <div className="text-xl font-black">{item.metadata?.year || 2026}</div>
-                          </div>
-                          <button onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { month: (item.metadata?.month || 1) % 12 + 1 }); }} className="hover:scale-110 transition-transform">▶️</button>
-                        </div>
-                        <div className="grid grid-cols-7 gap-1 p-4">
-                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-xs font-black text-slate-300 py-2">{d}</div>)}
-                          {Array.from({length: new Date(item.metadata?.year || 2026, item.metadata?.month || 1, 0).getDate()}).map((_, i) => {
-                            const day = i + 1;
-                            const isSelected = item.metadata?.selectedDays?.includes(day);
+                      ) : item.type === 'shape' && item.content === 'clock' ? (
+                        <div className="w-64 h-64 bg-white rounded-full border-8 border-slate-800 relative shadow-2xl flex items-center justify-center pointer-events-auto clock-container">
+                          {/* Remove Button */}
+                          <button
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                            className="absolute -top-4 -right-4 w-8 h-8 bg-white rounded-full shadow-lg border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all z-50"
+                          >
+                            ✕
+                          </button>
+                          {/* Minute Ticks */}
+                          {Array.from({ length: 60 }).map((_, i) => {
+                            const angle = i * 6 * (Math.PI / 180);
+                            const isFiveMin = i % 5 === 0;
+                            const length = isFiveMin ? 12 : 6;
+                            const thickness = isFiveMin ? 'w-1' : 'w-0.5';
+                            const x = Math.sin(angle) * (110 - length / 2);
+                            const y = -Math.cos(angle) * (110 - length / 2);
                             return (
-                              <button 
-                                key={i} 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const selectedDays = item.metadata?.selectedDays || [];
-                                  const newSelected = selectedDays.includes(day) 
-                                    ? selectedDays.filter((d: number) => d !== day)
-                                    : [...selectedDays, day];
-                                  updateItemMetadata(item.id, { selectedDays: newSelected });
+                              <div
+                                key={i}
+                                className={`absolute ${thickness} bg-slate-300 rounded-full`}
+                                style={{
+                                  height: `${length}px`,
+                                  transform: `translate(${x}px, ${y}px) rotate(${i * 6}deg)`
                                 }}
-                                className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all ${isSelected ? 'bg-blue-500 text-white shadow-lg scale-110' : 'hover:bg-slate-50 text-slate-600'}`}
-                              >
-                                {day}
-                              </button>
+                              />
                             );
                           })}
+                          {/* Clock Numbers */}
+                          {Array.from({ length: 12 }).map((_, i) => {
+                            const angle = (i + 1) * 30 * (Math.PI / 180);
+                            const x = Math.sin(angle) * 90;
+                            const y = -Math.cos(angle) * 90;
+                            return (
+                              <div key={i} className="absolute font-black text-slate-800 text-xl pointer-events-none" style={{ transform: `translate(${x}px, ${y}px)` }}>
+                                {i + 1}
+                              </div>
+                            );
+                          })}
+                          {/* Hour Hand */}
+                          <div
+                            onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'hour')}
+                            className="absolute w-4 h-20 bg-slate-800 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-600 z-20"
+                            style={{ transform: `rotate(${(item.metadata?.hour || 0) * 30 + (item.metadata?.minute || 0) * 0.5}deg)` }}
+                          />
+                          {/* Minute Hand */}
+                          <div
+                            onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'minute')}
+                            className="absolute w-2.5 h-28 bg-slate-500 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-400 z-20"
+                            style={{ transform: `rotate(${(item.metadata?.minute || 0) * 6}deg)` }}
+                          />
+                          <div className="absolute w-6 h-6 bg-slate-800 rounded-full z-30" />
+
+                          {selectedItemId === item.id && (
+                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
+                              Drag hands to set time! 🕒
+                            </div>
+                          )}
                         </div>
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                          <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                            {item.metadata?.selectedDays?.length || 0} Days Selected
+                      ) : item.type === 'shape' && item.content === 'ruler' ? (
+                        <div
+                          className={`bg-yellow-100 border-2 border-yellow-300 shadow-lg relative pointer-events-auto transition-all duration-300 rounded-lg ${item.metadata?.vertical ? 'w-20 h-[600px]' : 'w-[600px] h-20'}`}
+                        >
+                          {/* Ruler Marks */}
+                          <div className={`absolute inset-0 flex ${item.metadata?.vertical ? 'flex-col' : 'flex-row'}`}>
+                            {Array.from({ length: item.metadata?.vertical ? 24 : 12 }).map((_, i) => (
+                              <div key={i} className={`flex-1 border-slate-400/30 flex ${item.metadata?.vertical ? 'border-b flex-row justify-between items-center px-2' : 'border-r flex-col justify-between items-center py-2'}`}>
+                                <span className="text-xs font-black text-slate-500">{i}</span>
+                                <div className={`flex ${item.metadata?.vertical ? 'flex-col gap-1' : 'flex-row gap-1'}`}>
+                                  {Array.from({ length: 4 }).map((_, j) => (
+                                    <div key={j} className={`bg-slate-400/50 ${item.metadata?.vertical ? 'h-px w-2' : 'w-px h-2'}`} />
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { selectedDays: [] }); }}
-                            className="text-xs font-black text-blue-500 uppercase hover:underline"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                    ) : item.type === 'timer' ? (
-                      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-blue-100 flex flex-col items-center gap-6 min-w-[280px] pointer-events-auto">
-                        <div className="flex justify-between w-full items-center">
-                          <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Classroom Timer ⏱️</div>
-                          <button 
-                            onMouseDown={e => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                            className="text-slate-300 hover:text-rose-500 transition-colors"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        <div className={`text-7xl font-black tabular-nums transition-colors ${item.metadata?.timeLeft === 0 ? 'text-rose-500 animate-bounce-gentle' : 'text-slate-800'}`}>
-                          {Math.floor((item.metadata?.timeLeft || 0) / 60)}:{String((item.metadata?.timeLeft || 0) % 60).padStart(2, '0')}
-                        </div>
-                        
-                        <div className="flex gap-4 w-full" onMouseDown={e => e.stopPropagation()}>
-                          <button 
-                            onClick={() => {
-                              const isRunning = !item.metadata?.isRunning;
-                              updateItemMetadata(item.id, { isRunning });
-                            }}
-                            className={`flex-1 py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 ${item.metadata?.isRunning ? 'bg-amber-100 text-amber-600 border-b-4 border-amber-300' : 'bg-emerald-500 text-white border-b-4 border-emerald-700'}`}
-                          >
-                            {item.metadata?.isRunning ? '⏸️ Pause' : '▶️ Start'}
-                          </button>
-                          <button 
-                            onClick={() => {
-                              updateItemMetadata(item.id, { timeLeft: item.metadata?.initialTime || 60, isRunning: false });
-                            }}
-                            className="px-6 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black border-b-4 border-slate-200 hover:bg-slate-200 transition-all"
-                          >
-                            🔄
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-3 w-full bg-slate-50 p-3 rounded-2xl" onMouseDown={e => e.stopPropagation()}>
-                          <span className="text-xs font-black text-slate-400 uppercase">Set:</span>
-                          {[1, 2, 5, 10].map(m => (
-                            <button 
-                              key={m}
-                              onClick={() => updateItemMetadata(item.id, { timeLeft: m * 60, initialTime: m * 60, isRunning: false })}
-                              className="flex-1 py-2 bg-white rounded-xl text-sm font-black text-slate-600 border-2 border-slate-100 hover:border-blue-300 transition-all"
+                          <div className={`absolute ${item.metadata?.vertical ? 'top-2 right-2' : 'bottom-2 right-2'} flex gap-2`}>
+                            <button
+                              onMouseDown={e => e.stopPropagation()}
+                              onClick={() => updateItemMetadata(item.id, { vertical: !item.metadata?.vertical })}
+                              className="bg-white/80 backdrop-blur p-2 rounded-xl shadow-sm border border-slate-200 text-xs hover:bg-white transition-all"
                             >
-                              {m}m
+                              🔄 Rotate
                             </button>
-                          ))}
+                          </div>
                         </div>
-
-                        {item.metadata?.timeLeft === 0 && (
-                          <div className="text-rose-500 font-black text-xl animate-pulse">TIME IS UP! 🔔</div>
-                        )}
-                      </div>
-                    ) : item.type === 'spinner' ? (
-                      <div 
-                        className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-purple-100 flex flex-col items-center gap-6 pointer-events-auto"
-                        style={{ 
-                          minWidth: (item.metadata?.names || []).length > 8 ? 350 + ((item.metadata?.names || []).length - 8) * 20 : 350 
-                        }}
-                      >
-                        <div className="flex justify-between w-full items-center">
-                          <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Wheel Spinner 🎡</div>
-                          <button 
-                            onMouseDown={e => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                            className="text-slate-300 hover:text-rose-500 transition-colors"
+                      ) : item.type === 'shape' && item.content === 'unit-cube' ? (
+                        <div className={`w-10 h-10 ${item.metadata?.color || 'bg-blue-400'} border-2 border-white/50 shadow-md rounded-sm flex items-center justify-center pointer-events-auto relative`}>
+                          <div className="w-6 h-6 border border-white/20 rounded-sm shadow-inner" />
+                          {(() => {
+                            const info = getCubeClusterInfo(item);
+                            if (info && info.isTopLeft) {
+                              return (
+                                <div className="absolute -top-8 left-0 bg-slate-800 text-white px-2 py-0.5 rounded-md text-xs font-black whitespace-nowrap shadow-xl z-50">
+                                  {info.width > 1 && info.height > 1 ? `${info.width} × ${info.height} = ${info.total}` : info.total}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : item.type === 'shape' && item.content === 'thermometer' ? (
+                        <div className="w-16 h-64 bg-slate-100 rounded-full border-4 border-slate-300 relative shadow-xl flex flex-col items-center py-4 pointer-events-auto thermometer-container">
+                          <div
+                            onMouseDown={(e) => handleThermometerMouseDown(e, item.id)}
+                            className="w-6 flex-1 bg-white rounded-full relative overflow-hidden border-2 border-slate-200 cursor-ns-resize thermo-tube"
                           >
-                            ✕
-                          </button>
+                            <div
+                              className="absolute bottom-0 w-full bg-red-500 transition-all duration-75"
+                              style={{ height: `${item.metadata?.temp || 0}%` }}
+                            />
+                            {/* Scale Marks */}
+                            <div className="absolute inset-0 flex flex-col justify-between py-2 pointer-events-none opacity-20">
+                              {Array.from({ length: 11 }).map((_, i) => (
+                                <div key={i} className="w-full h-px bg-slate-900" />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="w-10 h-10 bg-red-500 rounded-full mt-[-6px] border-4 border-slate-100 shadow-md z-10" />
+
+                          {selectedItemId === item.id && (
+                            <div className="absolute -right-16 top-1/2 -translate-y-1/2 flex flex-col items-center bg-slate-800 text-white p-2 rounded-xl shadow-2xl border border-slate-700 pointer-events-none">
+                              <span className="text-sm font-black">{item.metadata?.temp || 0}°</span>
+                              <span className="text-xs uppercase font-bold text-slate-400">Temp</span>
+                            </div>
+                          )}
                         </div>
-                        
-                        <div 
-                          className="relative"
-                          style={{ 
-                            width: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288,
-                            height: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288
+                      ) : item.type === 'shape' && item.content === 'measuring-cup' ? (
+                        <div className="w-32 h-40 bg-white/30 backdrop-blur-sm border-4 border-slate-300 rounded-b-3xl relative shadow-xl pointer-events-auto flex flex-col-reverse overflow-hidden">
+                          <div
+                            className="bg-blue-400/60 transition-all duration-500"
+                            style={{ height: `${((item.metadata?.fill || 0) / (item.metadata?.capacity || 1)) * 100}%` }}
+                          />
+                          <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
+                            <div className="text-xs font-black text-slate-500 uppercase">{item.metadata?.capacity} Cup</div>
+                            <div className="flex-1 border-l-2 border-slate-300/50 my-2 relative">
+                              <div className="absolute top-1/4 left-0 w-2 h-px bg-slate-300" />
+                              <div className="absolute top-1/2 left-0 w-4 h-px bg-slate-300" />
+                              <div className="absolute top-3/4 left-0 w-2 h-px bg-slate-300" />
+                            </div>
+                          </div>
+                          {selectedItemId === item.id && (
+                            <div className="absolute -right-12 top-0 bottom-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-slate-100" onMouseDown={e => e.stopPropagation()}>
+                              <input
+                                type="range"
+                                min="0"
+                                max={item.metadata?.capacity || 1}
+                                step="0.0625"
+                                value={item.metadata?.fill || 0}
+                                onChange={(e) => updateItemMetadata(item.id, { fill: parseFloat(e.target.value) }, true)}
+                                className="h-24 appearance-none bg-slate-200 rounded-full w-2"
+                                style={{ WebkitAppearance: 'slider-vertical' } as any}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : item.type === 'shape' && item.content === 'calendar' ? (
+                        <div className="w-[400px] bg-white rounded-3xl shadow-2xl border-4 border-slate-100 overflow-hidden pointer-events-auto">
+                          <div className="bg-slate-800 p-4 text-white flex justify-between items-center">
+                            <button onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { month: ((item.metadata?.month || 1) + 10) % 12 + 1 }); }} className="hover:scale-110 transition-transform">◀️</button>
+                            <div className="text-center">
+                              <div className="text-xs font-black uppercase tracking-widest text-slate-400">
+                                {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][(item.metadata?.month || 1) - 1]}
+                              </div>
+                              <div className="text-xl font-black">{item.metadata?.year || 2026}</div>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { month: (item.metadata?.month || 1) % 12 + 1 }); }} className="hover:scale-110 transition-transform">▶️</button>
+                          </div>
+                          <div className="grid grid-cols-7 gap-1 p-4">
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-xs font-black text-slate-300 py-2">{d}</div>)}
+                            {Array.from({ length: new Date(item.metadata?.year || 2026, item.metadata?.month || 1, 0).getDate() }).map((_, i) => {
+                              const day = i + 1;
+                              const isSelected = item.metadata?.selectedDays?.includes(day);
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const selectedDays = item.metadata?.selectedDays || [];
+                                    const newSelected = selectedDays.includes(day)
+                                      ? selectedDays.filter((d: number) => d !== day)
+                                      : [...selectedDays, day];
+                                    updateItemMetadata(item.id, { selectedDays: newSelected });
+                                  }}
+                                  className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all ${isSelected ? 'bg-blue-500 text-white shadow-lg scale-110' : 'hover:bg-slate-50 text-slate-600'}`}
+                                >
+                                  {day}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                              {item.metadata?.selectedDays?.length || 0} Days Selected
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); updateItemMetadata(item.id, { selectedDays: [] }); }}
+                              className="text-xs font-black text-blue-500 uppercase hover:underline"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      ) : item.type === 'timer' ? (
+                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-blue-100 flex flex-col items-center gap-6 min-w-[280px] pointer-events-auto">
+                          <div className="flex justify-between w-full items-center">
+                            <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Classroom Timer ⏱️</div>
+                            <button
+                              onMouseDown={e => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                              className="text-slate-300 hover:text-rose-500 transition-colors"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className={`text-7xl font-black tabular-nums transition-colors ${item.metadata?.timeLeft === 0 ? 'text-rose-500 animate-bounce-gentle' : 'text-slate-800'}`}>
+                            {Math.floor((item.metadata?.timeLeft || 0) / 60)}:{String((item.metadata?.timeLeft || 0) % 60).padStart(2, '0')}
+                          </div>
+
+                          <div className="flex gap-4 w-full" onMouseDown={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                const isRunning = !item.metadata?.isRunning;
+                                updateItemMetadata(item.id, { isRunning });
+                              }}
+                              className={`flex-1 py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 ${item.metadata?.isRunning ? 'bg-amber-100 text-amber-600 border-b-4 border-amber-300' : 'bg-emerald-500 text-white border-b-4 border-emerald-700'}`}
+                            >
+                              {item.metadata?.isRunning ? '⏸️ Pause' : '▶️ Start'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                updateItemMetadata(item.id, { timeLeft: item.metadata?.initialTime || 60, isRunning: false });
+                              }}
+                              className="px-6 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black border-b-4 border-slate-200 hover:bg-slate-200 transition-all"
+                            >
+                              🔄
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-3 w-full bg-slate-50 p-3 rounded-2xl" onMouseDown={e => e.stopPropagation()}>
+                            <span className="text-xs font-black text-slate-400 uppercase">Set:</span>
+                            {[1, 2, 5, 10].map(m => (
+                              <button
+                                key={m}
+                                onClick={() => updateItemMetadata(item.id, { timeLeft: m * 60, initialTime: m * 60, isRunning: false })}
+                                className="flex-1 py-2 bg-white rounded-xl text-sm font-black text-slate-600 border-2 border-slate-100 hover:border-blue-300 transition-all"
+                              >
+                                {m}m
+                              </button>
+                            ))}
+                          </div>
+
+                          {item.metadata?.timeLeft === 0 && (
+                            <div className="text-rose-500 font-black text-xl animate-pulse">TIME IS UP! 🔔</div>
+                          )}
+                        </div>
+                      ) : item.type === 'spinner' ? (
+                        <div
+                          className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-purple-100 flex flex-col items-center gap-6 pointer-events-auto"
+                          style={{
+                            minWidth: (item.metadata?.names || []).length > 8 ? 350 + ((item.metadata?.names || []).length - 8) * 20 : 350
                           }}
                         >
-                          {/* Spinner Ticker */}
-                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl z-20 drop-shadow-lg">🔻</div>
-                          
-                          {/* The Wheel */}
-                          <motion.div 
-                            animate={{ rotate: item.metadata?.rotation || 0 }}
-                            transition={item.metadata?.isSpinning ? { duration: 4, ease: [0.15, 0, 0.15, 1] } : { duration: 0 }}
-                            className="w-full h-full rounded-full border-[12px] border-slate-900 relative overflow-hidden shadow-2xl bg-slate-100"
+                          <div className="flex justify-between w-full items-center">
+                            <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Wheel Spinner 🎡</div>
+                            <button
+                              onMouseDown={e => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                              className="text-slate-300 hover:text-rose-500 transition-colors"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <div
+                            className="relative"
+                            style={{
+                              width: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288,
+                              height: (item.metadata?.names || []).length > 8 ? 288 + ((item.metadata?.names || []).length - 8) * 15 : 288
+                            }}
                           >
-                            {(item.metadata?.names || []).length > 0 ? (
-                              <svg viewBox="0 0 100 100" className="w-full h-full">
-                                {(item.metadata?.names || []).map((name: string, i: number, arr: string[]) => {
-                                  const sliceAngle = 360 / arr.length;
-                                  const startAngle = i * sliceAngle;
-                                  const endAngle = (i + 1) * sliceAngle;
-                                  const colors = ['#eab308', '#ec4899', '#3b82f6', '#8b5cf6', '#22c55e', '#f97316', '#ef4444'];
-                                  
-                                  // Special case for 1 student: full circle
-                                  if (arr.length === 1) {
+                            {/* Spinner Ticker */}
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl z-20 drop-shadow-lg">🔻</div>
+
+                            {/* The Wheel */}
+                            <motion.div
+                              animate={{ rotate: item.metadata?.rotation || 0 }}
+                              transition={item.metadata?.isSpinning ? { duration: 4, ease: [0.15, 0, 0.15, 1] } : { duration: 0 }}
+                              className="w-full h-full rounded-full border-[12px] border-slate-900 relative overflow-hidden shadow-2xl bg-slate-100"
+                            >
+                              {(item.metadata?.names || []).length > 0 ? (
+                                <svg viewBox="0 0 100 100" className="w-full h-full">
+                                  {(item.metadata?.names || []).map((name: string, i: number, arr: string[]) => {
+                                    const sliceAngle = 360 / arr.length;
+                                    const startAngle = i * sliceAngle;
+                                    const endAngle = (i + 1) * sliceAngle;
+                                    const colors = ['#eab308', '#ec4899', '#3b82f6', '#8b5cf6', '#22c55e', '#f97316', '#ef4444'];
+
+                                    // Special case for 1 student: full circle
+                                    if (arr.length === 1) {
+                                      return (
+                                        <g key={i}>
+                                          <circle cx="50" cy="50" r="50" fill={colors[0]} />
+                                          <text
+                                            x="50"
+                                            y="30"
+                                            textAnchor="middle"
+                                            dominantBaseline="middle"
+                                            fill="white"
+                                            className="font-black text-[15px] drop-shadow-sm"
+                                          >
+                                            {name}
+                                          </text>
+                                        </g>
+                                      );
+                                    }
+
+                                    // Path calculation for slices
+                                    const radius = 50;
+                                    const centerX = 50;
+                                    const centerY = 50;
+
+                                    const startRad = (startAngle - 90) * Math.PI / 180.0;
+                                    const endRad = (endAngle - 90) * Math.PI / 180.0;
+
+                                    const x1 = centerX + radius * Math.cos(startRad);
+                                    const y1 = centerY + radius * Math.sin(startRad);
+                                    const x2 = centerX + radius * Math.cos(endRad);
+                                    const y2 = centerY + radius * Math.sin(endRad);
+
+                                    const largeArcFlag = sliceAngle <= 180 ? "0" : "1";
+                                    const d = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+
+                                    // Text positioning
+                                    const textAngle = startAngle + sliceAngle / 2;
+                                    const textRad = (textAngle - 90) * Math.PI / 180.0;
+
+                                    // Switch to radial (vertical) text if more than 5 names to avoid overlap
+                                    const isRadial = arr.length > 5;
+                                    const textDist = isRadial ? 0.75 : 0.65;
+                                    const textX = centerX + (radius * textDist) * Math.cos(textRad);
+                                    const textY = centerY + (radius * textDist) * Math.sin(textRad);
+
+                                    // Dynamic Font Size Calculation
+                                    const fontSize = Math.max(3.5, Math.min(isRadial ? 12 : 14, (isRadial ? 90 : 50) / arr.length));
+                                    const rotation = isRadial ? textAngle + 90 : textAngle;
+
                                     return (
                                       <g key={i}>
-                                        <circle cx="50" cy="50" r="50" fill={colors[0]} />
-                                        <text 
-                                          x="50" 
-                                          y="30" 
-                                          textAnchor="middle" 
-                                          dominantBaseline="middle" 
-                                          fill="white" 
-                                          className="font-black text-[15px] drop-shadow-sm"
+                                        <path d={d} fill={colors[i % colors.length]} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+                                        <text
+                                          x={textX}
+                                          y={textY}
+                                          textAnchor="middle"
+                                          dominantBaseline="middle"
+                                          fill="white"
+                                          className="font-black drop-shadow-sm"
+                                          style={{ fontSize: `${fontSize}px` }}
+                                          transform={`rotate(${rotation}, ${textX}, ${textY})`}
                                         >
                                           {name}
                                         </text>
                                       </g>
                                     );
+                                  })}
+                                </svg>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold italic text-center p-8">Add names below to start!</div>
+                              )}
+                            </motion.div>
+
+                            {/* Center Button - Dark Circular */}
+                            <button
+                              onMouseDown={e => e.stopPropagation()}
+                              onClick={() => {
+                                if ((item.metadata?.names || []).length < 2) return;
+                                const extraSpins = 6 + Math.random() * 4;
+                                const newRotation = (item.metadata?.rotation || 0) + (360 * extraSpins) + Math.random() * 360;
+                                updateItemMetadata(item.id, { isSpinning: true, rotation: newRotation, selectedName: null });
+
+                                // Play spin sound
+                                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
+                                audio.volume = 0.3;
+                                audio.play().catch(() => { });
+
+                                setTimeout(() => {
+                                  const finalRotation = newRotation % 360;
+                                  const anglePerSegment = 360 / (item.metadata?.names || []).length;
+                                  // Ticker is at top (270 deg). 
+                                  const winningAngle = (360 - (finalRotation % 360)) % 360;
+                                  const winnerIdx = Math.floor(winningAngle / anglePerSegment);
+                                  const winner = item.metadata?.names[winnerIdx];
+                                  updateItemMetadata(item.id, { isSpinning: false, selectedName: winner });
+
+                                  // Play win sound
+                                  const winAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3');
+                                  winAudio.volume = 0.4;
+                                  winAudio.play().catch(() => { });
+                                }, 4000);
+                              }}
+                              disabled={item.metadata?.isSpinning || (item.metadata?.names || []).length < 2}
+                              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-slate-900 text-white rounded-full border-4 border-slate-700 shadow-2xl z-30 font-black text-sm hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex flex-col items-center justify-center gap-0.5"
+                            >
+                              <span className="text-xl">🎡</span>
+                              <span>SPIN</span>
+                            </button>
+                          </div>
+
+                          {/* Name Input */}
+                          <div className="w-full space-y-3" onMouseDown={e => e.stopPropagation()}>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Add to spinner"
+                                value={spinnerInputs[item.id] || ''}
+                                onChange={(e) => setSpinnerInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-base"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const name = spinnerInputs[item.id]?.trim();
+                                    if (name) {
+                                      updateItemMetadata(item.id, { names: [...(item.metadata?.names || []), name] });
+                                      setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
+                                    }
                                   }
-
-                                  // Path calculation for slices
-                                  const radius = 50;
-                                  const centerX = 50;
-                                  const centerY = 50;
-                                  
-                                  const startRad = (startAngle - 90) * Math.PI / 180.0;
-                                  const endRad = (endAngle - 90) * Math.PI / 180.0;
-                                  
-                                  const x1 = centerX + radius * Math.cos(startRad);
-                                  const y1 = centerY + radius * Math.sin(startRad);
-                                  const x2 = centerX + radius * Math.cos(endRad);
-                                  const y2 = centerY + radius * Math.sin(endRad);
-                                  
-                                  const largeArcFlag = sliceAngle <= 180 ? "0" : "1";
-                                  const d = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-
-                                  // Text positioning
-                                  const textAngle = startAngle + sliceAngle / 2;
-                                  const textRad = (textAngle - 90) * Math.PI / 180.0;
-                                  
-                                  // Switch to radial (vertical) text if more than 5 names to avoid overlap
-                                  const isRadial = arr.length > 5;
-                                  const textDist = isRadial ? 0.75 : 0.65;
-                                  const textX = centerX + (radius * textDist) * Math.cos(textRad);
-                                  const textY = centerY + (radius * textDist) * Math.sin(textRad);
-
-                                  // Dynamic Font Size Calculation
-                                  const fontSize = Math.max(3.5, Math.min(isRadial ? 12 : 14, (isRadial ? 90 : 50) / arr.length));
-                                  const rotation = isRadial ? textAngle + 90 : textAngle;
-
-                                  return (
-                                    <g key={i}>
-                                      <path d={d} fill={colors[i % colors.length]} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
-                                      <text 
-                                        x={textX} 
-                                        y={textY} 
-                                        textAnchor="middle" 
-                                        dominantBaseline="middle" 
-                                        fill="white" 
-                                        className="font-black drop-shadow-sm"
-                                        style={{ fontSize: `${fontSize}px` }}
-                                        transform={`rotate(${rotation}, ${textX}, ${textY})`}
-                                      >
-                                        {name}
-                                      </text>
-                                    </g>
-                                  );
-                                })}
-                              </svg>
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold italic text-center p-8">Add names below to start!</div>
-                            )}
-                          </motion.div>
-
-                          {/* Center Button - Dark Circular */}
-                          <button 
-                            onMouseDown={e => e.stopPropagation()}
-                            onClick={() => {
-                              if ((item.metadata?.names || []).length < 2) return;
-                              const extraSpins = 6 + Math.random() * 4;
-                              const newRotation = (item.metadata?.rotation || 0) + (360 * extraSpins) + Math.random() * 360;
-                              updateItemMetadata(item.id, { isSpinning: true, rotation: newRotation, selectedName: null });
-                              
-                              // Play spin sound
-                              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
-                              audio.volume = 0.3;
-                              audio.play().catch(() => {});
-
-                              setTimeout(() => {
-                                const finalRotation = newRotation % 360;
-                                const anglePerSegment = 360 / (item.metadata?.names || []).length;
-                                // Ticker is at top (270 deg). 
-                                const winningAngle = (360 - (finalRotation % 360)) % 360;
-                                const winnerIdx = Math.floor(winningAngle / anglePerSegment);
-                                const winner = item.metadata?.names[winnerIdx];
-                                updateItemMetadata(item.id, { isSpinning: false, selectedName: winner });
-                                
-                                // Play win sound
-                                const winAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3');
-                                winAudio.volume = 0.4;
-                                winAudio.play().catch(() => {});
-                              }, 4000);
-                            }}
-                            disabled={item.metadata?.isSpinning || (item.metadata?.names || []).length < 2}
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-slate-900 text-white rounded-full border-4 border-slate-700 shadow-2xl z-30 font-black text-sm hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex flex-col items-center justify-center gap-0.5"
-                          >
-                            <span className="text-xl">🎡</span>
-                            <span>SPIN</span>
-                          </button>
-                        </div>
-
-                        {/* Name Input */}
-                        <div className="w-full space-y-3" onMouseDown={e => e.stopPropagation()}>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text"
-                              placeholder="Add to spinner"
-                              value={spinnerInputs[item.id] || ''}
-                              onChange={(e) => setSpinnerInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                              className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-base"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
+                                }}
+                              />
+                              <button
+                                onClick={() => {
                                   const name = spinnerInputs[item.id]?.trim();
                                   if (name) {
                                     updateItemMetadata(item.id, { names: [...(item.metadata?.names || []), name] });
                                     setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
                                   }
-                                }
-                              }}
-                            />
-                            <button 
-                              onClick={() => {
-                                const name = spinnerInputs[item.id]?.trim();
-                                if (name) {
-                                  updateItemMetadata(item.id, { names: [...(item.metadata?.names || []), name] });
-                                  setSpinnerInputs(prev => ({ ...prev, [item.id]: '' }));
-                                }
-                              }}
-                              className="px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-base hover:scale-105 active:scale-95 transition-all shadow-md"
-                            >
-                              Add
-                            </button>
-                            <button 
-                              onClick={() => updateItemMetadata(item.id, { names: [] })}
-                              className="px-4 py-3 bg-slate-100 text-slate-400 rounded-xl font-black text-xs hover:bg-rose-50 hover:text-rose-500 transition-all"
-                            >
-                              Clear
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar w-full">
-                            {(item.metadata?.names || []).map((name: string, i: number) => (
-                              <div key={i} className="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-black flex items-center justify-between gap-1 border border-purple-100 min-w-0">
-                                <span className="truncate">{name}</span>
-                                <button onClick={() => updateItemMetadata(item.id, { names: (item.metadata?.names || []).filter((_: any, idx: number) => idx !== i) })} className="hover:text-rose-500 flex-shrink-0">✕</button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Winner Announcement */}
-                        <AnimatePresence>
-                          {item.metadata?.selectedName && (
-                            <motion.div 
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-8 rounded-[3rem] text-center shadow-2xl border-4 border-purple-200"
-                              onMouseDown={e => e.stopPropagation()}
-                            >
-                              <motion.div 
-                                animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.2, 1] }}
-                                transition={{ duration: 0.5, repeat: Infinity }}
-                                className="text-8xl mb-6"
+                                }}
+                                className="px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-base hover:scale-105 active:scale-95 transition-all shadow-md"
                               >
-                                🌟
-                              </motion.div>
-                              <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2">The Winner Is...</div>
-                              <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 mb-8 animate-celebrate drop-shadow-sm">
-                                {item.metadata?.selectedName}
-                              </div>
-                              <button 
-                                onClick={() => updateItemMetadata(item.id, { selectedName: null })}
-                                className="px-10 py-5 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-2xl font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
-                              >
-                                Awesome! 🎉
+                                Add
                               </button>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    ) : (
-                      <span className={`block pointer-events-none ${item.type === 'text' ? 'text-7xl font-black text-slate-900' : 'text-9xl'}`}>{item.content}</span>
-                    )}
-                    {activeTool === 'select' && selectedItemId === item.id && (
-                      <><button 
-                        onMouseDown={(e) => { e.stopPropagation(); removeItem(item.id); }} 
-                        className="absolute -top-3 -right-3 w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl font-black text-xl border-4 border-white z-[100] cursor-pointer hover:scale-110 transition-transform"
-                      >
-                        🗑️
-                      </button>
-                      <div className="absolute -bottom-3 -right-3 w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-nwse-resize" onMouseDown={(e) => handleResizeMouseDown(e, item)} /></>
-                    )}
+                              <button
+                                onClick={() => updateItemMetadata(item.id, { names: [] })}
+                                className="px-4 py-3 bg-slate-100 text-slate-400 rounded-xl font-black text-xs hover:bg-rose-50 hover:text-rose-500 transition-all"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar w-full">
+                              {(item.metadata?.names || []).map((name: string, i: number) => (
+                                <div key={i} className="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-black flex items-center justify-between gap-1 border border-purple-100 min-w-0">
+                                  <span className="truncate">{name}</span>
+                                  <button onClick={() => updateItemMetadata(item.id, { names: (item.metadata?.names || []).filter((_: any, idx: number) => idx !== i) })} className="hover:text-rose-500 flex-shrink-0">✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Winner Announcement */}
+                          <AnimatePresence>
+                            {item.metadata?.selectedName && (
+                              <motion.div
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-8 rounded-[3rem] text-center shadow-2xl border-4 border-purple-200"
+                                onMouseDown={e => e.stopPropagation()}
+                              >
+                                <motion.div
+                                  animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.2, 1] }}
+                                  transition={{ duration: 0.5, repeat: Infinity }}
+                                  className="text-8xl mb-6"
+                                >
+                                  🌟
+                                </motion.div>
+                                <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2">The Winner Is...</div>
+                                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 mb-8 animate-celebrate drop-shadow-sm">
+                                  {item.metadata?.selectedName}
+                                </div>
+                                <button
+                                  onClick={() => updateItemMetadata(item.id, { selectedName: null })}
+                                  className="px-10 py-5 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-2xl font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                                >
+                                  Awesome! 🎉
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ) : (
+                        <span className={`block pointer-events-none ${item.type === 'text' ? 'text-7xl font-black text-slate-900' : 'text-9xl'}`}>{item.content}</span>
+                      )}
+                      {activeTool === 'select' && selectedItemId === item.id && (
+                        <><button
+                          onMouseDown={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                          className="absolute -top-3 -right-3 w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl font-black text-xl border-4 border-white z-[100] cursor-pointer hover:scale-110 transition-transform"
+                        >
+                          🗑️
+                        </button>
+                          <div className="absolute -bottom-3 -right-3 w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-nwse-resize" onMouseDown={(e) => handleResizeMouseDown(e, item)} /></>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )})}
+                )
+              })}
 
               {/* Group Boxes */}
               {groups.map(group => {
@@ -2918,16 +2989,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setItems(prev => {
-                                const initialItems = prev.filter(it => group.itemIds.includes(it.id));
-                                if(initialItems.length===0) return prev;
-                                const xs = initialItems.map(it => it.x);
-                                const ys = initialItems.map(it => it.y);
-                                const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                                const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-                                return prev.map(it => {
-                                   if(!group.itemIds.includes(it.id)) return it;
-                                   return { ...it, scale: it.scale * 1.1, x: centerX + (it.x - centerX) * 1.1, y: centerY + (it.y - centerY) * 1.1 };
-                                });
+                              const initialItems = prev.filter(it => group.itemIds.includes(it.id));
+                              if (initialItems.length === 0) return prev;
+                              const xs = initialItems.map(it => it.x);
+                              const ys = initialItems.map(it => it.y);
+                              const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                              const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                              return prev.map(it => {
+                                if (!group.itemIds.includes(it.id)) return it;
+                                return { ...it, scale: it.scale * 1.1, x: centerX + (it.x - centerX) * 1.1, y: centerY + (it.y - centerY) * 1.1 };
+                              });
                             });
                           }}
                           className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-md text-xs font-black shadow-md hover:bg-green-600 transition-all border border-green-600"
@@ -2940,16 +3011,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setItems(prev => {
-                                const initialItems = prev.filter(it => group.itemIds.includes(it.id));
-                                if(initialItems.length===0) return prev;
-                                const xs = initialItems.map(it => it.x);
-                                const ys = initialItems.map(it => it.y);
-                                const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                                const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-                                return prev.map(it => {
-                                   if(!group.itemIds.includes(it.id)) return it;
-                                   return { ...it, scale: Math.max(0.2, it.scale * 0.9), x: centerX + (it.x - centerX) * 0.9, y: centerY + (it.y - centerY) * 0.9 };
-                                });
+                              const initialItems = prev.filter(it => group.itemIds.includes(it.id));
+                              if (initialItems.length === 0) return prev;
+                              const xs = initialItems.map(it => it.x);
+                              const ys = initialItems.map(it => it.y);
+                              const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                              const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                              return prev.map(it => {
+                                if (!group.itemIds.includes(it.id)) return it;
+                                return { ...it, scale: Math.max(0.2, it.scale * 0.9), x: centerX + (it.x - centerX) * 0.9, y: centerY + (it.y - centerY) * 0.9 };
+                              });
                             });
                           }}
                           className="w-8 h-8 flex items-center justify-center bg-yellow-500 text-white rounded-md text-xs font-black shadow-md hover:bg-yellow-600 transition-all border border-yellow-600"
@@ -2959,9 +3030,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         </button>
                       </div>
                       {!group.minimized && (
-                        <div 
-                          className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform" 
-                          onMouseDown={(e) => handleGroupResizeMouseDown(e, group)} 
+                        <div
+                          className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform"
+                          onMouseDown={(e) => handleGroupResizeMouseDown(e, group)}
                           title="Resize Group"
                         />
                       )}
@@ -2991,12 +3062,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           </div>
           <div className="h-16 py-2 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-4 z-50">
             <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
-              {[ {id: 'select', icon: '🖐️'}, {id: 'marker', icon: '✏️'}, {id: 'highlighter', icon: '🖍️'}, {id: 'eraser', icon: '🧼'} ].map(t => (
+              {[{ id: 'select', icon: '🖐️' }, { id: 'marker', icon: '✏️' }, { id: 'highlighter', icon: '🖍️' }, { id: 'eraser', icon: '🧼' }].map(t => (
                 <div key={t.id} className="relative group/tool">
                   <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-10 h-10 rounded-full transition-all flex items-center justify-center text-xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
                     {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
                   </button>
-                  {showColorPicker === t.id && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${ (t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
+                  {showColorPicker === t.id && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${(t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
                 </div>
               ))}
             </div>
@@ -3009,21 +3080,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-10 h-10 rounded-full flex items-center justify-center text-xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
             <div className="h-8 w-px bg-slate-200" />
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
                 className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 border-b-4 border-blue-200 flex items-center justify-center text-2xl hover:bg-blue-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Timer"
               >
                 ⏱️
               </button>
-              <button 
+              <button
                 onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
                 className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 border-b-4 border-purple-200 flex items-center justify-center text-2xl hover:bg-purple-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Wheel Spinner"
               >
                 🎡
               </button>
-              <button 
+              <button
                 onClick={() => { setActiveTool(activeTool === 'boxSelect' ? 'select' : 'boxSelect'); }}
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${activeTool === 'boxSelect' ? 'bg-blue-500 text-white border-blue-700 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}
                 title="Group Select"
@@ -3046,12 +3117,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </div>
               <button onClick={() => setIsSearchingIcons(false)} className="w-12 h-12 bg-white rounded-2xl shadow-sm border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
             </div>
-            
+
             <div className="p-6 bg-white border-b-2 border-slate-50">
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Search all topic icons (e.g. 'Lion', 'Ruler', 'A')..."
                   value={iconSearchQuery}
                   onChange={(e) => setIconSearchQuery(e.target.value)}
@@ -3061,7 +3132,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
               <AnimatePresence>
                 {isCreatingCustomIcon && (
-                  <motion.div 
+                  <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
@@ -3071,7 +3142,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       <div className="flex gap-4">
                         <div className="flex flex-col gap-2 relative">
                           <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-2">Icon</label>
-                          <button 
+                          <button
                             onClick={() => setActiveEmojiPicker(activeEmojiPicker === 'main' ? null : 'main')}
                             className="w-20 h-20 bg-white border-2 border-blue-100 rounded-3xl text-4xl flex items-center justify-center text-center focus:outline-none focus:border-blue-400 shadow-sm hover:bg-blue-50 transition-all"
                           >
@@ -3080,7 +3151,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           {activeEmojiPicker === 'main' && (
                             <div className="absolute top-full left-0 mt-2 w-64 bg-white border-2 border-blue-100 rounded-2xl shadow-2xl p-4 z-[100] grid grid-cols-5 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
                               {EMOJI_LIST.map(emoji => (
-                                <button 
+                                <button
                                   key={emoji}
                                   onClick={() => {
                                     setCustomIconForm(prev => ({ ...prev, icon: emoji }));
@@ -3096,7 +3167,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         </div>
                         <div className="flex-1 flex flex-col gap-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 ml-2">Topic Label</label>
-                          <input 
+                          <input
                             type="text"
                             value={customIconForm.label}
                             onChange={(e) => setCustomIconForm(prev => ({ ...prev, label: e.target.value }))}
@@ -3113,7 +3184,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             <div key={idx} className="bg-white px-3 py-2 rounded-xl border-2 border-blue-100 flex items-center gap-2 shadow-sm group">
                               <span className="text-xl">{item.type === 'text' ? '🔤' : '🖼️'}</span>
                               <span className="font-bold text-slate-600">{item.content}</span>
-                              <button 
+                              <button
                                 onClick={() => setCustomIconForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }))}
                                 className="text-rose-400 hover:text-rose-600 transition-colors"
                               >✕</button>
@@ -3125,13 +3196,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         </div>
                         <div className="flex flex-col gap-3">
                           <div className="flex border-b-2 border-blue-100 mb-2">
-                            <button 
+                            <button
                               onClick={() => setCustomIconTab('text')}
                               className={`flex-1 py-2 font-black text-[10px] uppercase tracking-widest transition-all ${customIconTab === 'text' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                               Add Text Item
                             </button>
-                            <button 
+                            <button
                               onClick={() => setCustomIconTab('image')}
                               className={`flex-1 py-2 font-black text-[10px] uppercase tracking-widest transition-all ${customIconTab === 'image' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'}`}
                             >
@@ -3142,7 +3213,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           {customIconTab === 'text' ? (
                             <div className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                               <div className="flex-1 flex flex-col gap-2">
-                                <input 
+                                <input
                                   type="text"
                                   value={textItemInput}
                                   onChange={(e) => setTextItemInput(e.target.value)}
@@ -3156,7 +3227,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                                   className="w-full py-3 px-4 bg-white border-2 border-blue-100 rounded-2xl font-bold text-sm text-slate-700 focus:outline-none focus:border-blue-400 shadow-sm"
                                 />
                               </div>
-                              <button 
+                              <button
                                 onClick={() => {
                                   if (textItemInput) {
                                     setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'text', content: textItemInput, label: textItemInput }] }));
@@ -3172,7 +3243,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-right-2 duration-300">
                               <div className="bg-white border-2 border-blue-100 rounded-2xl shadow-sm p-4 grid grid-cols-8 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                                 {EMOJI_LIST.map(emoji => (
-                                  <button 
+                                  <button
                                     key={emoji}
                                     onClick={() => {
                                       setCustomIconForm(prev => ({ ...prev, items: [...prev.items, { type: 'sticker', content: emoji, label: emoji }] }));
@@ -3189,7 +3260,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       </div>
 
                       <div className="flex gap-3 pt-2">
-                        <button 
+                        <button
                           onClick={() => {
                             if (!customIconForm.label) return alert('Please enter a label');
                             const newId = `CUSTOM_${Date.now()}`;
@@ -3214,7 +3285,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         >
                           Save Topic
                         </button>
-                        <button 
+                        <button
                           onClick={() => setIsCreatingCustomIcon(false)}
                           className="flex-1 py-4 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-sm shadow-md hover:bg-slate-300 transition-all"
                         >
@@ -3229,7 +3300,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               <div className="grid grid-cols-6 gap-4">
-                <button 
+                <button
                   onClick={() => setIsCreatingCustomIcon(true)}
                   className={`aspect-square rounded-3xl border-4 border-dashed transition-all flex flex-col items-center justify-center gap-2 relative group ${isCreatingCustomIcon ? 'border-blue-400 bg-blue-50 shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-white hover:scale-105 shadow-sm hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`}
                 >
@@ -3239,12 +3310,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter text-center px-1">Create Your Own</span>
                 </button>
 
-                {availableCustomIcons.filter(cat => 
+                {availableCustomIcons.filter(cat =>
                   cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
                 ).map((cat, idx) => {
                   const isAlreadyAdded = customIcons.some(ci => ci.id === cat.id);
                   return (
-                    <button 
+                    <button
                       key={`custom-${idx}`}
                       onClick={() => {
                         if (isAlreadyAdded) {
@@ -3264,12 +3335,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   );
                 })}
 
-                {CATEGORY_TEMPLATES.filter(cat => 
+                {CATEGORY_TEMPLATES.filter(cat =>
                   cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
                 ).map((cat, idx) => {
                   const isAlreadyAdded = customIcons.some(ci => ci.id === cat.id);
                   return (
-                    <button 
+                    <button
                       key={idx}
                       onClick={() => {
                         if (isAlreadyAdded) {
@@ -3290,9 +3361,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 })}
               </div>
             </div>
-            
+
             <div className="p-8 bg-slate-50 border-t-2 border-slate-100 flex justify-end">
-              <button 
+              <button
                 onClick={() => setIsSearchingIcons(false)}
                 className="px-10 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest text-xs"
               >
@@ -3306,7 +3377,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       <AnimatePresence>
         {itemToRemove && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-modal-fade-in">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -3315,13 +3386,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               <div className="text-5xl mb-4">🗑️</div>
               <h3 className="text-xl font-black text-slate-800 mb-4">Are you sure you want to remove this material from your classroom?</h3>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => setItemToRemove(null)}
                   className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors"
                 >
                   No
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (onUpdateMaterials) {
                       const updated = materials.filter(m => m.id !== itemToRemove.id);
