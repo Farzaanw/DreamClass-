@@ -144,7 +144,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [items, setItems] = useState<BoardItem[]>([]);
   const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
   
-  const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser'>('select');
+  const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser' | 'boxSelect'>('select');
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0].value);
   const [highlighterColor, setHighlightColor] = useState(HIGHLIGHTER_COLORS[0].value);
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
@@ -163,6 +163,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [globalSpinnerNames, setGlobalSpinnerNames] = useState<string[]>(design.spinnerNames || []);
+
+  // Group box state
+  const [groups, setGroups] = useState<{id: string, itemIds: string[], minimized: boolean}[]>([]);
+  const [boxSelectRect, setBoxSelectRect] = useState<{x1: number, y1: number, x2: number, y2: number} | null>(null);
+  const isBoxSelectingRef = useRef(false);
+  const boxSelectStartRef = useRef<{wx: number, wy: number} | null>(null);
 
   const onSaveDesignRef = useRef(onSaveDesign);
   useEffect(() => {
@@ -364,11 +370,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, []);
 
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
+  const getCenter = () => ({ x: window.innerWidth / 2 - 10000, y: window.innerHeight / 2 - 10000, zoom: 1 });
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
-  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 transition-all cursor-pointer overflow-hidden p-2 m-0.5";
+  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-2 m-0.5";
   const letterBaseClass = stickerBaseClass.replace('text-5xl', 'text-4xl');
-  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 transition-all cursor-pointer text-center truncate min-h-[64px]";
+  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer text-center truncate min-h-[64px]";
   const headerClass = "col-span-4 mt-8 mb-4 text-lg font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
@@ -387,8 +394,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   useEffect(() => {
     if (canvasRef.current) {
       const canvas = canvasRef.current;
-      canvas.width = 2000; 
-      canvas.height = 2000;
+      canvas.width = 20000; 
+      canvas.height = 20000;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
         ctx.lineCap = 'round';
@@ -421,7 +428,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           setItems([]);
           setBoardBg('plain');
           setBoardBgColor('#ffffff');
-          setViewport({ x: 0, y: 0, zoom: 1 });
+          setViewport(getCenter());
           setCurrentBoardId(null);
           setCurrentBoardName(null);
           setCustomIcons([]);
@@ -575,13 +582,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (isDraggingMaterial.current) return;
     const nativeEvent = getEvent.nativeEvent || getEvent;
     const coords = getScreenCoordinates(nativeEvent);
-    if (activeTool === 'select') {
+    if (activeTool === 'boxSelect') {
+      const worldCoords = screenToWorld(coords.sx, coords.sy);
+      boxSelectStartRef.current = worldCoords;
+      isBoxSelectingRef.current = true;
+      setBoxSelectRect({ x1: worldCoords.wx, y1: worldCoords.wy, x2: worldCoords.wx, y2: worldCoords.wy });
+    } else if (activeTool === 'select') {
       isPanningRef.current = true;
       lastPanPos.current = { x: coords.sx, y: coords.sy };
       // Clear selection if clicking on the background (canvas or the background div)
       const target = nativeEvent.target as HTMLElement;
       if (target.classList.contains('board-lined') || target.classList.contains('board-grid') || target.tagName === 'CANVAS' || target.classList.contains('bg-white')) {
         setSelectedItemId(null);
+        setGroups([]);
       }
     } else {
       if (!contextRef.current) return;
@@ -613,7 +626,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         return;
     }
     const coords = getScreenCoordinates(nativeEvent);
-    if (isPanningRef.current) {
+    if (isBoxSelectingRef.current && boxSelectStartRef.current) {
+      const worldCoords = screenToWorld(coords.sx, coords.sy);
+      setBoxSelectRect({ x1: boxSelectStartRef.current.wx, y1: boxSelectStartRef.current.wy, x2: worldCoords.wx, y2: worldCoords.wy });
+    } else if (isPanningRef.current) {
       const dx = coords.sx - lastPanPos.current.x;
       const dy = coords.sy - lastPanPos.current.y;
       setViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
@@ -626,9 +642,103 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const stopInteraction = () => {
+    if (isBoxSelectingRef.current && boxSelectRect) {
+      const x1 = Math.min(boxSelectRect.x1, boxSelectRect.x2);
+      const y1 = Math.min(boxSelectRect.y1, boxSelectRect.y2);
+      const x2 = Math.max(boxSelectRect.x1, boxSelectRect.x2);
+      const y2 = Math.max(boxSelectRect.y1, boxSelectRect.y2);
+      if (Math.abs(x2 - x1) > 20 && Math.abs(y2 - y1) > 20) {
+        const enclosed = items.filter(it => it.x >= x1 && it.x <= x2 && it.y >= y1 && it.y <= y2);
+        if (enclosed.length > 0) {
+          setGroups(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), itemIds: enclosed.map(it => it.id), minimized: false }]);
+        }
+      }
+      setBoxSelectRect(null);
+      boxSelectStartRef.current = null;
+      isBoxSelectingRef.current = false;
+      setActiveTool('select');
+      return;
+    }
     if (isDrawingRef.current && contextRef.current) contextRef.current.closePath();
     isPanningRef.current = false;
     isDrawingRef.current = false;
+  };
+
+  const handleGroupMouseDown = (e: React.MouseEvent, group: {id: string, itemIds: string[], minimized: boolean}) => {
+    e.stopPropagation();
+    if (group.minimized) return;
+    saveToUndoStack();
+    const startX = e.clientX, startY = e.clientY;
+    let hasDragged = false;
+    const initialPositions = items.filter(it => group.itemIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }));
+    const handleMouseMove = (mv: MouseEvent) => {
+      if (Math.abs(mv.clientX - startX) > 3 || Math.abs(mv.clientY - startY) > 3) hasDragged = true;
+      const dx = (mv.clientX - startX) / viewport.zoom;
+      const dy = (mv.clientY - startY) / viewport.zoom;
+      setItems(prev => prev.map(it => {
+        const init = initialPositions.find(p => p.id === it.id);
+        if (init) return { ...it, x: init.x + dx, y: init.y + dy };
+        return it;
+      }));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (!hasDragged) {
+        setGroups(prev => prev.filter(g => g.id !== group.id));
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleGroupResizeMouseDown = (e: React.MouseEvent, group: {id: string, itemIds: string[], minimized: boolean}) => {
+    e.stopPropagation();
+    if (group.minimized) return;
+    saveToUndoStack();
+    const startX = e.clientX;
+    const initialItems = items.filter(it => group.itemIds.includes(it.id));
+    if (initialItems.length === 0) return;
+    
+    // Find the center of the group
+    const xs = initialItems.map(it => it.x);
+    const ys = initialItems.map(it => it.y);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+    const initialData = initialItems.map(it => ({ id: it.id, scale: it.scale, x: it.x, y: it.y }));
+    const handleMouseMove = (mv: MouseEvent) => {
+      const scaleFactor = Math.max(0.2, 1 + (startX - mv.clientX) / (100 * viewport.zoom));
+      setItems(prev => prev.map(it => {
+        const init = initialData.find(p => p.id === it.id);
+        if (init) {
+          const newX = centerX + (init.x - centerX) * scaleFactor;
+          const newY = centerY + (init.y - centerY) * scaleFactor;
+          return { ...it, scale: init.scale * scaleFactor, x: newX, y: newY };
+        }
+        return it;
+      }));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const getGroupBounds = (group: {id: string, itemIds: string[]}) => {
+    const groupItems = items.filter(it => group.itemIds.includes(it.id));
+    if (groupItems.length === 0) return null;
+    const padding = 60;
+    const xs = groupItems.map(it => it.x);
+    const ys = groupItems.map(it => it.y);
+    return {
+      x: Math.min(...xs) - padding,
+      y: Math.min(...ys) - padding,
+      w: Math.max(...xs) - Math.min(...xs) + padding * 2,
+      h: Math.max(...ys) - Math.min(...ys) + padding * 2,
+    };
   };
 
   const handleZoomAt = (screenCoords: { sx: number, sy: number }, factor: number) => {
@@ -1840,21 +1950,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         setShowAddArrow(false);
         setShowLibraryArrow(false);
         setShowSwitcherArrow(false);
+        setSelectedItemId(null);
       }}
     >
-      <header className="h-24 bg-white border-b-4 border-slate-100 px-8 flex items-center justify-between z-50 shadow-sm">
+      <header className="h-20 py-21 bg-white border-b-2 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
         <div className="flex items-center gap-6 flex-1">
-          <button onClick={onBack} className="text-3xl p-3 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
+          <button onClick={onBack} className="text-xl p-1.5 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
           <div className="flex flex-col min-w-[150px]">
             <div className="flex items-center gap-3">
-              <h1 className="font-black text-slate-900 text-2xl tracking-tight leading-tight truncate max-w-[250px]">{concept.title}</h1>
+              <h1 className="font-black text-slate-900 text-base tracking-tight leading-tight truncate max-w-[250px]">{concept.title}</h1>
               {currentBoardName && (
                 <span className="px-3 py-1 bg-blue-50 text-blue-600 text-sm font-black rounded-md border border-blue-100 uppercase tracking-tighter">
                   Active: {currentBoardName}
                 </span>
               )}
             </div>
-            <span className="text-sm font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
+            <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
           </div>
 
           {/* Concept Switcher for Teacher Mode */}
@@ -1917,27 +2028,27 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           {mode === 'teacher' ? (
             <button 
               onClick={() => handleSaveBoard(() => onBack())} 
-              className={`px-10 py-5 rounded-2xl font-black text-xl border-b-8 transition-all shadow-2xl flex items-center gap-4 ${
+              className={`px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${
                 saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
                 saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
-                'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-2 active:border-b-0'
+                'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
               }`}
               disabled={saveStatus === 'saving'}
             >
-              <span className="text-3xl">{saveStatus === 'saved' ? '✅' : '💾'}</span>
-              {saveStatus === 'saved' ? 'Changes Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save Lesson'}
+              <span className="text-lg">{saveStatus === 'saved' ? '✅' : '💾'}</span>
+              {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save'}
             </button>
           ) : (
             <div className="flex items-center gap-4">
               <button 
                 onClick={handleClearEverything} 
-                className="px-6 py-3 bg-slate-100 rounded-xl font-black text-slate-900 text-base border-b-4 border-slate-200 active:translate-y-1 active:border-b-0 transition-all"
+                className="px-4 py-1.5 bg-slate-100 rounded-lg font-black text-slate-900 text-xs border-b-2 border-slate-200 active:translate-y-0.5 active:border-b-0 transition-all"
               >
                 ✨ New
               </button>
               <button 
                 onClick={handleSaveBoard} 
-                className={`px-8 py-3 rounded-xl font-black text-base border-b-4 transition-all shadow-md flex items-center gap-2 ${
+                className={`px-5 py-1.5 rounded-lg font-black text-xs border-b-2 transition-all shadow-md flex items-center gap-2 ${
                   saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' : 
                   saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
                   'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
@@ -2031,7 +2142,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
-                <span className={`text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all ${activeCategoryId === cat.id && drawerOpen ? 'bg-blue-100 text-blue-700' : ''}`}>{cat.label}</span>
+                <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all">{cat.label}</span>
                 
                 {cat.isCustom && mode === 'teacher' && (
                   <button 
@@ -2101,8 +2212,20 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         }}
                         className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
                       >
-                        <div className="h-28 bg-slate-50 flex items-center justify-center">
-                          {m.thumbnailUrl ? <img src={m.thumbnailUrl} className="w-full h-full object-cover" /> : <div className="text-5xl">{getFileIcon(m.type)}</div>}
+                        <div className="h-28 bg-slate-50 flex items-center justify-center relative overflow-hidden pointer-events-none">
+                          {m.type === 'pdf' && m.content ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white">
+                              <div className="w-[400px] h-[400px] origin-center" style={{ transform: 'scale(0.35)' }}>
+                                <iframe src={`${m.content}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full pointer-events-none" scrolling="no" title={m.name} />
+                              </div>
+                            </div>
+                          ) : m.type === 'video' && m.content ? (
+                            <video src={m.content} className="w-full h-full object-cover pointer-events-none" muted />
+                          ) : m.thumbnailUrl ? (
+                            <img src={m.thumbnailUrl} className="w-full h-full object-cover pointer-events-none" alt="Thumbnail" />
+                          ) : (
+                            <div className="text-5xl">{getFileIcon(m.type)}</div>
+                          )}
                         </div>
                         <div className="p-3 text-left font-black text-slate-900 truncate text-sm">{m.name}</div>
                       </button>
@@ -2216,11 +2339,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           )}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
-          <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
-            <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '2000px', height: '2000px', backgroundColor: boardBgColor }}>
+          <div className={`flex-1 relative touch-none select-none ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`} onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} style={{ touchAction: 'none' }}>
+            <div className={`absolute inset-0 origin-top-left ${boardBg === 'lined' ? 'board-lined' : boardBg === 'grid' ? 'board-grid' : ''}`} style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, backgroundPosition: '0 0', backgroundSize: `50px 50px`, width: '20000px', height: '20000px', backgroundColor: boardBgColor }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
-              {items.map(item => (
-                <div key={item.id} className="absolute z-10 select-none group pointer-events-auto" style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => handleItemMouseDown(e, item)}>
+              {items.filter(item => {
+                const parentGroup = groups.find(g => g.itemIds.includes(item.id));
+                return !parentGroup || !parentGroup.minimized;
+              }).map(item => {
+                const inGroup = groups.some(g => g.itemIds.includes(item.id));
+                return (
+                <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }}>
                   <div className={`relative p-4 rounded-3xl border-4 transition-all ${selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
                     {item.type === 'song' ? (
                       <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border-4 border-pink-100 flex items-center gap-6 min-w-[320px] pointer-events-auto">
@@ -2672,7 +2800,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           <div className="flex gap-2">
                             <input 
                               type="text"
-                              placeholder="Add student name..."
+                              placeholder="Add to spinner"
                               value={spinnerInputs[item.id] || ''}
                               onChange={(e) => setSpinnerInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                               className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-purple-300 outline-none font-bold text-base"
@@ -2760,42 +2888,147 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
+
+              {/* Group Boxes */}
+              {groups.map(group => {
+                const bounds = getGroupBounds(group);
+                if (!bounds) return null;
+                return (
+                  <div
+                    key={group.id}
+                    className="absolute z-[5] pointer-events-auto"
+                    style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: group.minimized ? 40 : bounds.h }}
+                  >
+                    <div
+                      className={`w-full h-full border-2 border-dashed border-blue-400 rounded-2xl transition-all ${group.minimized ? 'bg-blue-50/90 backdrop-blur-sm' : 'bg-blue-50/20'}`}
+                      onMouseDown={(e) => handleGroupMouseDown(e, group)}
+                    >
+                      <div className="absolute -top-12 left-0 flex gap-1 z-20">
+                        <button
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); setGroups(prev => prev.map(g => g.id === group.id ? { ...g, minimized: !g.minimized } : g)); }}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-500 text-white rounded-md text-xs font-black shadow-md hover:bg-blue-600 transition-all border border-blue-600"
+                          title={group.minimized ? 'Expand' : 'Minimize'}
+                        >
+                          {group.minimized ? '▶' : '▼'}
+                        </button>
+                        <button
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItems(prev => {
+                                const initialItems = prev.filter(it => group.itemIds.includes(it.id));
+                                if(initialItems.length===0) return prev;
+                                const xs = initialItems.map(it => it.x);
+                                const ys = initialItems.map(it => it.y);
+                                const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                                const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                                return prev.map(it => {
+                                   if(!group.itemIds.includes(it.id)) return it;
+                                   return { ...it, scale: it.scale * 1.1, x: centerX + (it.x - centerX) * 1.1, y: centerY + (it.y - centerY) * 1.1 };
+                                });
+                            });
+                          }}
+                          className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-md text-xs font-black shadow-md hover:bg-green-600 transition-all border border-green-600"
+                          title="Increase Size"
+                        >
+                          ➕
+                        </button>
+                        <button
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItems(prev => {
+                                const initialItems = prev.filter(it => group.itemIds.includes(it.id));
+                                if(initialItems.length===0) return prev;
+                                const xs = initialItems.map(it => it.x);
+                                const ys = initialItems.map(it => it.y);
+                                const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                                const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                                return prev.map(it => {
+                                   if(!group.itemIds.includes(it.id)) return it;
+                                   return { ...it, scale: Math.max(0.2, it.scale * 0.9), x: centerX + (it.x - centerX) * 0.9, y: centerY + (it.y - centerY) * 0.9 };
+                                });
+                            });
+                          }}
+                          className="w-8 h-8 flex items-center justify-center bg-yellow-500 text-white rounded-md text-xs font-black shadow-md hover:bg-yellow-600 transition-all border border-yellow-600"
+                          title="Decrease Size"
+                        >
+                          ➖
+                        </button>
+                      </div>
+                      {!group.minimized && (
+                        <div 
+                          className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform" 
+                          onMouseDown={(e) => handleGroupResizeMouseDown(e, group)} 
+                          title="Resize Group"
+                        />
+                      )}
+                      {group.minimized && (
+                        <div className="flex items-center justify-center h-full text-blue-500 font-black text-xs uppercase tracking-widest gap-2">
+                          <span>📦</span> {group.itemIds.length} items grouped
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Box Selection Rectangle */}
+              {boxSelectRect && (
+                <div
+                  className="absolute border-2 border-blue-500 bg-blue-400/15 rounded-lg pointer-events-none z-[100]"
+                  style={{
+                    left: Math.min(boxSelectRect.x1, boxSelectRect.x2),
+                    top: Math.min(boxSelectRect.y1, boxSelectRect.y2),
+                    width: Math.abs(boxSelectRect.x2 - boxSelectRect.x1),
+                    height: Math.abs(boxSelectRect.y2 - boxSelectRect.y1),
+                  }}
+                />
+              )}
             </div>
           </div>
-          <div className="h-24 bg-white/95 backdrop-blur-md border-t-4 border-slate-100 flex items-center justify-center gap-6 z-50">
+          <div className="h-16 py-2 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-4 z-50">
             <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
               {[ {id: 'select', icon: '🖐️'}, {id: 'marker', icon: '✏️'}, {id: 'highlighter', icon: '🖍️'}, {id: 'eraser', icon: '🧼'} ].map(t => (
                 <div key={t.id} className="relative group/tool">
-                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-16 h-16 rounded-full transition-all flex items-center justify-center text-3xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
+                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-10 h-10 rounded-full transition-all flex items-center justify-center text-xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
                     {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
                   </button>
                   {showColorPicker === t.id && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${ (t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
                 </div>
               ))}
             </div>
-            <div className="h-12 w-px bg-slate-200" />
+            <div className="h-8 w-px bg-slate-200" />
             <div className="flex gap-2">
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">➕</button>
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-14 h-14 rounded-2xl bg-white shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">➖</button>
-              <button onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="w-14 h-14 rounded-2xl bg-slate-50 shadow-lg border-2 border-slate-100 flex items-center justify-center text-2xl">🏠</button>
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-9 h-9 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-base">➕</button>
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-9 h-9 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-base">➖</button>
+              <button onClick={() => setViewport(getCenter())} className="w-9 h-9 rounded-xl bg-slate-50 shadow-md border border-slate-100 flex items-center justify-center text-base">🏠</button>
             </div>
-            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl border-b-8 transition-all active:translate-y-1 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
-            <div className="h-12 w-px bg-slate-200" />
+            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-10 h-10 rounded-full flex items-center justify-center text-xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
+            <div className="h-8 w-px bg-slate-200" />
             <div className="flex gap-2">
               <button 
                 onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
-                className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 border-b-8 border-blue-200 flex items-center justify-center text-4xl hover:bg-blue-100 transition-all active:translate-y-1 active:border-b-0"
+                className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 border-b-4 border-blue-200 flex items-center justify-center text-2xl hover:bg-blue-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Timer"
               >
                 ⏱️
               </button>
               <button 
                 onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
-                className="w-16 h-16 rounded-full bg-purple-50 text-purple-500 border-b-8 border-purple-200 flex items-center justify-center text-4xl hover:bg-purple-100 transition-all active:translate-y-1 active:border-b-0"
+                className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 border-b-4 border-purple-200 flex items-center justify-center text-2xl hover:bg-purple-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Wheel Spinner"
               >
                 🎡
+              </button>
+              <button 
+                onClick={() => { setActiveTool(activeTool === 'boxSelect' ? 'select' : 'boxSelect'); }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${activeTool === 'boxSelect' ? 'bg-blue-500 text-white border-blue-700 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}
+                title="Group Select"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 4" /><path d="M14 10l6-6m0 0v5m0-5h-5" strokeDasharray="none" /></svg>
               </button>
             </div>
           </div>
