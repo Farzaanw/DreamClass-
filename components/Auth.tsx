@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, SubjectId } from '../types';
 import { WALL_COLORS, FLOOR_COLORS, SUBJECTS } from '../constants';
+import { supabase } from '../lib/supabase';
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -21,6 +21,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setView(initialMode);
@@ -32,80 +33,82 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
     setShowPassword(false);
   }, [view]);
 
-  const getAccounts = (): User[] => {
-    const data = localStorage.getItem('dreamclass_accounts');
-    return data ? JSON.parse(data) : [];
-  };
+  // Removed localStorage helpers as we are migrating to Supabase
 
-  const saveAccounts = (accounts: User[]) => {
-    localStorage.setItem('dreamclass_accounts', JSON.stringify(accounts));
-  };
-
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     if (!username || !email || !password) {
       setError('Please fill in all fields! 📝');
+      setLoading(false);
       return;
     }
 
-    const accounts = getAccounts();
-    if (accounts.some(acc => acc.email.toLowerCase() === email.toLowerCase())) {
-      setError('An account with this email already exists! 📧');
-      return;
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        setSuccess('Account created! Please check your email for verification (if enabled) or log in now. 🎉');
+        setView('login');
+        setUsername('');
+        setPassword('');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error creating account. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    const initialDesigns: any = {};
-    SUBJECTS.forEach(s => {
-      initialDesigns[s.id] = {
-        wallColor: WALL_COLORS[0],
-        floorColor: FLOOR_COLORS[0],
-        posterUrls: [],
-        ambientMusic: 'none',
-        whiteboards: [],
-        conceptBoards: {}
-      };
-    });
-
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      username,
-      email: email.toLowerCase(),
-      password,
-      customSubjects: [],
-      hiddenSubjectIds: [],
-      classroomDesigns: initialDesigns,
-      progress: {}
-    };
-
-    const newAccounts = [...accounts, newUser];
-    saveAccounts(newAccounts);
-    setSuccess('Account created! Now you can log in. 🎉');
-    setView('login');
-    setUsername('');
-    setPassword('');
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     if (!email || !password) {
       setError('Please enter your email and password! 🔑');
+      setLoading(false);
       return;
     }
 
-    const accounts = getAccounts();
-    const user = accounts.find(
-      acc => acc.email.toLowerCase() === email.toLowerCase() && acc.password === password
-    );
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (user) {
-      const { password: _, ...sessionUser } = user;
-      onLogin(sessionUser as User);
-    } else {
+      if (authError) throw authError;
+
+      if (data.user) {
+        // App.tsx will handle the session change and fetch user data
+        // but we'll call onLogin with a placeholder if needed, 
+        // though App.tsx should ideally listen to onAuthStateChange
+        onLogin({
+          id: data.user.id,
+          username: data.user.user_metadata?.username || 'Teacher',
+          email: data.user.email!,
+          customSubjects: [],
+          hiddenSubjectIds: [],
+          classroomDesigns: {},
+          progress: {}
+        });
+      }
+    } catch (err: any) {
       setError('Incorrect email or password. Please try again! ❌');
+    } finally {
+      setLoading(false);
     }
   };
 

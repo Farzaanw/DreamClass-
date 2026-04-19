@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile, Subject, Song, AppMode } from '../types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { STICKERS, VC_WORDS, CV_WORDS, REGULAR_SIGHT_WORDS, IRREGULAR_SIGHT_WORDS, CONSONANT_DIGRAPHS, VOWEL_DIGRAPHS } from '../constants';
+import { supabase } from '../lib/supabase';
 
 interface ConceptDashboardProps {
   concept: Concept;
@@ -165,6 +165,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [historyLimit, setHistoryLimit] = useState(20);
   const [globalSpinnerNames, setGlobalSpinnerNames] = useState<string[]>(design.spinnerNames || []);
+
+  const [isNamingModalOpen, setIsNamingModalOpen] = useState(false);
+  const [namingModalInput, setNamingModalInput] = useState("");
+  const [pendingSaveSuccessCallback, setPendingSaveSuccessCallback] = useState<(() => void) | null>(null);
+  const namingInputRef = useRef<HTMLInputElement>(null);
 
   // Group box state
   const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
@@ -677,7 +682,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const handleGroupMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
-    if (group.minimized) return;
     saveToUndoStack();
     const startX = e.clientX, startY = e.clientY;
     let hasDragged = false;
@@ -1166,28 +1170,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     }
   }, [items, boardBg, boardBgColor, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode, design]);
 
-  const handleSaveBoard = (onSuccess?: () => void) => {
-    let boardId = currentBoardId;
-    let boardName = currentBoardName;
-
-    if (!boardId) {
-      const inputName = window.prompt("Name this lesson board:", `Lesson ${new Date().toLocaleTimeString()}`);
-      if (inputName === null) return false;
-      boardName = inputName || `Lesson ${new Date().toLocaleTimeString()}`;
-      boardId = Math.random().toString(36).substr(2, 9);
-      setCurrentBoardId(boardId);
-      setCurrentBoardName(boardName);
-    }
-
+  const executeSaveBoard = async (boardId: string, boardName: string, onSuccess?: () => void) => {
     setSaveStatus('saving');
 
     // Capture the full state including the drawing layer
-    const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : undefined;
+    // Switching to JPEG with 0.5 quality to save space in Supabase/Cloud
+    const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/jpeg', 0.5) : undefined;
 
     const newBoard: Whiteboard = {
       id: boardId,
       conceptId: concept.id,
-      name: boardName!,
+      name: boardName,
       timestamp: Date.now(),
       items: [...items],
       bg: boardBg,
@@ -1199,6 +1192,29 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       customDrawerLabels: { ...customDrawerLabels }
     };
 
+    // 1. Update Cloud (Supabase)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Exclude values that have their own columns
+      const { id, conceptId, name, timestamp, drawingData, ...data } = newBoard;
+      
+      const { error } = await supabase
+        .from('whiteboards')
+        .upsert({
+          id: boardId,
+          user_id: user.id,
+          subject_id: subjectId,
+          concept_id: concept.id,
+          name: boardName,
+          data: data,
+          drawing_data: drawingSnapshot,
+          timestamp: Date.now()
+        });
+
+      if (error) console.error('Error saving whiteboard to Supabase:', error);
+    }
+
+    // 2. Update local state
     const existingWhiteboards = design.whiteboards || [];
     const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
       ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
@@ -1218,24 +1234,40 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     } else {
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
+  };
 
+  const handleSaveBoard = (onSuccess?: () => void) => {
+    if (!currentBoardId) {
+      setNamingModalInput(`Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      setPendingSaveSuccessCallback(() => onSuccess);
+      setIsNamingModalOpen(true);
+      setTimeout(() => namingInputRef.current?.focus(), 200);
+      return false;
+    }
+
+    executeSaveBoard(currentBoardId, currentBoardName || "Untitled Board", onSuccess);
     return true;
   };
 
   const handleClearEverything = () => {
+    const clearAction = () => {
+      setItems([]);
+      if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      setViewport({ x: 0, y: 0, zoom: 1 });
+      setUndoStack([]);
+      setSelectedItemId(null);
+      setCurrentBoardId(null);
+      setCurrentBoardName(null);
+      const updatedConceptBoards = { ...(design.conceptBoards || {}) };
+      delete updatedConceptBoards[concept.id];
+      onSaveDesign({ ...design, conceptBoards: updatedConceptBoards });
+    };
+
     if (confirm("Do you want to save your current whiteboard before starting a new one?")) {
-      if (!handleSaveBoard()) return;
+      handleSaveBoard(clearAction);
+    } else if (confirm("Are you sure you want to clear everything without saving?")) {
+      clearAction();
     }
-    setItems([]);
-    if (contextRef.current) contextRef.current.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
-    setViewport({ x: 0, y: 0, zoom: 1 });
-    setUndoStack([]);
-    setSelectedItemId(null);
-    setCurrentBoardId(null);
-    setCurrentBoardName(null);
-    const updatedConceptBoards = { ...(design.conceptBoards || {}) };
-    delete updatedConceptBoards[concept.id];
-    onSaveDesign({ ...design, conceptBoards: updatedConceptBoards });
   };
 
   const handleMaterialMouseDown = (e: React.MouseEvent) => {
@@ -3406,6 +3438,75 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   className="flex-1 py-3 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-colors shadow-lg border-b-4 border-rose-700 active:translate-y-1 active:border-b-0"
                 >
                   Yes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {isNamingModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsNamingModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-blue-50 flex flex-col gap-8"
+            >
+              <div className="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center text-5xl shadow-inner mx-auto animate-bounce-gentle">
+                📝
+              </div>
+              <div className="text-center">
+                <h2 className="text-3xl font-black text-slate-900 mb-2">Name Your Lesson</h2>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-xs">Give this board a memorable title</p>
+              </div>
+
+              <div className="relative group/input">
+                <input
+                  ref={namingInputRef}
+                  type="text"
+                  value={namingModalInput}
+                  onChange={(e) => setNamingModalInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const finalName = namingModalInput.trim() || `Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                      const newId = Math.random().toString(36).substr(2, 9);
+                      setCurrentBoardId(newId);
+                      setCurrentBoardName(finalName);
+                      setIsNamingModalOpen(false);
+                      executeSaveBoard(newId, finalName, pendingSaveSuccessCallback || undefined);
+                    }
+                  }}
+                  className="w-full px-8 py-6 bg-slate-50 border-4 border-slate-100 rounded-[2rem] font-black text-slate-800 text-xl focus:border-blue-400 focus:bg-white outline-none transition-all placeholder:text-slate-300 shadow-inner group-hover/input:border-slate-200"
+                  placeholder="Enter lesson name..."
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsNamingModalOpen(false)}
+                  className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-3xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const finalName = namingModalInput.trim() || `Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    const newId = Math.random().toString(36).substr(2, 9);
+                    setCurrentBoardId(newId);
+                    setCurrentBoardName(finalName);
+                    setIsNamingModalOpen(false);
+                    executeSaveBoard(newId, finalName, pendingSaveSuccessCallback || undefined);
+                  }}
+                  className="flex-[1.5] py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest hover:scale-[1.02] hover:shadow-2xl transition-all shadow-xl border-b-8 border-blue-900 active:translate-y-2 active:border-b-0"
+                >
+                  Save Board 💾
                 </button>
               </div>
             </motion.div>

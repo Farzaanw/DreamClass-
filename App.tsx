@@ -10,6 +10,7 @@ import ClassroomView from './components/ClassroomView';
 import ConceptDashboard from './components/ConceptDashboard';
 import ClassroomDesigner from './components/ClassroomDesigner';
 import PublicLibrary, { Resource } from './components/PublicLibrary';
+import { supabase } from './lib/supabase';
 
 type View = 'landing' | 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept' | 'public-library';
 
@@ -284,17 +285,147 @@ const App: React.FC = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('dreamclass_user');
-    if (saved) {
-      setCurrentUser(JSON.parse(saved));
-      setCurrentView('mode-selection');
-    }
+    // 1. Initial Session Check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchUserData(session.user.id);
+      }
+    });
+
+    // 2. Auth State Change Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchUserData(session.user.id);
+      } else {
+        setCurrentUser(null);
+        setCurrentView('landing');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserData = async (userId: string) => {
+    try {
+      // 1. Get current session metadata as a fallback for the name
+      const { data: { session } } = await supabase.auth.getSession();
+      const metaName = session?.user?.user_metadata?.username || 'Teacher';
+      const userEmail = session?.user?.email || '';
+
+      // 2. Fetch profile (remove .single() to avoid 406 noise)
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      let profile = profiles && profiles.length > 0 ? profiles[0] : null;
+
+      // 3. Self-Healing: If profile is missing, create it now
+      if (!profile && session) {
+        console.log('Profile missing, creating self-healing profile for:', userId);
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            username: metaName,
+            email: userEmail,
+            hidden_subject_ids: [],
+            progress: {}
+          })
+          .select()
+          .single();
+        
+        if (!createError) {
+          profile = newProfile;
+        }
+      }
+
+      // 4. Fetch subjects
+      const { data: subjects, error: subjectsError } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (subjectsError) throw subjectsError;
+
+      // 5. Fetch classroom designs
+      const { data: designs, error: designsError } = await supabase
+        .from('classroom_designs')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (designsError) throw designsError;
+
+      // Map designs to the Record format
+      const designMap: Record<string, ClassroomDesign> = {};
+      designs?.forEach(d => {
+        designMap[d.subject_id] = {
+          ...d.design_data,
+          whiteboards: [], // History will be fetched on demand
+          conceptBoards: {}
+        };
+      });
+
+      // 6. Fetch whiteboards
+      const { data: whiteboards, error: whiteboardsError } = await supabase
+        .from('whiteboards')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (whiteboardsError) throw whiteboardsError;
+
+      whiteboards?.forEach(w => {
+        if (designMap[w.subject_id]) {
+          const board: Whiteboard = {
+            ...w.data,
+            id: w.id,
+            conceptId: w.concept_id,
+            name: w.name,
+            drawingData: w.drawing_data,
+            timestamp: w.timestamp
+          };
+          
+          if (w.concept_id) {
+            designMap[w.subject_id].conceptBoards![w.concept_id] = board;
+          }
+          designMap[w.subject_id].whiteboards!.push(board);
+        }
+      });
+
+      // Always set the user, even if data is still thin
+      setCurrentUser({
+        id: userId,
+        username: profile?.username || metaName,
+        email: profile?.email || userEmail,
+        customSubjects: (subjects || []).map(s => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          color: s.color,
+          icon: s.icon,
+          concepts: s.concepts
+        })),
+        hiddenSubjectIds: profile?.hidden_subject_ids || [],
+        classroomDesigns: designMap,
+        progress: profile?.progress || {},
+        calendarData: profile?.calendar_data,
+        materials: profile?.materials || [],
+        songs: profile?.songs || [],
+        games: profile?.games || []
+      });
+      setCurrentView('mode-selection');
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+    }
+  };
+
   const handleLogin = (user: User) => {
+    // Auth.tsx handles the Supabase login, which triggers fetchUserData
+    // This local call is kept for immediate UI feedback if needed
     setCurrentUser(user);
     setCurrentView('mode-selection');
-    localStorage.setItem('dreamclass_user', JSON.stringify(user));
   };
 
   const handleModeSelect = useCallback((mode: AppMode) => {
@@ -332,14 +463,27 @@ const App: React.FC = () => {
     setCurrentView('mode-selection');
   }, []);
 
-  const persistUser = useCallback((updatedUser: Partial<User>) => {
+  const persistUser = useCallback(async (updatedUser: Partial<User>) => {
     setCurrentUser(prev => {
       if (!prev) return prev;
       return { ...prev, ...updatedUser };
     });
-  }, []);
 
-  const updateClassroom = useCallback((subjectId: SubjectId, design: ClassroomDesign) => {
+    if (currentUser) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          hidden_subject_ids: updatedUser.hiddenSubjectIds,
+          progress: updatedUser.progress,
+          calendar_data: updatedUser.calendarData,
+        })
+        .eq('id', currentUser.id);
+      
+      if (error) console.error('Error persisting user profile:', error);
+    }
+  }, [currentUser]);
+
+  const updateClassroom = useCallback(async (subjectId: SubjectId, design: ClassroomDesign) => {
     setCurrentUser(prev => {
       if (!prev) return prev;
       return { 
@@ -354,25 +498,33 @@ const App: React.FC = () => {
         } 
       };
     });
-  }, []);
 
-  // Centralized persistence effect
-  useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('dreamclass_user', JSON.stringify(currentUser));
+      // Exclude whiteboards from the design_data blob as they live in their own table
+      const { whiteboards, conceptBoards, ...designData } = design;
       
-      const accountsData = localStorage.getItem('dreamclass_accounts');
-      if (accountsData) {
-        const accounts: User[] = JSON.parse(accountsData);
-        const updatedAccounts = accounts.map(acc => 
-          acc.id === currentUser.id ? { ...acc, ...currentUser, password: acc.password } : acc
-        );
-        localStorage.setItem('dreamclass_accounts', JSON.stringify(updatedAccounts));
-      }
+      const { error } = await supabase
+        .from('classroom_designs')
+        .upsert({
+          user_id: currentUser.id,
+          subject_id: subjectId,
+          design_data: designData
+        }, { onConflict: 'user_id,subject_id' });
+
+      if (error) console.error('Error updating classroom design:', error);
     }
   }, [currentUser]);
 
-  const handleLogout = useCallback(() => {
+  // persistence logic moved to individual action handlers for Supabase efficiency
+  useEffect(() => {
+    if (currentUser) {
+      // We still sync cursor style to localStorage as it's a browser preference
+      localStorage.setItem('teachly_cursor_style', JSON.stringify(cursorStyle));
+    }
+  }, [currentUser, cursorStyle]);
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setAppMode(null);
     setCurrentView('landing');
@@ -385,7 +537,7 @@ const App: React.FC = () => {
     }
   }, [selectedSubject, updateClassroom]);
 
-  const handleAddSubject = useCallback((subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
+  const handleAddSubject = useCallback(async (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser || !subjectData.name.trim()) return;
     const newId = `custom-${Date.now()}`;
     const colors = ['bg-pink-400', 'bg-orange-400', 'bg-indigo-400', 'bg-teal-400', 'bg-rose-400'];
@@ -398,28 +550,63 @@ const App: React.FC = () => {
       concepts: subjectData.concepts,
       icon: subjectData.icon
     };
+
+    // 1. Update local state
     const updatedUser = {
       ...currentUser,
       customSubjects: [...(currentUser.customSubjects || []), newSubject],
-      classroomDesigns: {
-        ...currentUser.classroomDesigns,
-        [newId]: {
+    };
+    setCurrentUser(updatedUser);
+
+    // 2. Push to Supabase
+    const { error: subjectError } = await supabase
+      .from('subjects')
+      .insert({
+        id: newId,
+        user_id: currentUser.id,
+        title: subjectData.name,
+        description: subjectData.description,
+        color: randomColor,
+        icon: subjectData.icon,
+        concepts: subjectData.concepts
+      });
+
+    if (subjectError) {
+      console.error('Error adding subject to Supabase:', subjectError);
+      return;
+    }
+
+    // Initialize design for this subject
+    const initialDesign: ClassroomDesign = {
+      wallColor: WALL_COLORS[0],
+      floorColor: FLOOR_COLORS[0],
+      posterUrls: [],
+      ambientMusic: 'none',
+      whiteboards: [],
+      conceptBoards: {}
+    };
+
+    const { error: designError } = await supabase
+      .from('classroom_designs')
+      .insert({
+        user_id: currentUser.id,
+        subject_id: newId,
+        design_data: {
           wallColor: WALL_COLORS[0],
           floorColor: FLOOR_COLORS[0],
           posterUrls: [],
-          ambientMusic: 'none',
-          whiteboards: [],
-          conceptBoards: {}
+          ambientMusic: 'none'
         }
-      }
-    };
-    persistUser(updatedUser);
-  }, [currentUser, persistUser]);
+      });
 
-  const handleEditSubject = useCallback((subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
+    if (designError) console.error('Error initializing subject design:', designError);
+  }, [currentUser]);
+
+  const handleEditSubject = useCallback(async (subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
     if (!currentUser) return;
     const existing = allSubjects.find(s => s.id === subjectId);
     if (!existing) return;
+    
     const updatedSubject: Subject = {
       ...existing,
       title: updatedData.name,
@@ -427,14 +614,30 @@ const App: React.FC = () => {
       concepts: updatedData.concepts,
       icon: updatedData.icon
     };
+    
+    // 1. Update local state
     const otherCustom = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
-    persistUser({
+    setCurrentUser({
       ...currentUser,
       customSubjects: [...otherCustom, updatedSubject]
     });
-  }, [currentUser, allSubjects, persistUser]);
 
-  const handleDeleteSubject = useCallback((subjectId: SubjectId) => {
+    // 2. Push to Supabase
+    const { error } = await supabase
+      .from('subjects')
+      .update({
+        title: updatedData.name,
+        description: updatedData.description,
+        concepts: updatedData.concepts,
+        icon: updatedData.icon
+      })
+      .eq('id', subjectId)
+      .eq('user_id', currentUser.id);
+
+    if (error) console.error('Error updating subject in Supabase:', error);
+  }, [currentUser, allSubjects]);
+
+  const handleDeleteSubject = useCallback(async (subjectId: SubjectId) => {
     if (!currentUser) return;
     
     const updatedHidden = Array.from(new Set([...(currentUser.hiddenSubjectIds || []), subjectId]));
@@ -442,47 +645,124 @@ const App: React.FC = () => {
     const updatedDesigns = { ...currentUser.classroomDesigns };
     delete updatedDesigns[subjectId];
     
-    const updatedUser: User = {
+    // 1. Update local state
+    setCurrentUser({
       ...currentUser,
       customSubjects: updatedCustomSubjects,
       hiddenSubjectIds: updatedHidden,
       classroomDesigns: updatedDesigns
-    };
-    
-    persistUser(updatedUser);
-  }, [currentUser, persistUser]);
+    });
 
-  const handleUpdateMaterials = useCallback((materials: MaterialFile[]) => {
+    // 2. Push to Supabase
+    // If it's a custom subject, we can delete it entirely
+    if (subjectId.startsWith('custom-')) {
+      const { error: deleteError } = await supabase
+        .from('subjects')
+        .delete()
+        .eq('id', subjectId)
+        .eq('user_id', currentUser.id);
+      
+      if (deleteError) console.error('Error deleting subject from Supabase:', deleteError);
+
+      // Clean up whiteboards associated with this subject
+      const { error: whiteboardDeleteError } = await supabase
+        .from('whiteboards')
+        .delete()
+        .eq('subject_id', subjectId)
+        .eq('user_id', currentUser.id);
+      
+      if (whiteboardDeleteError) console.error('Error deleting orphaned whiteboards:', whiteboardDeleteError);
+    } else {
+      // If it's a built-in subject, we just hide it (it stays in hidden_subject_ids)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ hidden_subject_ids: updatedHidden })
+        .eq('id', currentUser.id);
+      
+      if (profileError) console.error('Error hiding subject in Supabase:', profileError);
+    }
+
+    // Also remove the classroom design persistence
+    const { error: designError } = await supabase
+      .from('classroom_designs')
+      .delete()
+      .eq('subject_id', subjectId)
+      .eq('user_id', currentUser.id);
+
+    if (designError) console.error('Error removing subject design persistence:', designError);
+  }, [currentUser]);
+
+  const handleUpdateMaterials = useCallback(async (materials: MaterialFile[]) => {
     if (!currentUser) return;
-    persistUser({
+    
+    // 1. Update local state
+    setCurrentUser({
       ...currentUser,
       materials
     });
-  }, [currentUser, persistUser]);
 
-  const handleUpdateSongs = useCallback((songs: Song[]) => {
+    // 2. Push to Supabase
+    const { error } = await supabase
+      .from('profiles')
+      .update({ materials })
+      .eq('id', currentUser.id);
+
+    if (error) console.error('Error updating materials in Supabase:', error);
+  }, [currentUser]);
+
+  const handleUpdateSongs = useCallback(async (songs: Song[]) => {
     if (!currentUser) return;
-    persistUser({
+    
+    // 1. Update local state
+    setCurrentUser({
       ...currentUser,
       songs
     });
-  }, [currentUser, persistUser]);
 
-  const handleUpdateGames = useCallback((games: Game[]) => {
+    // 2. Push to Supabase
+    const { error } = await supabase
+      .from('profiles')
+      .update({ songs })
+      .eq('id', currentUser.id);
+
+    if (error) console.error('Error updating songs in Supabase:', error);
+  }, [currentUser]);
+
+  const handleUpdateGames = useCallback(async (games: Game[]) => {
     if (!currentUser) return;
-    persistUser({
+    
+    // 1. Update local state
+    setCurrentUser({
       ...currentUser,
       games
     });
-  }, [currentUser, persistUser]);
 
-  const handleUpdateCalendarData = useCallback((calendarData: any) => {
+    // 2. Push to Supabase
+    const { error } = await supabase
+      .from('profiles')
+      .update({ games })
+      .eq('id', currentUser.id);
+
+    if (error) console.error('Error updating games in Supabase:', error);
+  }, [currentUser]);
+
+  const handleUpdateCalendarData = useCallback(async (calendarData: any) => {
     if (!currentUser) return;
-    persistUser({
+    
+    // 1. Update local state
+    setCurrentUser({
       ...currentUser,
       calendarData
     });
-  }, [currentUser, persistUser]);
+
+    // 2. Push to Supabase
+    const { error } = await supabase
+      .from('profiles')
+      .update({ calendar_data: calendarData })
+      .eq('id', currentUser.id);
+
+    if (error) console.error('Error updating calendar data in Supabase:', error);
+  }, [currentUser]);
 
   const handleAddResourceToClassroom = useCallback((resource: Resource, subjectId: string) => {
     if (!currentUser) return;
