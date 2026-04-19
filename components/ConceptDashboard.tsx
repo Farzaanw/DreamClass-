@@ -148,6 +148,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0].value);
   const [highlighterColor, setHighlightColor] = useState(HIGHLIGHTER_COLORS[0].value);
   const [showColorPicker, setShowColorPicker] = useState<'marker' | 'highlighter' | null>(null);
+  const mainContentRef = useRef<HTMLElement>(null);
 
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
   const [boardBgColor, setBoardBgColor] = useState<string>('#ffffff');
@@ -170,6 +171,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [namingModalInput, setNamingModalInput] = useState("");
   const [pendingSaveSuccessCallback, setPendingSaveSuccessCallback] = useState<(() => void) | null>(null);
   const namingInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isDeleteHistoryModalOpen, setIsDeleteHistoryModalOpen] = useState(false);
+  const [boardToDelete, setBoardToDelete] = useState<{ id: string, name: string } | null>(null);
 
   // Group box state
   const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
@@ -570,23 +574,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const deleteFromHistory = (boardId: string) => {
-    if (confirm("Delete this saved board from history?")) {
-      const updatedWhiteboards = (design.whiteboards || []).filter(b => b.id !== boardId);
-      const updatedConceptBoards = { ...(design.conceptBoards || {}) };
-      Object.keys(updatedConceptBoards).forEach(key => {
-        if (updatedConceptBoards[key].id === boardId) delete updatedConceptBoards[key];
-      });
-      onSaveDesign({ ...design, whiteboards: updatedWhiteboards, conceptBoards: updatedConceptBoards });
+    const updatedWhiteboards = (design.whiteboards || []).filter(b => b.id !== boardId);
+    const updatedConceptBoards = { ...(design.conceptBoards || {}) };
+    Object.keys(updatedConceptBoards).forEach(key => {
+      if (updatedConceptBoards[key].id === boardId) delete updatedConceptBoards[key];
+    });
+    onSaveDesign({ ...design, whiteboards: updatedWhiteboards, conceptBoards: updatedConceptBoards });
 
-      // Reset active whiteboard space to default blank
-      setItems([]);
-      if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      setViewport({ x: 0, y: 0, zoom: 1 });
-      setUndoStack([]);
-      setSelectedItemId(null);
-      setCurrentBoardId(null);
-      setCurrentBoardName(null);
-    }
+    // Reset active whiteboard space to default blank
+    setItems([]);
+    if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    setViewport({ x: 0, y: 0, zoom: 1 });
+    setUndoStack([]);
+    setSelectedItemId(null);
+    setCurrentBoardId(null);
+    setCurrentBoardName(null);
+    setIsDeleteHistoryModalOpen(false);
+    setBoardToDelete(null);
   };
 
   const screenToWorld = (sx: number, sy: number) => ({
@@ -1174,8 +1178,20 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     setSaveStatus('saving');
 
     // Capture the full state including the drawing layer
-    // Switching to JPEG with 0.5 quality to save space in Supabase/Cloud
-    const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/jpeg', 0.5) : undefined;
+    // We flatten onto a white background to avoid "black" JPEGs from transparency
+    let drawingSnapshot: string | undefined = undefined;
+    if (canvasRef.current) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvasRef.current.width;
+      tempCanvas.height = canvasRef.current.height;
+      const tCtx = tempCanvas.getContext('2d');
+      if (tCtx) {
+        tCtx.fillStyle = '#ffffff'; // White background
+        tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tCtx.drawImage(canvasRef.current, 0, 0);
+        drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.5);
+      }
+    }
 
     const newBoard: Whiteboard = {
       id: boardId,
@@ -2011,7 +2027,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </button>
 
               <button
-                onClick={(e) => { e.stopPropagation(); deleteFromHistory(b.id); }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setBoardToDelete({ id: b.id, name: b.name || 'Untitled Lesson' });
+                  setIsDeleteHistoryModalOpen(true);
+                }}
                 className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all z-10"
                 title="Delete Snapshot"
               >
@@ -2377,7 +2397,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         </div>
 
         {/* WHITEBOARD MAIN AREA */}
-        <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" onDrop={handleDropOnBoard} onDragOver={(e) => e.preventDefault()} onWheel={(e) => { e.preventDefault(); handleZoomAt({ sx: e.clientX, sy: e.clientY }, Math.pow(1.1, e.deltaY > 0 ? -1 : 1)); }}>
+        <main 
+          ref={mainContentRef}
+          className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" 
+          onDrop={handleDropOnBoard} 
+          onDragOver={(e) => e.preventDefault()}
+        >
           <AnimatePresence>
             {showTransition && (
               <motion.div
@@ -3507,6 +3532,53 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   className="flex-[1.5] py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest hover:scale-[1.02] hover:shadow-2xl transition-all shadow-xl border-b-8 border-blue-900 active:translate-y-2 active:border-b-0"
                 >
                   Save Board 💾
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isDeleteHistoryModalOpen && boardToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteHistoryModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-rose-50 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
+                🗑️
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Lesson?</h2>
+                <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
+                  Are you sure you want to delete <span className="text-rose-500">"{boardToDelete.name}"</span>? This cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsDeleteHistoryModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  No, Keep It
+                </button>
+                <button
+                  onClick={() => {
+                    deleteFromHistory(boardToDelete.id);
+                    setIsDeleteHistoryModalOpen(false);
+                    setBoardToDelete(null);
+                  }}
+                  className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
+                >
+                  Yes, Delete
                 </button>
               </div>
             </motion.div>

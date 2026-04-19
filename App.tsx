@@ -249,6 +249,17 @@ const CursorFollower: React.FC<{ style: any }> = ({ style }) => {
   );
 };
 
+const DEFAULT_DESIGN: ClassroomDesign = {
+  wallColor: '#fbbf24', // Warm honey
+  floorColor: '#92400e', // Wood floor
+  posterUrls: [],
+  ambientMusic: 'none',
+  whiteboards: [],
+  conceptBoards: {},
+  mascot: 'none',
+  shelves: []
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('landing');
@@ -837,7 +848,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900 ${cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none' ? 'custom-cursor-active' : ''}`}>
+    <div className={`min-h-screen bg-[#F0F9FF] font-['Fredoka'] selection:bg-blue-100 selection:text-blue-900 ${currentUser && (cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none') ? 'custom-cursor-active' : ''}`}>
       {/* Custom Cursor Element */}
       {currentUser && (cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none') && (
         <CursorFollower style={cursorStyle} />
@@ -896,7 +907,7 @@ const App: React.FC = () => {
               </div>
               <RainbowLogo size="text-6xl sm:text-8xl lg:text-9xl" />
               <p className="mt-8 text-xl sm:text-3xl font-medium text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                For teachers, made by teachers ❤️
+                For teachers, designed by teachers ❤️
               </p>
               
               <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
@@ -1189,17 +1200,17 @@ const App: React.FC = () => {
           )}
           
           {currentView === 'designer' && designingSubjectId && (
-            <ClassroomDesigner subjectTitle={allSubjects.find(s => s.id === designingSubjectId)?.title || ''} design={currentUser.classroomDesigns[designingSubjectId]} onSave={(design) => { updateClassroom(designingSubjectId, design); setCurrentView('dashboard'); }} onCancel={() => setCurrentView('dashboard')} />
+            <ClassroomDesigner subjectTitle={allSubjects.find(s => s.id === designingSubjectId)?.title || ''} design={currentUser.classroomDesigns[designingSubjectId] || DEFAULT_DESIGN} onSave={(design) => { updateClassroom(designingSubjectId, design); setCurrentView('dashboard'); }} onCancel={() => setCurrentView('dashboard')} />
           )}
           
           {currentView === 'classroom' && selectedSubject && (
-            <ClassroomView subject={selectedSubject} design={currentUser.classroomDesigns[selectedSubject.id]} onBack={() => setCurrentView('dashboard')} onSelectConcept={navigateToConcept} />
+            <ClassroomView subject={selectedSubject} design={currentUser.classroomDesigns[selectedSubject.id] || DEFAULT_DESIGN} onBack={() => setCurrentView('dashboard')} onSelectConcept={navigateToConcept} />
           )}
           
           {currentView === 'concept' && selectedConcept && selectedSubject && (
             <ConceptDashboard 
               concept={selectedConcept} 
-              design={currentUser.classroomDesigns[selectedSubject.id]} 
+              design={currentUser.classroomDesigns[selectedSubject.id] || DEFAULT_DESIGN} 
               subjectId={selectedSubject.id} 
               materials={currentUser.materials || []} 
               allSubjects={allSubjects} 

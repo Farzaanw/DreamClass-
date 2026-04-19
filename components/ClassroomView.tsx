@@ -41,7 +41,18 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
   const originalCount = subject.concepts.length;
 
-  const activeMusic = MUSIC_OPTIONS.find(m => m.id === design.ambientMusic);
+  const safeDesign = design || {
+    ambientMusic: 'none',
+    wallColor: '#fbbf24',
+    floorColor: '#92400e',
+    posterUrls: [],
+    wallTheme: 'plain',
+    floorTheme: 'plain',
+    mascot: 'none',
+    shelves: []
+  };
+
+  const activeMusic = MUSIC_OPTIONS.find(m => m.id === safeDesign.ambientMusic);
 
   useEffect(() => {
     if (audioRef.current) {
