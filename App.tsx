@@ -474,6 +474,41 @@ const App: React.FC = () => {
     setCurrentView('mode-selection');
   }, []);
 
+  const handleDeleteWhiteboard = useCallback(async (boardId: string) => {
+    if (!currentUser) return;
+
+    // 1. Delete from Supabase
+    const { error } = await supabase
+      .from('whiteboards')
+      .delete()
+      .eq('id', boardId)
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      console.error('Error deleting whiteboard from Supabase:', error);
+      return;
+    }
+
+    // 2. Update local state
+    setCurrentUser(prev => {
+      if (!prev) return null;
+      const newDesigns = { ...prev.classroomDesigns };
+      Object.keys(newDesigns).forEach(subId => {
+        const d = newDesigns[subId];
+        if (d.whiteboards) {
+          newDesigns[subId] = {
+            ...d,
+            whiteboards: d.whiteboards.filter(b => b.id !== boardId),
+            conceptBoards: d.conceptBoards ? Object.fromEntries(
+              Object.entries(d.conceptBoards).filter(([_, b]) => b.id !== boardId)
+            ) : d.conceptBoards
+          };
+        }
+      });
+      return { ...prev, classroomDesigns: newDesigns };
+    });
+  }, [currentUser]);
+
   const persistUser = useCallback(async (updatedUser: Partial<User>) => {
     setCurrentUser(prev => {
       if (!prev) return prev;
@@ -512,7 +547,7 @@ const App: React.FC = () => {
 
     if (currentUser) {
       // Exclude whiteboards from the design_data blob as they live in their own table
-      const { whiteboards, conceptBoards, ...designData } = design;
+      const { whiteboards, ...designData } = design;
       
       const { error } = await supabase
         .from('classroom_designs')
@@ -1153,10 +1188,18 @@ const App: React.FC = () => {
                 <button onClick={() => handleModeSelect('classroom')} className="group bg-white p-10 rounded-[3rem] shadow-xl border-b-[16px] border-blue-100 hover:border-blue-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center">
                   <div className="w-32 h-32 bg-blue-50 rounded-full flex items-center justify-center text-6xl mb-6 group-hover:scale-110 transition-transform">👨‍🏫</div>
                   <h3 className="text-3xl font-bold text-blue-600 mb-4">Classroom-Mode</h3>
+                  <h2 className="text-xl text-gray-500 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out font-medium max-w-[280px]">
+                    <span className="inline-block animate-pulse mr-1">✨</span>
+                    Welcome to the classroom — everything your teacher shares, all in one, magical place.
+                  </h2>
                 </button>
                 <button onClick={() => handleModeSelect('teacher')} className="group bg-white p-10 rounded-[3rem] shadow-xl border-b-[16px] border-purple-100 hover:border-purple-400 hover:-translate-y-2 transition-all flex flex-col items-center text-center">
                   <div className="w-32 h-32 bg-purple-50 rounded-full flex items-center justify-center text-6xl mb-6 group-hover:scale-110 transition-transform">🛠️</div>
                   <h3 className="text-3xl font-bold text-purple-600 mb-4">Teacher-Mode</h3>
+                  <h2 className="text-xl text-gray-400 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out font-medium max-w-[280px]">
+                    <span className="inline-block animate-pulse mr-1">🪄</span>
+                    Welcome to Teacher Mode — create, edit, and prepare what your students will see live in class.
+                  </h2>
                 </button>
               </div>
             </div>
@@ -1175,6 +1218,7 @@ const App: React.FC = () => {
               onAddSubject={handleAddSubject} 
               onEditSubject={handleEditSubject} 
               onDeleteSubject={handleDeleteSubject} 
+              onDeleteWhiteboard={handleDeleteWhiteboard}
               onUpdateMaterials={handleUpdateMaterials}
               onUpdateSongs={handleUpdateSongs}
               onUpdateGames={handleUpdateGames}
@@ -1222,6 +1266,7 @@ const App: React.FC = () => {
                 }
               }} 
               onSaveDesign={handleSaveDesign} 
+              onDeleteWhiteboard={handleDeleteWhiteboard}
               onSelectConcept={(c) => setSelectedConcept(c)}
               onUpdateMaterials={handleUpdateMaterials}
               onNavigateToMaterials={(subId) => {

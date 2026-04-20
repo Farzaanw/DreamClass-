@@ -170,6 +170,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [isNamingModalOpen, setIsNamingModalOpen] = useState(false);
   const [namingModalInput, setNamingModalInput] = useState("");
   const [pendingSaveSuccessCallback, setPendingSaveSuccessCallback] = useState<(() => void) | null>(null);
+  const [showSaveGlow, setShowSaveGlow] = useState(false);
+  const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
   const namingInputRef = useRef<HTMLInputElement>(null);
   
   const [isDeleteHistoryModalOpen, setIsDeleteHistoryModalOpen] = useState(false);
@@ -1245,27 +1247,37 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     onSaveDesign(updatedDesign);
 
     setSaveStatus('saved');
+    
+    // Trigger Success Glow
+    setShowSaveGlow(true);
+    setTimeout(() => setShowSaveGlow(false), 2000);
+
     if (onSuccess) {
-      setTimeout(onSuccess, 800);
+      onSuccess();
     } else {
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
   };
 
   const handleSaveBoard = (onSuccess?: () => void) => {
-    if (!currentBoardId) {
-      setNamingModalInput(`Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-      setPendingSaveSuccessCallback(() => onSuccess);
-      setIsNamingModalOpen(true);
-      setTimeout(() => namingInputRef.current?.focus(), 200);
-      return false;
+    // If we have a current board, skip naming and just overwrite (for preparation flow)
+    if (currentBoardId) {
+      executeSaveBoard(currentBoardId, currentBoardName || "Prepared Lesson", onSuccess);
+      return true;
     }
 
-    executeSaveBoard(currentBoardId, currentBoardName || "Untitled Board", onSuccess);
-    return true;
+    setNamingModalInput(`Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    setPendingSaveSuccessCallback(() => onSuccess);
+    setIsNamingModalOpen(true);
+    setTimeout(() => namingInputRef.current?.focus(), 200);
+    return false;
   };
 
   const handleClearEverything = () => {
+    setIsNewBoardModalOpen(true);
+  };
+
+  const executeClearEverything = (saveFirst: boolean) => {
     const clearAction = () => {
       setItems([]);
       if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -1277,11 +1289,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       const updatedConceptBoards = { ...(design.conceptBoards || {}) };
       delete updatedConceptBoards[concept.id];
       onSaveDesign({ ...design, conceptBoards: updatedConceptBoards });
+      setIsNewBoardModalOpen(false);
     };
 
-    if (confirm("Do you want to save your current whiteboard before starting a new one?")) {
+    if (saveFirst) {
       handleSaveBoard(clearAction);
-    } else if (confirm("Are you sure you want to clear everything without saving?")) {
+    } else {
       clearAction();
     }
   };
@@ -3433,12 +3446,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
       <AnimatePresence>
         {itemToRemove && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-modal-fade-in">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setItemToRemove(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full text-center"
+              className="relative bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full text-center z-10"
             >
               <div className="text-5xl mb-4">🗑️</div>
               <h3 className="text-xl font-black text-slate-800 mb-4">Are you sure you want to remove this material from your classroom?</h3>
@@ -3465,6 +3485,58 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   Yes
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* New Board Confirmation Modal */}
+        {isNewBoardModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsNewBoardModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-blue-50 flex flex-col gap-6 text-center"
+            >
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
+                ✨
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Create New Board?</h2>
+                <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
+                  This will clear your current space. 
+                  <br />
+                  <span className="text-blue-500 uppercase text-[10px] tracking-widest font-black block mt-2 opacity-70">We'll save your current work first! 💾</span>
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsNewBoardModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  Not Yet
+                </button>
+                <button
+                  onClick={() => executeClearEverything(true)}
+                  className="flex-[1.5] py-4 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg transition-all shadow-md border-b-6 border-blue-700 active:translate-y-1 active:border-b-0"
+                >
+                  Yes, Create New
+                </button>
+              </div>
+              <button
+                onClick={() => executeClearEverything(false)}
+                className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-400 transition-colors"
+              >
+                Clear without saving
+              </button>
             </motion.div>
           </div>
         )}

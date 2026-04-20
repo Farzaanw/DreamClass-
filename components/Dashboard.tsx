@@ -127,6 +127,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [showCursorMenu, setShowCursorMenu] = useState(false);
   const modalScrollRef = useRef<HTMLDivElement>(null);
   const songFileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
+  const [subjectToDelete, setSubjectToDelete] = useState<{ id: string, name: string } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1328,6 +1331,55 @@ const Dashboard: React.FC<DashboardProps> = ({
             onClose={() => setShowCalendar(false)}
           />
         )}
+
+        {isDeleteSubjectModalOpen && subjectToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteSubjectModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-rose-50 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
+                🎒
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Subject</h2>
+                <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
+                  Are you sure you want to delete <span className="text-rose-500">"{subjectToDelete.name}"</span>? 
+                  <br />
+                  <span className="text-[13px] uppercase opacity-70 leading-none mt-2 block">This will also delete all associated classroom designs and whiteboards.</span>
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsDeleteSubjectModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  No, Go Back
+                </button>
+                <button
+                  onClick={() => {
+                    onDeleteSubject(subjectToDelete.id);
+                    setIsDeleteSubjectModalOpen(false);
+                    setSubjectToDelete(null);
+                  }}
+                  className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
+                >
+                  Yes, Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       <div className="grid md:grid-cols-3 gap-8">
@@ -1380,9 +1432,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
-                    if(window.confirm(`Are you sure you want to delete ${subject.title}?`)) { 
-                      onDeleteSubject(subject.id); 
-                    } 
+                    setSubjectToDelete({ id: subject.id, name: subject.title });
+                    setIsDeleteSubjectModalOpen(true);
                   }} 
                   className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
                 >
