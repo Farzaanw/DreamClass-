@@ -6,13 +6,15 @@ import { supabase } from '../lib/supabase';
 interface AuthProps {
   onLogin: (user: User) => void;
   initialMode?: 'login' | 'signup';
+  isRecovering?: boolean;
+  onPasswordUpdated?: () => void;
   onBack?: () => void;
 }
 
-type AuthView = 'login' | 'signup' | 'reset-request' | 'reset-password';
+type AuthView = 'login' | 'signup' | 'reset-request' | 'reset-password' | 'update-password';
 
-const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) => {
-  const [view, setView] = useState<AuthView>(initialMode);
+const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecovering = false, onPasswordUpdated, onBack }) => {
+  const [view, setView] = useState<AuthView>(isRecovering ? 'update-password' : initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,10 +30,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
   }, [initialMode]);
 
   useEffect(() => {
+    if (isRecovering) {
+      setView('update-password');
+    }
     setError('');
     setSuccess('');
     setShowPassword(false);
-  }, [view]);
+  }, [view, isRecovering]);
 
   // Removed localStorage helpers as we are migrating to Supabase
 
@@ -60,6 +65,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
       if (authError) throw authError;
 
       if (authData.user) {
+        // Create the initial profile record
+        await supabase.from('profiles').insert({
+          id: authData.user.id,
+          username: username,
+          email: email.toLowerCase(),
+          hidden_subject_ids: [],
+          progress: {}
+        });
+
         setSuccess('Account created! Please check your email for verification (if enabled) or log in now. 🎉');
         setView('login');
         setUsername('');
@@ -112,59 +126,81 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
     }
   };
 
-  const handleResetRequest = (e: React.FormEvent) => {
+  const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
     if (!email) {
       setError('Enter your email to reset! 📧');
+      setLoading(false);
       return;
     }
 
-    const accounts = getAccounts();
-    const userExists = accounts.some(acc => acc.email.toLowerCase() === email.toLowerCase());
+    try {
+      // Check if the email exists (Passive check - we won't block if RLS prevents lookup)
+      await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.trim().toLowerCase());
 
-    if (userExists) {
-      setSuccess('Reset code sent! (Demo Code: 123456) 📩');
-      setView('reset-password');
-    } else {
-      setError('We couldn\'t find an account with that email. 🔍');
+      // We proceed directly to Supabase Auth. 
+      // Supabase is designed to handle this securely without leaking user existence.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin
+      });
+
+      if (error) {
+        if (error.message.includes('rate limit')) {
+          setError('Too many requests! Please wait a moment. ⏳');
+        } else {
+          setError('We couldn\'t find an account or something went wrong. 🔍');
+        }
+      } else {
+        setSuccess('Reset link sent! Check your email inbox. 📩');
+        // We'll give the user some time to read the success message
+        setTimeout(() => setView('login'), 3000);
+      }
+    } catch (err: any) {
+      setError('Something went wrong. Please try again! ❌');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (resetCode !== '123456') {
-      setError('Invalid reset code! Please check your email. 🔢');
-      return;
-    }
+    setLoading(true);
 
     if (!password || password.length < 6) {
       setError('Password must be at least 6 characters. 🛡️');
+      setLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match! 👯');
+      setLoading(false);
       return;
     }
 
-    const accounts = getAccounts();
-    const updatedAccounts = accounts.map(acc => {
-      if (acc.email.toLowerCase() === email.toLowerCase()) {
-        return { ...acc, password };
-      }
-      return acc;
-    });
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
 
-    saveAccounts(updatedAccounts);
-    setSuccess('Password updated! You can now log in. 🎊');
-    setView('login');
-    setPassword('');
-    setConfirmPassword('');
-    setResetCode('');
+      if (error) {
+        setError(error.message + ' ❌');
+      } else {
+        setSuccess('Password updated successfully! Redirecting... 🎉');
+        setTimeout(() => {
+          if (onPasswordUpdated) onPasswordUpdated();
+        }, 3000);
+      }
+    } catch (err: any) {
+      setError('Failed to update password. Please try again! ❌');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -186,12 +222,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
             {view === 'signup' && 'Start Your Journey'}
             {view === 'reset-request' && 'Oops! Forgotten?'}
             {view === 'reset-password' && 'New Secret Key'}
+            {view === 'update-password' && 'Update Secret Key'}
           </h1>
           <p className="text-gray-400 font-medium text-xs sm:text-sm">
             {view === 'login' && 'Log in to your magical classroom.'}
             {view === 'signup' && 'Create an account to begin teaching.'}
             {view === 'reset-request' && 'We\'ll help you get back into your room.'}
             {view === 'reset-password' && 'Make it strong and easy to remember!'}
+            {view === 'update-password' && 'Almost there! Set your new password below.'}
           </p>
         </div>
 
@@ -322,7 +360,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               type="submit"
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-orange-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
             >
-              Send Reset Code 📧
+              Send Reset Link 📧
             </button>
             <button 
               type="button" 
@@ -330,6 +368,49 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', onBack }) =
               className="w-full py-2 text-gray-400 font-bold hover:text-gray-600 text-sm"
             >
               Wait, I remember it! 🔙
+            </button>
+          </form>
+        )}
+
+        {view === 'update-password' && (
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">New Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full px-6 sm:px-8 py-3 sm:py-4 pr-12 sm:pr-16 rounded-2xl sm:rounded-3xl border-4 border-blue-50 bg-blue-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-base sm:text-lg font-bold text-gray-700 transition-all shadow-inner"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/50 rounded-full transition-colors text-xl sm:text-2xl"
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 ml-4 uppercase tracking-wider">Confirm New Password</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-2xl sm:rounded-3xl border-4 border-blue-50 bg-blue-50/30 focus:border-blue-300 focus:bg-white focus:outline-none text-base sm:text-lg font-bold text-gray-700 transition-all shadow-inner"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
+            >
+              {loading ? 'Updating... ⏳' : 'Lock in New Password 🛡️'}
             </button>
           </form>
         )}

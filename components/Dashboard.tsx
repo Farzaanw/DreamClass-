@@ -1350,32 +1350,35 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
                 🎒
               </div>
-              <div className="text-center">
+              <div className="text-center mb-1">
                 <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Subject</h2>
                 <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
                   Are you sure you want to delete <span className="text-rose-500">"{subjectToDelete.name}"</span>? 
-                  <br />
-                  <span className="text-[13px] uppercase opacity-70 leading-none mt-2 block">This will also delete all associated classroom designs and whiteboards.</span>
                 </p>
               </div>
 
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setIsDeleteSubjectModalOpen(false)}
-                  className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
-                >
-                  No, Go Back
-                </button>
-                <button
-                  onClick={() => {
-                    onDeleteSubject(subjectToDelete.id);
-                    setIsDeleteSubjectModalOpen(false);
-                    setSubjectToDelete(null);
-                  }}
-                  className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
-                >
-                  Yes, Delete
-                </button>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setIsDeleteSubjectModalOpen(false)}
+                    className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                  >
+                    No, Go Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDeleteSubject(subjectToDelete.id);
+                      setIsDeleteSubjectModalOpen(false);
+                      setSubjectToDelete(null);
+                    }}
+                    className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+                <div className="bg-rose-50 p-3 rounded-xl">
+                  <span className="text-rose-500 text-xs font-bold uppercase tracking-wider block text-center">Warning: This will also delete all associated classroom designs and whiteboards.</span>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -1429,16 +1432,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                 >
                   ✏️
                 </button>
-                <button 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    setSubjectToDelete({ id: subject.id, name: subject.title });
-                    setIsDeleteSubjectModalOpen(true);
-                  }} 
-                  className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
-                >
-                  🗑️
-                </button>
+                {!['phonics', 'math', 'science'].includes(subject.id) && (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setSubjectToDelete({ id: subject.id, name: subject.title });
+                      setIsDeleteSubjectModalOpen(true);
+                    }} 
+                    className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                  >
+                    🗑️
+                  </button>
+                )}
               </div>
             )}
             <motion.div 

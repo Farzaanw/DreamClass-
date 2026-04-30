@@ -173,7 +173,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [showSaveGlow, setShowSaveGlow] = useState(false);
   const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
   const namingInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isDeleteHistoryModalOpen, setIsDeleteHistoryModalOpen] = useState(false);
   const [boardToDelete, setBoardToDelete] = useState<{ id: string, name: string } | null>(null);
 
@@ -242,6 +242,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [showAddArrow, setShowAddArrow] = useState(mode === 'teacher');
   const [showLibraryArrow, setShowLibraryArrow] = useState(mode === 'teacher');
   const [showSwitcherArrow, setShowSwitcherArrow] = useState(mode === 'teacher');
+  const [showSaveArrow, setShowSaveArrow] = useState(mode === 'teacher');
 
   const conceptSwitcherRef = useRef<HTMLDivElement>(null);
   const isDraggingSwitcher = useRef(false);
@@ -316,7 +317,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       }
     }
 
-    const baseCategories = CATEGORY_TEMPLATES.filter(cat => relevantCategoryIds.includes(cat.id));
+    const baseCategories = CATEGORY_TEMPLATES.filter(cat => relevantCategoryIds.includes(cat.id) && !customIcons.some(ci => ci.id === cat.id));
 
     const customCats = customIcons.map(ci => ({
       id: ci.id,
@@ -329,12 +330,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const addMaterialBtn = mode === 'teacher' ? [{ id: 'ADD_MATERIAL', label: 'Add', icon: '➕' }] : [];
 
     // Ensure we don't duplicate commonTail if they are already in baseCategories
-    const filteredCommonTail = commonTail.filter(ct => !relevantCategoryIds.includes(ct.id));
+    const filteredCommonTail = commonTail.filter(ct => !relevantCategoryIds.includes(ct.id) && !customIcons.some(ci => ci.id === ct.id));
 
     return [
       ...addMaterialBtn,
-      ...baseCategories,
       ...customCats,
+      ...baseCategories,
       ...filteredCommonTail
     ];
   }, [subjectId, currentSubject, customIcons, mode]);
@@ -383,7 +384,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, []);
 
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
-  const getCenter = () => ({ x: window.innerWidth / 2 - 10000, y: window.innerHeight / 2 - 10000, zoom: 1 });
+  const getCenter = () => ({ x: window.innerWidth / 2 - 3500, y: window.innerHeight / 2 - 3500, zoom: 1 });
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
   const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-2 m-0.5";
@@ -407,8 +408,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   useEffect(() => {
     if (canvasRef.current) {
       const canvas = canvasRef.current;
-      canvas.width = 15000;
-      canvas.height = 15000;
+      if (canvas.width !== 7000) canvas.width = 7000;
+      if (canvas.height !== 7000) canvas.height = 7000;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
         ctx.lineCap = 'round';
@@ -603,6 +604,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const startInteraction = (getEvent: any) => {
     if (isDraggingMaterial.current) return;
     const nativeEvent = getEvent.nativeEvent || getEvent;
+
+    if (nativeEvent.type === 'touchstart' && nativeEvent.touches && nativeEvent.touches.length === 2) {
+      const touch1 = nativeEvent.touches[0];
+      const touch2 = nativeEvent.touches[1];
+      lastTouchDistance.current = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      return; // Handled by pinch-to-zoom
+    }
+    lastTouchDistance.current = null;
+
     const coords = getScreenCoordinates(nativeEvent);
     if (activeTool === 'boxSelect') {
       const worldCoords = screenToWorld(coords.sx, coords.sy);
@@ -643,6 +653,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const performInteraction = (getEvent: any) => {
     const nativeEvent = getEvent.nativeEvent || getEvent;
+
+    if (nativeEvent.type === 'touchmove' && nativeEvent.touches && nativeEvent.touches.length === 2) {
+      const touch1 = nativeEvent.touches[0];
+      const touch2 = nativeEvent.touches[1];
+      const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      if (lastTouchDistance.current !== null) {
+        const factor = dist / lastTouchDistance.current;
+        const cx = (touch1.clientX + touch2.clientX) / 2;
+        const cy = (touch1.clientY + touch2.clientY) / 2;
+        const rect = getEvent.currentTarget.getBoundingClientRect();
+        handleZoomAt({ sx: cx - rect.left, sy: cy - rect.top }, factor);
+      }
+      lastTouchDistance.current = dist;
+      return;
+    }
+
     if (nativeEvent.type === 'mousemove' && !(nativeEvent.buttons & 1)) {
       if (isDrawingRef.current) stopInteraction();
       return;
@@ -664,6 +690,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const stopInteraction = () => {
+    lastTouchDistance.current = null;
     if (isBoxSelectingRef.current && boxSelectRect) {
       const x1 = Math.min(boxSelectRect.x1, boxSelectRect.x2);
       const y1 = Math.min(boxSelectRect.y1, boxSelectRect.y2);
@@ -1151,6 +1178,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           bgColor: boardBgColor,
           viewport: { ...viewport },
           customIcons: [...customIcons],
+          hiddenDrawerItems: [...hiddenDrawerItems],
           // Keep existing drawing data during auto-save
           drawingData: design.conceptBoards?.[concept.id]?.drawingData
         };
@@ -1171,10 +1199,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
           });
         }
-      }, 5000); // 5 second debounce for auto-save
+      }, 2000); // 2 second debounce for auto-save
       return () => clearTimeout(timer);
     }
-  }, [items, boardBg, boardBgColor, viewport, customIcons, currentBoardId, currentBoardName, concept.id, mode, design]);
+  }, [items, boardBg, boardBgColor, viewport, customIcons, hiddenDrawerItems, currentBoardId, currentBoardName, concept.id, mode, design]);
 
   const executeSaveBoard = async (boardId: string, boardName: string, onSuccess?: () => void) => {
     setSaveStatus('saving');
@@ -1215,7 +1243,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (user) {
       // Exclude values that have their own columns
       const { id, conceptId, name, timestamp, drawingData, ...data } = newBoard;
-      
+
       const { error } = await supabase
         .from('whiteboards')
         .upsert({
@@ -1247,7 +1275,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     onSaveDesign(updatedDesign);
 
     setSaveStatus('saved');
-    
+
     // Trigger Success Glow
     setShowSaveGlow(true);
     setTimeout(() => setShowSaveGlow(false), 2000);
@@ -2040,8 +2068,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </button>
 
               <button
-                onClick={(e) => { 
-                  e.stopPropagation(); 
+                onClick={(e) => {
+                  e.stopPropagation();
                   setBoardToDelete({ id: b.id, name: b.name || 'Untitled Lesson' });
                   setIsDeleteHistoryModalOpen(true);
                 }}
@@ -2084,18 +2112,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           <div className="flex flex-col min-w-[150px]">
             <div className="flex items-center gap-3">
               <h1 className="font-black text-slate-900 text-base tracking-tight leading-tight truncate max-w-[250px]">{concept.title}</h1>
-              {currentBoardName && (
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-sm font-black rounded-md border border-blue-100 uppercase tracking-tighter">
-                  Active: {currentBoardName}
-                </span>
-              )}
             </div>
             <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">{currentSubject?.title}</span>
           </div>
 
           {/* Concept Switcher for Teacher Mode */}
           {mode === 'teacher' && subjectConcepts.length > 1 && (
-            <div className="relative ml-4 flex-1 max-w-[500px] group/switcher">
+            <div className="relative ml-4 flex-1 max-w-[1200px] group/switcher">
               <AnimatePresence>
                 {showSwitcherArrow && (
                   <motion.div
@@ -2111,7 +2134,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     >
                       ⬆️
                     </motion.span>
-                    <div className="bg-green-600 text-white px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
+                    <div className="bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
                       Switch Concepts
                     </div>
                   </motion.div>
@@ -2130,12 +2153,55 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     key={c.title}
                     onClick={() => {
                       if (!hasMovedSwitcher.current) {
+                        // Automatically capture the current board's full state (including drawing) before switching
+                        let drawingSnapshot: string | undefined = undefined;
+                        if (canvasRef.current) {
+                          const tempCanvas = document.createElement('canvas');
+                          tempCanvas.width = canvasRef.current.width;
+                          tempCanvas.height = canvasRef.current.height;
+                          const tCtx = tempCanvas.getContext('2d');
+                          if (tCtx) {
+                            tCtx.fillStyle = '#ffffff';
+                            tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                            tCtx.drawImage(canvasRef.current, 0, 0);
+                            drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.5);
+                          }
+                        }
+
+                        const boardId = currentBoardId || `auto-${concept.id}`;
+                        const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
+
+                        const newBoard: Whiteboard = {
+                          id: boardId,
+                          conceptId: concept.id,
+                          name: boardName,
+                          timestamp: Date.now(),
+                          items: [...items],
+                          bg: boardBg,
+                          bgColor: boardBgColor,
+                          drawingData: drawingSnapshot,
+                          viewport: { ...viewport },
+                          customIcons: [...customIcons],
+                          hiddenDrawerItems: [...hiddenDrawerItems],
+                        };
+
+                        const existingWhiteboards = design.whiteboards || [];
+                        const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
+                          ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
+                          : [...existingWhiteboards, newBoard];
+
+                        onSaveDesignRef.current({
+                          ...design,
+                          whiteboards: updatedWhiteboards,
+                          conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
+                        });
+
                         onSelectConcept?.(c);
                       }
                     }}
                     className={`px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap pointer-events-auto ${c.title === concept.title
-                        ? 'bg-white text-blue-600 shadow-md ring-4 ring-blue-400 scale-110'
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
+                      ? 'bg-white text-blue-600 shadow-md ring-4 ring-blue-400 scale-110'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
                       }`}
                   >
                     {c.icon} {c.title}
@@ -2151,15 +2217,40 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         <div className="flex items-center gap-4">
           {mode === 'teacher' ? (
             <button
-              onClick={() => handleSaveBoard(() => onBack())}
-              className={`px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
-                  saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
-                    'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
+              onClick={() => {
+                setShowSaveArrow(false);
+                handleSaveBoard(() => onBack());
+              }}
+              className={`relative px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
+                  'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
                 }`}
               disabled={saveStatus === 'saving'}
             >
               <span className="text-lg">{saveStatus === 'saved' ? '✅' : '💾'}</span>
               {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save'}
+
+              {showSaveArrow && (
+                <AnimatePresence>
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute right-full mr-4 top-1 -translate-y-1/2 flex items-center pointer-events-none whitespace-nowrap z-[100]"
+                  >
+                    <div className="bg-green-600 text-white px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl border-2 border-white mr-2">
+                      Save for classroom
+                    </div>
+                    <motion.span
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-3xl drop-shadow-md"
+                    >
+                      ➡️
+                    </motion.span>
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </button>
           ) : (
             <div className="flex items-center gap-4">
@@ -2172,8 +2263,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               <button
                 onClick={handleSaveBoard}
                 className={`px-5 py-1.5 rounded-lg font-black text-xs border-b-2 transition-all shadow-md flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
-                    saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
-                      'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
+                  saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
+                    'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
                   }`}
                 disabled={saveStatus === 'saving'}
               >
@@ -2238,7 +2329,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     >
                       ⬅️
                     </motion.span>
-                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2 animate-bounce-gentle">
+                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2">
                       Click to add icons!
                     </div>
                   </motion.div>
@@ -2249,7 +2340,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
           {/* Scrollable Categories */}
           <div className="flex-1 overflow-y-auto py-4 flex flex-col items-center gap-3 custom-scrollbar">
-            {categories.filter(cat => cat.id !== 'ADD_MATERIAL').map((cat) => (
+            {categories.filter(cat => cat.id !== 'ADD_MATERIAL' && !hiddenDrawerItems.includes(cat.id)).map((cat) => (
               <button
                 key={cat.id}
                 onClick={(e) => {
@@ -2258,18 +2349,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   setDrawerOpen(true);
                 }}
                 className={`w-20 h-20 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all relative group ${activeCategoryId === cat.id && drawerOpen
-                    ? 'bg-white shadow-lg text-blue-600 ring-4 ring-blue-400 scale-105'
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
+                  ? 'bg-white shadow-lg text-blue-600 ring-4 ring-blue-400 scale-105'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
                   }`}
               >
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
                 <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all">{cat.label}</span>
 
-                {cat.isCustom && mode === 'teacher' && (
+                {mode === 'teacher' && !['STICKERS','SONGS', 'GAMES', 'HISTORY'].includes(cat.id) && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                      if (cat.isCustom) {
+                        setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                      } else {
+                        setHiddenDrawerItems(prev => [...prev, cat.id]);
+                      }
+                      if (activeCategoryId === cat.id) setDrawerOpen(false);
                     }}
                     className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                   >
@@ -2393,7 +2489,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="absolute right-full mr-4 z-[100] flex items-center pointer-events-none"
                 >
-                  <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2 animate-bounce-gentle">
+                  <div className="bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2">
                     Classroom Materials
                   </div>
                   <motion.span
@@ -2410,10 +2506,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         </div>
 
         {/* WHITEBOARD MAIN AREA */}
-        <main 
+        <main
           ref={mainContentRef}
-          className="flex-1 relative overflow-hidden flex flex-col bg-slate-50" 
-          onDrop={handleDropOnBoard} 
+          className="flex-1 relative overflow-hidden flex flex-col bg-slate-50"
+          onDrop={handleDropOnBoard}
           onDragOver={(e) => e.preventDefault()}
         >
           <AnimatePresence>
@@ -2465,22 +2561,28 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           )}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
-          <div 
-            className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`} 
-            onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction} 
-            style={{ 
+          <div
+            className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
+            onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction}
+            onWheel={(e) => {
+              // Smooth zoom with scroll wheel without needing Ctrl
+              const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
+              const rect = e.currentTarget.getBoundingClientRect();
+              handleZoomAt({ sx: e.clientX - rect.left, sy: e.clientY - rect.top }, zoomFactor);
+            }}
+            style={{
               touchAction: 'none',
               backgroundColor: boardBgColor,
-              backgroundImage: boardBg === 'grid' 
-                ? 'radial-gradient(#cbd5e1 2px, transparent 2px)' 
-                : boardBg === 'lined' 
-                  ? 'repeating-linear-gradient(transparent, transparent 48px, #cbd5e1 48px, #cbd5e1 50px)' 
+              backgroundImage: boardBg === 'grid'
+                ? 'radial-gradient(#cbd5e1 2px, transparent 2px)'
+                : boardBg === 'lined'
+                  ? 'repeating-linear-gradient(transparent, transparent 48px, #cbd5e1 48px, #cbd5e1 50px)'
                   : 'none',
               backgroundSize: boardBg === 'grid' ? `${50 * viewport.zoom}px ${50 * viewport.zoom}px` : `100% ${50 * viewport.zoom}px`,
               backgroundPosition: `${viewport.x}px ${viewport.y}px`
             }}
           >
-            <div className="absolute top-0 left-0 origin-top-left" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, width: '15000px', height: '15000px' }}>
+            <div className="absolute top-0 left-0 origin-top-left border border-slate-300 shadow-md" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, width: '7000px', height: '7000px' }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
               {items.filter(item => {
                 const parentGroup = groups.find(g => g.itemIds.includes(item.id));
@@ -3131,6 +3233,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           </div>
           <div className="h-16 py-2 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-4 z-50">
+            {mode === 'teacher' && currentBoardName && (
+              <div className="flex items-center mr-2">
+                <span className="px-4 py-2 bg-blue-50 text-blue-600 text-sm font-black rounded-xl border-2 border-blue-100 uppercase tracking-wider shadow-sm">
+                  Active: {currentBoardName}
+                </span>
+              </div>
+            )}
             <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
               {[{ id: 'select', icon: '🖐️' }, { id: 'marker', icon: '✏️' }, { id: 'highlighter', icon: '🖍️' }, { id: 'eraser', icon: '🧼' }].map(t => (
                 <div key={t.id} className="relative group/tool">
@@ -3383,15 +3492,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 {availableCustomIcons.filter(cat =>
                   cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
                 ).map((cat, idx) => {
-                  const isAlreadyAdded = customIcons.some(ci => ci.id === cat.id);
+                  const isAlreadyAdded = !hiddenDrawerItems.includes(cat.id) && categories.some(c => c.id === cat.id);
                   return (
                     <button
                       key={`custom-${idx}`}
                       onClick={() => {
                         if (isAlreadyAdded) {
-                          setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                          if (cat.isCustom || customIcons.some(ci => ci.id === cat.id)) {
+                            setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                          }
+                          setHiddenDrawerItems(prev => [...prev, cat.id]);
                         } else {
-                          setCustomIcons(prev => [...prev, cat]);
+                          // Unhide if hidden
+                          setHiddenDrawerItems(prev => prev.filter(id => id !== cat.id));
+                          // Add to custom if not natively in categories
+                          if (!categories.some(c => c.id === cat.id)) {
+                            setCustomIcons(prev => [...prev, cat]);
+                          }
                         }
                       }}
                       className={`aspect-square rounded-3xl border-4 transition-all flex flex-col items-center justify-center gap-2 relative group ${isAlreadyAdded ? 'border-blue-400 bg-blue-50 shadow-inner' : 'border-slate-100 bg-white hover:border-blue-200 hover:scale-105 shadow-sm'}`}
@@ -3408,15 +3525,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 {CATEGORY_TEMPLATES.filter(cat =>
                   cat.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
                 ).map((cat, idx) => {
-                  const isAlreadyAdded = customIcons.some(ci => ci.id === cat.id);
+                  const isAlreadyAdded = !hiddenDrawerItems.includes(cat.id) && categories.some(c => c.id === cat.id);
                   return (
                     <button
                       key={idx}
                       onClick={() => {
                         if (isAlreadyAdded) {
-                          setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                          if (customIcons.some(ci => ci.id === cat.id)) {
+                            setCustomIcons(prev => prev.filter(ci => ci.id !== cat.id));
+                          }
+                          setHiddenDrawerItems(prev => [...prev, cat.id]);
                         } else {
-                          setCustomIcons(prev => [...prev, cat]);
+                          // Unhide if hidden
+                          setHiddenDrawerItems(prev => prev.filter(id => id !== cat.id));
+                          // Add to custom if not natively in categories
+                          if (!categories.some(c => c.id === cat.id) && !customIcons.some(ci => ci.id === cat.id)) {
+                            setCustomIcons(prev => [...prev, cat]);
+                          }
                         }
                       }}
                       className={`aspect-square rounded-3xl border-4 transition-all flex flex-col items-center justify-center gap-2 relative group ${isAlreadyAdded ? 'border-blue-400 bg-blue-50 shadow-inner' : 'border-slate-100 bg-white hover:border-blue-200 hover:scale-105 shadow-sm'}`}
@@ -3510,10 +3635,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </div>
               <div className="text-center">
                 <h2 className="text-2xl font-black text-slate-900 mb-2">Create New Board?</h2>
-                <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
-                  This will clear your current space. 
-                  <br />
-                  <span className="text-blue-500 uppercase text-[10px] tracking-widest font-black block mt-2 opacity-70">We'll save your current work first! 💾</span>
+                <p className="text-slate-500 font-bold text-md tracking-tight px-4 leading-relaxed">
+                  This will clear your current space and save your current work to history.
                 </p>
               </div>
 
@@ -3528,12 +3651,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   onClick={() => executeClearEverything(true)}
                   className="flex-[1.5] py-4 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg transition-all shadow-md border-b-6 border-blue-700 active:translate-y-1 active:border-b-0"
                 >
-                  Yes, Create New
+                  Create New
                 </button>
               </div>
               <button
                 onClick={() => executeClearEverything(false)}
-                className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-400 transition-colors"
+                className="text-[20px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-400 transition-colors"
               >
                 Clear without saving
               </button>

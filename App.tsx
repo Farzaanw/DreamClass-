@@ -264,6 +264,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('landing');
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [appMode, setAppMode] = useState<AppMode | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
@@ -304,12 +305,18 @@ const App: React.FC = () => {
     });
 
     // 2. Auth State Change Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+        setCurrentView('auth');
+      }
+
       if (session) {
         fetchUserData(session.user.id);
       } else {
         setCurrentUser(null);
         setCurrentView('landing');
+        setRecoveryMode(false);
       }
     });
 
@@ -962,50 +969,55 @@ const App: React.FC = () => {
           </section>
 
           {/* Features Section */}
-          <section id="features-section" className="py-32 px-6 sm:px-12 bg-white">
-            <div className="max-w-6xl mx-auto">
-              <div className="text-center mb-20">
-                <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-6 tracking-tight">Everything a Magic Classroom Needs</h2>
-                <p className="text-xl text-slate-500 max-w-2xl mx-auto">Teachly is more than just a whiteboard for teachers. It's a space that encourages engagement and fosters classroom collaboration.</p>
-              </div>
+          <section id="features-section" className="py-32 bg-white relative overflow-hidden">
+            <style>{`
+              @keyframes marquee {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+              }
+              .animate-marquee {
+                animation: marquee 40s linear infinite;
+              }
+              .animate-marquee:hover {
+                animation-play-state: paused;
+              }
+            `}</style>
+            <div className="max-w-6xl mx-auto px-6 sm:px-12 mb-20 text-center">
+              <h2 className="text-4xl sm:text-6xl font-bold text-slate-800 mb-6 tracking-tight">Everything a Magic Classroom Needs</h2>
+              <p className="text-xl text-slate-500 max-w-2xl mx-auto">Teachly is more than just a whiteboard for teachers. It's a space that encourages engagement and fosters classroom collaboration.</p>
+            </div>
+            
+            <div className="relative w-full flex overflow-hidden group">
+              <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
+              <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                <FeatureCard 
-                  icon="🎨" 
-                  title="Classroom Designer" 
-                  desc="Pick your wall colors, carpet textures, and even class pets. Create an environment that feels like home."
-                  color="bg-orange-100 text-orange-600"
-                />
-                <FeatureCard 
-                  icon="🪄" 
-                  title="Magic Whiteboard" 
-                  desc="Drag assets, draw with glow-markers, and manage multiple saved lesson states with the interactive board."
-                  color="bg-blue-100 text-blue-600"
-                />
-                <FeatureCard 
-                  icon="🤖" 
-                  title="AI Teaching Assistant" 
-                  desc="Powered by Gemini, your assistant helps come up with games, activity ideas, and even sings along to lyrics."
-                  color="bg-purple-100 text-purple-600"
-                />
-                <FeatureCard 
-                  icon="🎵" 
-                  title="Classroom Jams" 
-                  desc="Set the mood with ambient music and interactive sing-along lyrics to keep the energy high and fun."
-                  color="bg-pink-100 text-pink-600"
-                />
-                <FeatureCard 
-                  icon="📦" 
-                  title="Magic Asset Drawer" 
-                  desc="A bottomless box of letters, numbers, and stickers. Simply drag them onto the board for instant learning."
-                  color="bg-green-100 text-green-600"
-                />
-                <FeatureCard 
-                  icon="🏫" 
-                  title="Teacher-Mode Control" 
-                  desc="Easily add custom subjects and concepts to tailor the curriculum to your students' specific needs."
-                  color="bg-yellow-100 text-yellow-600"
-                />
+              <div className="flex w-max animate-marquee gap-8 px-4 py-8">
+                {[
+                  ...[
+                    { icon: '🎨', title: 'Classroom Designer', desc: 'Pick your wall colors, carpet textures, and even class pets to design your ideal classroom environment.', color: 'bg-orange-100 text-orange-600' },
+                    { icon: '🪄', title: 'Magic Whiteboard', desc: 'Drag assets, draw with glow-markers, and manage multiple saved lesson states with the interactive board.', color: 'bg-blue-100 text-blue-600' },
+                    { icon: '🎵', title: 'Classroom Jams', desc: 'Set the mood with ambient music and interactive sing-along lyrics to keep the energy high and fun.', color: 'bg-pink-100 text-pink-600' },
+                    { icon: '📦', title: 'Magic Asset Drawer', desc: 'An infinite supply of letters, numbers, and more. Simply drag them onto the board for instant, interactive learning.', color: 'bg-green-100 text-green-600' },
+                    { icon: '🎮', title: 'Game Zone', desc: 'Browse a curated library of online, educational games designed to make learning an engaging adventure.', color: 'bg-purple-100 text-purple-600' },
+                    { icon: '📚', title: 'Public Library', desc: 'Share your lesson plans or use ones created by other teachers to enhance your curriculum.', color: 'bg-amber-100 text-amber-600' },
+                    { icon: '🏆', title: 'Reward Badges', desc: 'Motivate students by easily handing out fun, animated badges for their achievements and participation.', color: 'bg-yellow-100 text-yellow-600' },
+                    { icon: '⏰', title: 'Fun Timers', desc: 'Keep activities on track with visual, playful countdown timers featuring rockets and floating balloons.', color: 'bg-red-100 text-red-600' }
+                  ],
+                  ...[
+                    { icon: '🎨', title: 'Classroom Designer', desc: 'Pick your wall colors, carpet textures, and even class pets to design your ideal classroom environment.', color: 'bg-orange-100 text-orange-600' },
+                    { icon: '🪄', title: 'Magic Whiteboard', desc: 'Drag assets, draw with glow-markers, and manage multiple saved lesson states with the interactive board.', color: 'bg-blue-100 text-blue-600' },
+                    { icon: '🎵', title: 'Classroom Jams', desc: 'Set the mood with ambient music and interactive sing-along lyrics to keep the energy high and fun.', color: 'bg-pink-100 text-pink-600' },
+                    { icon: '📦', title: 'Magic Asset Drawer', desc: 'An infinite supply of letters, numbers, and more. Simply drag them onto the board for instant, interactive learning.', color: 'bg-green-100 text-green-600' },
+                    { icon: '🎮', title: 'Game Zone', desc: 'Browse a curated library of online, educational games designed to make learning an engaging adventure.', color: 'bg-purple-100 text-purple-600' },
+                    { icon: '📚', title: 'Public Library', desc: 'Share your lesson plans or use ones created by other teachers to enhance your curriculum.', color: 'bg-amber-100 text-amber-600' },
+                    { icon: '🏆', title: 'Reward Badges', desc: 'Motivate students by easily handing out fun, animated badges for their achievements and participation.', color: 'bg-yellow-100 text-yellow-600' },
+                    { icon: '⏰', title: 'Fun Timers', desc: 'Keep activities on track with visual, playful countdown timers featuring rockets and floating balloons.', color: 'bg-red-100 text-red-600' }
+                  ]
+                ].map((feature, index) => (
+                  <div key={index} className="w-[350px] flex-shrink-0 [&>div]:h-full">
+                    <FeatureCard icon={feature.icon} title={feature.title} desc={feature.desc} color={feature.color} />
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -1039,7 +1051,7 @@ const App: React.FC = () => {
                   icon="👨‍🏫"
                   title="Classroom Mode" 
                   color="border-blue-200"
-                  desc="Play and learn! Switch to the immersive full-screen view where students interact with your lessons, music, and AI pet." 
+                  desc="Play and learn! Switch to the immersive full-screen, whiteboard view where students interact with your lessons." 
                 />
               </div>
             </div>
@@ -1091,19 +1103,33 @@ const App: React.FC = () => {
               </div>
 
               {/* Carousel container */}
-              <div className="relative group">
-                <div className="flex overflow-x-auto gap-8 pb-12 snap-x snap-mandatory scroll-smooth hide-scrollbar px-4">
-                  <ExampleCard emoji="🍪" title="Counting Cookies" color="bg-orange-100" />
-                  <ExampleCard emoji="🦁" title="Phonics Jungle" color="bg-green-100" />
-                  <ExampleCard emoji="🚀" title="Space Math Hub" color="bg-blue-100" />
-                  <ExampleCard emoji="🏠" title="Lava Science" color="bg-red-100" />
-                  <ExampleCard emoji="🏰" title="Medieval Phonics" color="bg-indigo-100" />
-                  <ExampleCard emoji="🏠" title="Ocean Explorers" color="bg-cyan-100" />
-                  <ExampleCard emoji="🧪" title="Chemistry Kids" color="bg-purple-100" />
+              <div className="relative w-full flex overflow-hidden group">
+                <style>{`
+                  .animate-marquee-customization {
+                    animation: marquee 30s linear infinite;
+                  }
+                  .animate-marquee-customization:hover {
+                    animation-play-state: paused;
+                  }
+                `}</style>
+                <div className="absolute left-0 top-0 bottom-12 w-16 sm:w-32 bg-gradient-to-r from-slate-50 to-transparent z-10 pointer-events-none"></div>
+                <div className="absolute right-0 top-0 bottom-12 w-16 sm:w-32 bg-gradient-to-l from-slate-50 to-transparent z-10 pointer-events-none"></div>
+                
+                <div className="flex w-max animate-marquee-customization gap-8 pb-12 pt-4 px-4">
+                  {[...Array(2)].map((_, i) => (
+                    <React.Fragment key={i}>
+                      <ExampleCard emoji="🍪" title="Counting Cookies" color="bg-orange-100" />
+                      <ExampleCard emoji="🦁" title="Phonics Jungle" color="bg-green-100" />
+                      <ExampleCard emoji="🚀" title="Space Math Hub" color="bg-blue-100" />
+                      <ExampleCard emoji="🌋" title="Lava Science" color="bg-red-100" />
+                      <ExampleCard emoji="🏰" title="Medieval Phonics" color="bg-indigo-100" />
+                      <ExampleCard emoji="🌊" title="Ocean Explorers" color="bg-cyan-100" />
+                      <ExampleCard emoji="🧪" title="Chemistry Kids" color="bg-purple-100" />
+                      <ExampleCard emoji="🦖" title="Dino History" color="bg-amber-100" />
+                      <ExampleCard emoji="🌻" title="Botany Gardens" color="bg-emerald-100" />
+                    </React.Fragment>
+                  ))}
                 </div>
-                {/* Visual fade indicators for mobile/desktop */}
-                <div className="absolute left-0 top-0 bottom-12 w-20 bg-gradient-to-r from-slate-50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="absolute right-0 top-0 bottom-12 w-20 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
 
               <div className="mt-12 text-center">
@@ -1116,7 +1142,7 @@ const App: React.FC = () => {
           </section>
 
           {/* Customization Quote */}
-          <section id="custom-section" className="py-24 px-6 sm:px-12 bg-blue-600 relative">
+          <section id="custom-section" className="py-24 px-6 sm:px-12 bg-blue-500 relative">
             <div className="max-w-4xl mx-auto text-center">
               <span className="text-white/60 font-bold uppercase tracking-widest text-sm mb-6 block">The Teacher's Heart</span>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-10 leading-tight">
@@ -1125,7 +1151,7 @@ const App: React.FC = () => {
               <div className="flex items-center justify-center gap-4">
                 <div className="w-16 h-16 bg-white/20 rounded-full border-2 border-white/30 flex items-center justify-center text-2xl overflow-hidden">🍎</div>
                 <div className="text-left">
-                  <span className="text-white font-bold block text-lg">Amborse Commisariat</span>
+                  <span className="text-white font-bold block text-lg">Ambrose Commisariat</span>
                   <span className="text-white/60 font-medium">Preschool Teacher for Gems Academy</span>
                 </div>
               </div>
@@ -1133,19 +1159,19 @@ const App: React.FC = () => {
           </section>
 
           {/* Footer */}
-          <footer className="bg-slate-900 text-slate-300 py-20 px-6 sm:px-12 border-t border-slate-800">
-            <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
+          <footer className="bg-slate-900 text-slate-300 py-10 px-6 sm:px-12 border-t border-slate-800">
+            {/* <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
               <RainbowLogo size="text-3xl" />
               <p className="mt-6 text-slate-500 max-w-xl">
                 Empowering the next generation of learners through high-fidelity, interactive digital teaching environments. Built with ❤️ for educators.
               </p>
-              <div className="mt-8 flex gap-6">
+            </div> */}
+            <div className="mt-8 flex gap-6 justify-center">
                 {['🐦', '📸', '👤'].map((icon, i) => (
                   <button key={i} className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 transition-all flex items-center justify-center text-2xl hover:scale-110 active:scale-95">{icon}</button>
                 ))}
-              </div>
             </div>
-            <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-slate-800 text-center text-xs text-slate-600 font-bold uppercase tracking-widest">
+            <div className="max-w-6xl mx-auto mt-10 pt-8 border-t border-slate-800 text-center text-xs text-slate-600 font-bold uppercase tracking-widest">
               © 2025 Teachly Interactive. All Rights Reserved.
             </div>
           </footer>
@@ -1153,7 +1179,16 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'auth' && (
-        <Auth onLogin={handleLogin} initialMode={authInitialMode} onBack={() => setCurrentView('landing')} />
+        <Auth 
+          onLogin={handleLogin} 
+          initialMode={authInitialMode} 
+          isRecovering={recoveryMode}
+          onPasswordUpdated={() => {
+            setRecoveryMode(false);
+            setCurrentView('landing');
+          }}
+          onBack={() => setCurrentView('landing')} 
+        />
       )}
 
       {currentView === 'public-library' && (
