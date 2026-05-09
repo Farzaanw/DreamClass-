@@ -44,6 +44,8 @@ interface DashboardProps {
   onUpdateGames: (games: Game[]) => void;
   onUpdateCalendarData: (calendarData: any) => void;
   onAddResourceToClassroom: (resource: Resource, subjectId: string) => void;
+  materialsOpenedFromConcept?: boolean;
+  onReturnToConceptFromMaterials?: () => void;
   initialView?: 'overview' | 'materials' | 'songs' | 'games';
   initialSubjectId?: string;
   cursorStyle: {
@@ -56,16 +58,11 @@ interface DashboardProps {
 }
 
 const EMOJI_OPTIONS = [
-  // Learning & School
-  '🍎', '📚', '✏️', '🎨', '🔬', '🚀', '🌍', '➕', '🔢', '🧩', '🎸', '🧠', '🔤', '🧪', '📐', '🎭', '🏫', '🎒', '💻',
-  // Animals (One representative)
-  '🦁',
-  // Plants (One representative)
-  '🌱',
-  // Weather & Environment
-  '☀️', '☁️', '❄️', '🌈', '🌋', '🌊',
-  // Food & Health
-  '🍕', '🍦', '🍓', '❤️', '🩺'
+  '\u{1F4DA}', '\u270F\uFE0F', '\u{1F4DD}', '\u{1F9EE}', '\u{1F4D0}', '\u{1F4CF}', '\u{1F52C}', '\u{1F9EA}', '\u{1F9E0}', '\u{1F393}', '\u{1F3EB}', '\u{1F4D6}',
+  '\u{1F524}', '\u{1F522}', '\u{1F5FA}\uFE0F', '\u{1F30D}', '\u{1F9E9}', '\u{1F3A8}', '\u{1F3B5}', '\u{1F3AD}', '\u{1F4A1}', '\u{1F58D}\uFE0F', '\u{1F4CE}', '\u{1F4CC}',
+  '\u{1F9F7}', '\u{1F4C2}', '\u{1F4C1}', '\u{1F4C4}', '\u{1F4C3}', '\u{1F4CA}', '\u{1F4C8}', '\u23F0', '\u{1F9ED}', '\u{1F9F5}', '\u2702\uFE0F', '\u{1F9F0}',
+  '\u{1F6E0}\uFE0F', '\u{1F9F1}', '\u{1FAB4}', '\u{1F331}', '\u{1F98B}', '\u{1F41D}', '\u{1F422}', '\u{1F989}', '\u2600\uFE0F', '\u2601\uFE0F', '\u2744\uFE0F', '\u{1F308}',
+  '\u{1F30A}', '\u{1F319}', '\u{1F680}', '\u{1F6F0}\uFE0F', '\u{1F9B4}', '\u2764\uFE0F', '\u{1FA7A}', '\u{1F34E}', '\u{1F955}', '\u26BD', '\u{1F3C0}', '\u2B50'
 ];
 
 const PUBLIC_SONG_POOL: Song[] = [
@@ -109,6 +106,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateGames,
   onUpdateCalendarData,
   onAddResourceToClassroom,
+  materialsOpenedFromConcept = false,
+  onReturnToConceptFromMaterials,
   initialView = 'overview',
   initialSubjectId,
   cursorStyle,
@@ -117,6 +116,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [view, setView] = useState<'overview' | 'materials' | 'songs' | 'games'>(initialView);
   const [materialSubView, setMaterialSubView] = useState<'my' | 'public'>('my');
+  const [expandedMaterialSubjects, setExpandedMaterialSubjects] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubjectForUpload, setActiveSubjectForUpload] = useState<string | null>(null);
@@ -181,7 +181,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [concepts, setConcepts] = useState<{ title: string; icon: string; description: string }[]>([
     { title: '', icon: '✨', description: '' }
   ]);
-  const [visibleEmojiCount, setVisibleEmojiCount] = useState(9);
 
   useEffect(() => {
     if (toast) {
@@ -260,7 +259,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       icon: c.icon,
       description: c.description
     })));
-    setVisibleEmojiCount(20);
     setShowSubjectModal(true);
   };
 
@@ -311,6 +309,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  const toggleMaterialSubject = (subjectId: string) => {
+    setExpandedMaterialSubjects(prev => ({ ...prev, [subjectId]: !prev[subjectId] }));
   };
 
   const readFileAsDataURL = (file: File): Promise<string> => {
@@ -373,21 +375,30 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !activeSubjectForUpload) return;
-    setIsProcessing(true);
-    const newMaterials: MaterialFile[] = [];
-    for (const file of Array.from(files) as File[]) {
-      let type: 'pdf' | 'slides' | 'video' = 'pdf';
-      const name = file.name.toLowerCase();
-      if (name.endsWith('.pdf')) type = 'pdf';
-      else if (name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || file.type.startsWith('video/')) type = 'video';
-      else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || file.type.includes('presentation')) type = 'slides';
-      const thumbnail = await generateThumbnail(file, type);
-      const content = await readFileAsDataURL(file);
-      newMaterials.push({ id: Math.random().toString(36).substr(2, 9), name: file.name, type: type, subjectId: activeSubjectForUpload!, timestamp: Date.now(), thumbnailUrl: thumbnail, content: content });
+    if (files.length > 1) {
+      setToast('Please upload one file at a time.');
     }
+    const file = files[0];
+    setIsProcessing(true);
+    let type: 'pdf' | 'slides' | 'video' = 'pdf';
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.pdf')) type = 'pdf';
+    else if (name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || file.type.startsWith('video/')) type = 'video';
+    else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || file.type.includes('presentation')) type = 'slides';
+    const thumbnail = await generateThumbnail(file, type);
+    const contentData = await readFileAsDataURL(file);
+    const newMaterial: MaterialFile = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      type,
+      subjectId: activeSubjectForUpload,
+      timestamp: Date.now(),
+      thumbnailUrl: thumbnail,
+      content: contentData
+    };
     const currentMaterials = user.materials || [];
-    onUpdateMaterials([...currentMaterials, ...newMaterials]);
-    setToast(`Successfully added ${newMaterials.length} file(s)! 🎉`);
+    onUpdateMaterials([...currentMaterials, newMaterial]);
+    setToast(`Added "${file.name}"!`);
     e.target.value = '';
     setActiveSubjectForUpload(null);
     setIsProcessing(false);
@@ -570,12 +581,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   if (view === 'materials') {
     return (
       <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
-        <input type="file" ref={fileInputRef} className="hidden" multiple accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*" onChange={handleFileChange} />
+        <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*" onChange={handleFileChange} />
         {isProcessing && (
           <div className="fixed inset-0 z-[300] bg-white/60 backdrop-blur-md flex items-center justify-center">
              <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 animate-pulse border-4 border-blue-400">
                 <div className="text-6xl animate-spin">⚙️</div>
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight text-center">Magically processing your files...<br/><span className="text-blue-500">Creating thumbnails ✨</span></h2>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight text-center">Processing your file...<br/><span className="text-blue-500">Creating thumbnail...</span></h2>
              </div>
           </div>
         )}
@@ -612,7 +623,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
         <header className="flex justify-between items-center mb-10">
           <div className="flex items-center gap-4">
-            <button onClick={() => setView('overview')} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90">⬅️</button>
+            <button onClick={() => { if (materialsOpenedFromConcept && onReturnToConceptFromMaterials) { onReturnToConceptFromMaterials(); } else { setView('overview'); } }} className="w-12 h-12 bg-white rounded-2xl shadow border-2 border-slate-100 flex items-center justify-center text-xl hover:bg-slate-50 transition-all active:scale-90">⬅️</button>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Classroom Material 📚</h1>
           </div>
         </header>
@@ -635,35 +646,58 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-12">
             {allSubjects.map(subject => {
               const subjectMaterials = (user.materials || []).filter(m => m.subjectId === subject.id);
+              const isExpanded = !!expandedMaterialSubjects[subject.id];
+
               return (
-                <div key={subject.id} id={`subject-section-${subject.id}`} className="bg-white/50 p-8 rounded-[3rem] border-2 border-slate-100/50 hover:bg-white transition-colors duration-500">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                <div key={subject.id} id={`subject-section-${subject.id}`} className="bg-white/85 p-8 rounded-[3rem] border-2 border-slate-200 shadow-sm hover:bg-white transition-colors duration-500">
+                  <button
+                    type="button"
+                    onClick={() => toggleMaterialSubject(subject.id)}
+                    className="w-full flex items-center justify-between gap-6 text-left"
+                  >
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">{subject.icon || '⭐'}</div>
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border-2 border-slate-50 flex items-center justify-center text-4xl">{subject.icon || '*'}</div>
                       <div>
                         <h3 className="text-2xl font-black text-slate-700 tracking-tight">{subject.title}</h3>
-                        <div className="flex items-center gap-2 mt-1"><span className="bg-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span></div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="bg-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-black uppercase tracking-widest">{subjectMaterials.length} Resources</span>
+                        </div>
                       </div>
                     </div>
-                    <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
-                      <span className="text-xl group-hover:rotate-12 transition-transform">➕</span><span>Add {subject.title} Files</span>
-                    </button>
-                  </div>
-                  {subjectMaterials.length === 0 ? (
-                    <div className="bg-white/40 border-4 border-dashed border-slate-100 p-16 rounded-[2.5rem] text-center text-slate-400 font-bold"><div className="text-6xl mb-6 opacity-20">📁</div><p className="text-lg">No files here yet!</p><p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p></div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                      {subjectMaterials.map(mat => (
-                        <div key={mat.id} onClick={() => setPreviewMaterial(mat)} className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden flex flex-col h-[240px] cursor-pointer">
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(mat.id); }} className="absolute top-2 right-2 w-10 h-10 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-20 border-4 border-white" title="Delete Material">✕</button>
-                          <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
-                            {mat.thumbnailUrl ? <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" /> : <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>}
-                            <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center"><div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">🔍</div></div>
-                            <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
-                          </div>
-                          <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
+                    <div className="w-12 h-12 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-center text-slate-500 shadow-[0_0_12px_rgba(59,130,246,0.18)]">
+                      {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-8">
+                      <div className="flex justify-end mb-6">
+                        <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
+                          <span className="text-xl group-hover:rotate-12 transition-transform">+</span><span>Add {subject.title} Files</span>
+                        </button>
+                      </div>
+
+                      {subjectMaterials.length === 0 ? (
+                        <div className="bg-white/40 border-4 border-dashed border-slate-100 p-16 rounded-[2.5rem] text-center text-slate-400 font-bold">
+                          <div className="text-6xl mb-6 opacity-20">[ ]</div>
+                          <p className="text-lg">No files here yet!</p>
+                          <p className="text-sm opacity-60">Click the button above to upload PDFs, Slides, or Videos.</p>
                         </div>
-                      ))}
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                          {subjectMaterials.map(mat => (
+                            <div key={mat.id} onClick={() => setPreviewMaterial(mat)} className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 relative group hover:shadow-2xl hover:-translate-y-2 transition-all overflow-hidden flex flex-col h-[240px] cursor-pointer">
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(mat.id); }} className="absolute top-2 right-2 w-10 h-10 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg flex items-center justify-center z-20 border-4 border-white" title="Delete Material">x</button>
+                              <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                                {mat.thumbnailUrl ? <img src={mat.thumbnailUrl} alt={mat.name} className="w-full h-full object-cover" /> : <div className="text-7xl group-hover:scale-110 transition-transform">{getFileIcon(mat.type)}</div>}
+                                <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center"><div className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-xl opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all">View</div></div>
+                                <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm"><span>{getFileIcon(mat.type)}</span><span className="text-slate-600">{mat.type}</span></div>
+                              </div>
+                              <div className="p-4 bg-white border-t border-slate-100"><h4 className="font-black text-slate-800 truncate text-sm px-1" title={mat.name}>{mat.name}</h4><div className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 ml-1">Uploaded {new Date(mat.timestamp).toLocaleDateString()}</div></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -674,18 +708,17 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="animate-fade-in">
             <PublicLibrary 
               onBack={() => setMaterialSubView('my')}
-              onLogin={() => {}} // Not needed in dashboard
+              onLogin={() => {}}
               isLoggedIn={true}
               onAddResource={(resource, subjectId) => {
                 onAddResourceToClassroom(resource, subjectId);
-                // Switch back to "My Material" after a short delay to show success message
                 setTimeout(() => {
                   setMaterialSubView('my');
-                  // Scroll to the subject section
                   setTimeout(() => {
                     const element = document.getElementById(`subject-section-${subjectId}`);
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      setExpandedMaterialSubjects(prev => ({ ...prev, [subjectId]: true }));
                     }
                   }, 300);
                 }, 1500);
@@ -695,8 +728,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               buttonText="Add"
             />
           </div>
-        )}
-      </div>
+        )}      </div>
     );
   }
 
@@ -1170,17 +1202,13 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="cursor-menu-container relative ml-4">
               <button 
                 onClick={() => setShowCursorMenu(!showCursorMenu)}
-                className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border-2 border-blue-100 shadow-sm hover:border-blue-300 transition-colors group"
+                className={`flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border-2 shadow-sm transition-all ${showCursorMenu ? 'border-blue-300' : 'border-slate-100 hover:border-blue-200'}`}
               >
-                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500">
                   <MousePointer size={18} />
                 </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-xs font-bold text-blue-500 uppercase tracking-widest leading-none mb-0.5">Cursor Style</span>
-                  <div className="flex items-center gap-1">
-                    <ChevronDown size={12} className={`text-gray-400 transition-transform ${showCursorMenu ? 'rotate-180' : ''}`} />
-                  </div>
-                </div>
+                <span className="text-sm font-black text-slate-700">Cursor Style</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showCursorMenu ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -1246,10 +1274,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <button 
                               key={st.id}
                               onClick={() => onCursorStyleChange({ ...cursorStyle, style: st.id })}
-                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.style === st.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                              className={`flex items-center justify-center py-3 rounded-xl transition-all border-2 ${cursorStyle.style === st.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
                               {st.icon}
-                              <span className="text-[11px] font-bold mt-1 capitalize">{st.id}</span>
                             </button>
                           ))}
                         </div>
@@ -1274,10 +1301,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <button 
                               key={tr.id}
                               onClick={() => onCursorStyleChange({ ...cursorStyle, trail: tr.id })}
-                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.trail === tr.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                              className={`flex items-center justify-center py-3 rounded-xl transition-all border-2 ${cursorStyle.trail === tr.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
-                              <span className="text-sm">{tr.icon}</span>
-                              <span className="text-[11px] font-bold mt-1 capitalize">{tr.id}</span>
+                              <span className="text-base">{tr.icon}</span>
                             </button>
                           ))}
                         </div>
@@ -1298,10 +1324,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <button 
                               key={ani.id}
                               onClick={() => onCursorStyleChange({ ...cursorStyle, animation: ani.id })}
-                              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all border-2 ${cursorStyle.animation === ani.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
+                              className={`flex items-center justify-center py-3 rounded-xl transition-all border-2 ${cursorStyle.animation === ani.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100'}`}
                             >
-                              <span className="text-sm">{ani.icon}</span>
-                              <span className="text-[11px] font-bold mt-1 capitalize">{ani.id}</span>
+                              <span className="text-base">{ani.icon}</span>
                             </button>
                           ))}
                         </div>
@@ -1351,10 +1376,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                 🎒
               </div>
               <div className="text-center mb-1">
-                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Subject</h2>
-                <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Subject?</h2>
+                {/* <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
                   Are you sure you want to delete <span className="text-rose-500">"{subjectToDelete.name}"</span>? 
-                </p>
+                </p> */}
               </div>
 
               <div className="flex flex-col gap-4">
@@ -1363,7 +1388,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => setIsDeleteSubjectModalOpen(false)}
                     className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
                   >
-                    No, Go Back
+                    Go Back
                   </button>
                   <button
                     onClick={() => {
@@ -1373,7 +1398,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     }}
                     className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
                   >
-                    Yes, Delete
+                    Yes
                   </button>
                 </div>
                 <div className="bg-rose-50 p-3 rounded-xl">
@@ -1390,7 +1415,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           onClick={appMode === 'teacher' ? onNavigateDesigner : undefined} 
           animate={appMode === 'teacher' ? { y: [0, -8, 0] } : {}}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:scale-[1.01]'}`}
+          className={`col-span-full md:col-span-2 p-10 rounded-[3rem] text-white shadow-xl transition-all relative overflow-hidden border-b-[12px] ${appMode === 'classroom' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-800/30' : 'bg-gradient-to-r from-purple-500 to-indigo-600 border-indigo-800/30 cursor-pointer hover:border-blue-400 hover:-translate-y-2'}`}
         >
           <div className="relative z-10"><h2 className="text-4xl font-bold mb-3">{appMode === 'classroom' ? 'Ready for Lessons?' : 'Decorate Your Classrooms'}</h2><p className="text-white/90 max-w-md text-lg">{appMode === 'classroom' ? 'Select a subject below to jump into an interactive session with your students.' : 'Customize colors, stickers, and music to create the perfect magic learning environment.'}</p></div>
           <div className="absolute right-[-30px] bottom-[-30px] text-[12rem] opacity-20 transform -rotate-12 select-none pointer-events-none">{appMode === 'classroom' ? '🎓' : '🏫'}</div>
@@ -1440,6 +1465,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       setIsDeleteSubjectModalOpen(true);
                     }} 
                     className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 border-4 border-white transform transition-all hover:scale-110 active:scale-95"
+                    aria-label={`Delete ${subject.title}`}
+                    title={`Delete ${subject.title}`}
                   >
                     🗑️
                   </button>
@@ -1461,7 +1488,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         {appMode === 'teacher' && (
           <motion.div 
-            onClick={() => { handleCloseSubjectModal(); setVisibleEmojiCount(20); setShowSubjectModal(true); }} 
+            onClick={() => { handleCloseSubjectModal(); setShowSubjectModal(true); }}
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 + (allSubjects.length * 0.1) }}
             className="bg-white border-4 border-dashed border-gray-200 p-8 rounded-[2.5rem] shadow-sm cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center group h-full min-h-[220px]"
@@ -1526,35 +1553,25 @@ const Dashboard: React.FC<DashboardProps> = ({
             <form onSubmit={handleCreateOrUpdateSubject} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-500 ml-4">ICON</label>
-                <div className="flex flex-wrap gap-2 p-4 bg-blue-50 rounded-3xl justify-center">
-                  {EMOJI_OPTIONS.slice(0, visibleEmojiCount).map(emoji => (
-                    <button key={emoji} type="button" onClick={() => setNewIcon(emoji)} className={`text-2xl p-2 rounded-xl ${newIcon === emoji ? 'bg-white shadow-md border-2 border-blue-400' : 'opacity-50'}`}>{emoji}</button>
-                  ))}
-                  <div className="w-full flex justify-center gap-4 mt-4">
-                    <button 
-                      type="button" 
-                      onClick={() => setVisibleEmojiCount(prev => Math.max(9, prev - 9))}
-                      disabled={visibleEmojiCount <= 9}
-                      className={`p-2 rounded-xl border-2 transition-all ${visibleEmojiCount <= 9 ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'border-blue-100 text-blue-500 hover:bg-blue-100'}`}
-                      title="Show Less"
+                <div className="p-4 bg-blue-50 rounded-3xl">
+                  <div className="max-h-[130px] overflow-y-auto pr-1 grid grid-cols-8 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewIcon('' )}
+                      className={`h-11 rounded-xl border-2 text-[10px] font-black tracking-wide transition-all ${newIcon === '' ? 'bg-white shadow-md border-blue-400 text-blue-600' : 'border-transparent bg-white/60 text-slate-500 hover:bg-white'}`}
+                      title="No icon"
                     >
-                      <ChevronUp size={24} />
+                      NONE
                     </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setVisibleEmojiCount(prev => Math.min(EMOJI_OPTIONS.length, prev + 9))}
-                      disabled={visibleEmojiCount >= EMOJI_OPTIONS.length}
-                      className={`p-2 rounded-xl border-2 transition-all ${visibleEmojiCount >= EMOJI_OPTIONS.length ? 'opacity-20 cursor-not-allowed border-gray-200 text-gray-400' : 'border-blue-100 text-blue-500 hover:bg-blue-100'}`}
-                      title="Show More"
-                    >
-                      <ChevronDown size={24} />
-                    </button>
+                    {EMOJI_OPTIONS.map(emoji => (
+                      <button key={emoji} type="button" onClick={() => setNewIcon(emoji)} className={`text-2xl p-2 rounded-xl border-2 transition-all ${newIcon === emoji ? 'bg-white shadow-md border-blue-400' : 'border-transparent bg-white/30 hover:bg-white/70'}`}>{emoji}</button>
+                    ))}
                   </div>
                 </div>
               </div>
               <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={newName} onChange={(e) => setNewName(e.target.value)} required />
               <div className="space-y-4">
-                <div className="flex justify-between items-center px-4"><label className="text-sm font-bold text-gray-500">CONCEPTS</label><button type="button" onClick={addConceptField} className="text-blue-500 font-bold text-sm">+ Add</button></div>
+                <div className="flex justify-between items-center px-4"><label className="text-base font-black text-gray-600 tracking-wide">CONCEPTS</label><button type="button" onClick={addConceptField} className="text-blue-600 font-black text-lg flex items-center gap-2"><span className="text-2xl leading-none">+</span><span>Add</span></button></div>
                 {concepts.map((concept, idx) => (
                   <div key={idx} className="flex gap-3">
                     <input type="text" className="w-16 px-2 py-4 rounded-2xl border-4 border-blue-50 bg-white text-center text-xl text-black" value={concept.icon} onChange={(e) => updateConcept(idx, 'icon', e.target.value)} />
@@ -1593,3 +1610,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 };
 
 export default Dashboard;
+
+
+
+

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Pencil, Star, Dog } from 'lucide-react';
-import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song, Game } from './types';
+import { User, SubjectId, Concept, Subject, ClassroomDesign, AppMode, MaterialFile, Song, Game, Whiteboard } from './types';
 import { SUBJECTS, WALL_COLORS, FLOOR_COLORS } from './constants';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -271,6 +271,7 @@ const App: React.FC = () => {
   const [designingSubjectId, setDesigningSubjectId] = useState<SubjectId | null>(null);
   const [dashboardInitialView, setDashboardInitialView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
   const [dashboardInitialSubjectId, setDashboardInitialSubjectId] = useState<string | null>(null);
+  const [materialsOpenedFromConcept, setMaterialsOpenedFromConcept] = useState(false);
   const [cursorStyle, setCursorStyle] = useState(() => {
     const saved = localStorage.getItem('teachly_cursor_style');
     return saved ? JSON.parse(saved) : {
@@ -379,10 +380,11 @@ const App: React.FC = () => {
       // Map designs to the Record format
       const designMap: Record<string, ClassroomDesign> = {};
       designs?.forEach(d => {
+        const designData = d.design_data || {};
         designMap[d.subject_id] = {
-          ...d.design_data,
-          whiteboards: [], // History will be fetched on demand
-          conceptBoards: {}
+          ...designData,
+          whiteboards: Array.isArray(designData.whiteboards) ? designData.whiteboards : [],
+          conceptBoards: designData.conceptBoards || {}
         };
       });
 
@@ -459,6 +461,7 @@ const App: React.FC = () => {
     }
     setDashboardInitialView('overview');
     setDashboardInitialSubjectId(null);
+    setMaterialsOpenedFromConcept(false);
     setCurrentView('dashboard');
   }, []);
 
@@ -506,9 +509,11 @@ const App: React.FC = () => {
           newDesigns[subId] = {
             ...d,
             whiteboards: d.whiteboards.filter(b => b.id !== boardId),
-            conceptBoards: d.conceptBoards ? Object.fromEntries(
-              Object.entries(d.conceptBoards).filter(([_, b]) => b.id !== boardId)
-            ) : d.conceptBoards
+            conceptBoards: d.conceptBoards
+              ? Object.fromEntries(
+                  Object.entries(d.conceptBoards as Record<string, Whiteboard>).filter(([_, b]) => b.id !== boardId)
+                )
+              : d.conceptBoards
           };
         }
       });
@@ -1259,6 +1264,11 @@ const App: React.FC = () => {
               onUpdateGames={handleUpdateGames}
               onUpdateCalendarData={handleUpdateCalendarData}
               onAddResourceToClassroom={handleAddResourceToClassroom}
+              materialsOpenedFromConcept={materialsOpenedFromConcept}
+              onReturnToConceptFromMaterials={() => {
+                setMaterialsOpenedFromConcept(false);
+                setCurrentView('concept');
+              }}
               initialView={dashboardInitialView}
               initialSubjectId={dashboardInitialSubjectId || undefined}
               cursorStyle={cursorStyle}
@@ -1307,6 +1317,7 @@ const App: React.FC = () => {
               onNavigateToMaterials={(subId) => {
                 setDashboardInitialView('materials');
                 setDashboardInitialSubjectId(subId);
+                setMaterialsOpenedFromConcept(true);
                 setCurrentView('dashboard');
               }}
               userSongs={currentUser.songs || []}

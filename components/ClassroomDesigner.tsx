@@ -23,18 +23,42 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
   
   const [history, setHistory] = useState<ClassroomDesign[]>([]);
   const [activeTarget, setActiveTarget] = useState<EditTarget>(null);
+  const mascotAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const getStickerAsset = (sticker: { url: string; emoji: string }) => sticker.url?.trim() ? sticker.url : `emoji:${sticker.emoji}`;
+  const isEmojiAsset = (asset: string) => asset.startsWith('emoji:');
+  const getEmojiFromAsset = (asset: string) => asset.replace('emoji:', '');
 
   const pushHistory = (newState: ClassroomDesign) => {
     setHistory(prev => [...prev, localDesign].slice(-20));
     setLocalDesign(newState);
   };
 
-  const toggleSticker = (url: string) => {
-    const exists = localDesign.posterUrls.includes(url);
+  const toggleSticker = (asset: string) => {
+    const exists = localDesign.posterUrls.includes(asset);
     let newUrls: string[] = exists 
-      ? localDesign.posterUrls.filter(u => u !== url)
-      : (localDesign.posterUrls.length < 12 ? [...localDesign.posterUrls, url] : localDesign.posterUrls);
+      ? localDesign.posterUrls.filter(u => u !== asset)
+      : (localDesign.posterUrls.length < 12 ? [...localDesign.posterUrls, asset] : localDesign.posterUrls);
     pushHistory({ ...localDesign, posterUrls: newUrls });
+  };
+
+  const playMascotSound = (mascotId: string) => {
+    const mascotSoundMap: Record<string, string> = {
+      cat: '/sounds/cat.wav',
+      dog: '/sounds/dog.wav',
+      monkey: '/sounds/monkey.wav',
+      robot: '/sounds/robot.wav',
+    };
+    const soundPath = mascotSoundMap[mascotId];
+    if (!soundPath) return;
+    if (mascotAudioRef.current) {
+      mascotAudioRef.current.pause();
+      mascotAudioRef.current.currentTime = 0;
+    }
+    const audio = new Audio(soundPath);
+    audio.volume = 0.7;
+    mascotAudioRef.current = audio;
+    void audio.play().catch(() => undefined);
   };
 
   const toggleShelfObject = (emoji: string) => {
@@ -73,6 +97,15 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
     return 'none';
   };
 
+  useEffect(() => {
+    return () => {
+      if (mascotAudioRef.current) {
+        mascotAudioRef.current.pause();
+        mascotAudioRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="h-screen w-full bg-[#F0F9FF] flex flex-col font-['Fredoka'] overflow-hidden">
       <header className="p-4 flex justify-between items-center bg-white border-b-4 border-blue-100 z-50 shadow-sm">
@@ -102,8 +135,10 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                 </div>
              </div>
             <div className="absolute top-4 left-0 right-0 px-12 flex flex-wrap gap-4 items-start pointer-events-none">
-              {localDesign.posterUrls.map((url, idx) => (
-                <img key={idx} src={url} className="w-16 h-16 object-contain animate-float-preview" />
+              {localDesign.posterUrls.map((asset, idx) => (
+                isEmojiAsset(asset)
+                  ? <span key={idx} className="w-16 h-16 text-5xl flex items-center justify-center animate-float-preview">{getEmojiFromAsset(asset)}</span>
+                  : <img key={idx} src={asset} className="w-16 h-16 object-contain animate-float-preview" />
               ))}
             </div>
           </div>
@@ -113,9 +148,17 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                 <span className="bg-black/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm">Click to Change Style</span>
              </div>
              {localDesign.mascot && localDesign.mascot !== 'none' && (
-               <div className="absolute bottom-6 left-12 text-7xl animate-bounce-mascot">
+               <button
+                 type="button"
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   playMascotSound(localDesign.mascot || 'none');
+                 }}
+                 className="absolute bottom-6 left-12 text-7xl animate-bounce-mascot cursor-pointer"
+               >
                  {MASCOTS.find(m => m.id === localDesign.mascot)?.emoji}
-               </div>
+                 <span className="absolute -top-2 -right-2 bg-white/90 text-blue-500 rounded-full text-xs px-2 py-1 font-bold shadow-md">🔊</span>
+               </button>
              )}
           </div>
         </div>
@@ -204,11 +247,17 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                 )}
                 {activeTarget === 'stickers' && (
                   <div className="grid grid-cols-4 gap-4">
-                    {STICKERS.map(s => (
-                      <button key={s.id} onClick={() => toggleSticker(s.url)} className={`aspect-square rounded-2xl border-4 p-3 ${localDesign.posterUrls.includes(s.url) ? 'border-yellow-400 bg-yellow-50' : 'border-gray-100'}`}>
-                        <img src={s.url} className="w-full h-full object-contain" />
+                    {STICKERS.map(s => {
+                      const asset = getStickerAsset(s);
+                      return (
+                      <button key={s.id} onClick={() => toggleSticker(asset)} className={`aspect-square rounded-2xl border-4 p-3 ${localDesign.posterUrls.includes(asset) ? 'border-yellow-400 bg-yellow-50' : 'border-gray-100'}`}>
+                        {isEmojiAsset(asset) ? (
+                          <span className="w-full h-full flex items-center justify-center text-5xl">{s.emoji}</span>
+                        ) : (
+                          <img src={asset} className="w-full h-full object-contain" />
+                        )}
                       </button>
-                    ))}
+                    )})}
                   </div>
                 )}
                 {activeTarget === 'shelves' && (
@@ -221,7 +270,14 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
                 {activeTarget === 'mascot' && (
                   <div className="grid grid-cols-2 gap-4">
                     {MASCOTS.map(m => (
-                      <button key={m.id} onClick={() => pushHistory({ ...localDesign, mascot: m.id })} className={`p-4 rounded-3xl border-4 flex flex-col items-center gap-2 ${localDesign.mascot === m.id ? 'border-rose-400 bg-rose-50' : 'border-gray-100'}`}>
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          pushHistory({ ...localDesign, mascot: m.id });
+                          playMascotSound(m.id);
+                        }}
+                        className={`p-4 rounded-3xl border-4 flex flex-col items-center gap-2 ${localDesign.mascot === m.id ? 'border-rose-400 bg-rose-50' : 'border-gray-100'}`}
+                      >
                         <span className="text-5xl">{m.emoji}</span>
                         <span className="font-bold text-gray-700">{m.label}</span>
                       </button>

@@ -79,7 +79,10 @@ export const MASCOTS = [
   { id: 'monkey', label: 'Nana', emoji: '🐒' },
 ];
 
-export const SHELF_OBJECTS = ['📚', '🪴', '🌍', '🏆', '🔬', '🎨', '🧸', '🔭', '🧪', '🦴', '🍎', '💎'];
+export const SHELF_OBJECTS = [
+  '📚', '🪴', '🌍', '🏆', '🔬', '🎨', '🧸', '🔭', '🧪', '🦴', '🍎', '💎',
+  '🧩', '🖍️', '✂️', '🧮', '🧠', '🛰️', '🧰', '🧵', '🎒', '🦋', '🌟', '🪁'
+];
 
 export const STICKERS = [
   // ORIGINAL SET

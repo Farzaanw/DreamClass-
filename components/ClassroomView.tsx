@@ -26,6 +26,7 @@ interface ClassroomViewProps {
 
 const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, onSelectConcept }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mascotAudioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLyrics, setShowLyrics] = useState(false);
   const [currentLyricIdx, setCurrentLyricIdx] = useState(0);
@@ -34,6 +35,8 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const [isMascotPeeking, setIsMascotPeeking] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragDistance, setDragDistance] = useState(0);
+  const isEmojiSticker = (asset: string) => asset.startsWith('emoji:');
+  const getEmojiSticker = (asset: string) => asset.replace('emoji:', '');
   const velocityRef = useRef<number>(0);
   const lastXRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -53,6 +56,9 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   };
 
   const activeMusic = MUSIC_OPTIONS.find(m => m.id === safeDesign.ambientMusic);
+  const previewBoard = subject.concepts.map(c => design.conceptBoards?.[c.id]).find(Boolean);
+  const previewItems = (previewBoard?.items || []).slice(0, 8);
+  const isImageContent = (content: string) => content.startsWith('http') || content.startsWith('data:image');
 
   useEffect(() => {
     if (audioRef.current) {
@@ -70,6 +76,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
     return () => {
       if (audioRef.current) audioRef.current.pause();
+      if (mascotAudioRef.current) mascotAudioRef.current.pause();
       cancelAnimationFrame(animationFrameRef.current);
     };
   }, [design.ambientMusic]);
@@ -93,6 +100,24 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   }, [subject.concepts.length]);
 
   const handleMascotClick = () => {
+    const mascotSoundMap: Record<string, string> = {
+      cat: '/sounds/cat.wav',
+      dog: '/sounds/dog.wav',
+      monkey: '/sounds/monkey.wav',
+      robot: '/sounds/robot.wav',
+    };
+    const soundPath = mascotSoundMap[design.mascot || ''];
+    if (soundPath) {
+      if (mascotAudioRef.current) {
+        mascotAudioRef.current.pause();
+        mascotAudioRef.current.currentTime = 0;
+      }
+      const audio = new Audio(soundPath);
+      audio.volume = 0.7;
+      mascotAudioRef.current = audio;
+      void audio.play().catch(() => undefined);
+    }
+
     if (isMascotPeeking) {
       setIsMascotPeeking(false);
     } else {
@@ -237,9 +262,13 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
         {/* Stickers Area */}
         <div className="absolute top-[4%] w-full flex justify-center gap-4 sm:gap-8 flex-wrap px-8 sm:px-20 pointer-events-none z-10 h-[8%] overflow-hidden">
-          {design.posterUrls.map((url, i) => (
+          {design.posterUrls.map((asset, i) => (
             <div key={i} className="w-10 h-10 sm:w-16 sm:h-16 animate-float-slow flex items-center justify-center pointer-events-auto" style={{ animationDelay: `${i * 0.7}s` }}>
-              <img src={url} alt="Sticker" className="max-w-full max-h-full drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6" />
+              {isEmojiSticker(asset) ? (
+                <span className="text-3xl sm:text-5xl drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6">{getEmojiSticker(asset)}</span>
+              ) : (
+                <img src={asset} alt="Sticker" className="max-w-full max-h-full drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6" />
+              )}
             </div>
           ))}
         </div>
@@ -252,6 +281,23 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
              ))}
           </div>
         </div>
+
+        {/* Saved Board Preview Items */}
+        {previewItems.length > 0 && (
+          <div className="absolute top-[34%] left-0 right-0 z-20 flex justify-center pointer-events-none">
+            <div className="max-w-[90%] flex flex-wrap items-center justify-center gap-2 bg-white/70 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg border border-white/80">
+              {previewItems.map((item, idx) => (
+                <div key={`${item.id}-${idx}`} className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg sm:text-xl">
+                  {isImageContent(item.content) ? (
+                    <img src={item.content} alt="Saved board item" className="w-full h-full object-contain rounded-lg" />
+                  ) : (
+                    <span className="font-black text-slate-700">{item.content}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Concept Cards Carousel */}
         <div 
@@ -308,21 +354,16 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
               <span className="text-6xl sm:text-[8rem] select-none">
                 {MASCOTS.find(m => m.id === design.mascot)?.emoji}
               </span>
+              <span className="absolute top-2 right-2 bg-white/90 text-blue-500 rounded-full text-xs sm:text-sm px-2 py-1 font-bold shadow-md">
+                🔊
+              </span>
               {isMascotPeeking && (
                 <div className="absolute top-1/2 left-[80%] -translate-y-1/2 bg-white px-3 py-1 rounded-full shadow-lg text-xs font-bold text-blue-500 animate-pulse whitespace-nowrap">
                   Peek! ✨
                 </div>
               )}
               {isMascotCelebrating && <div className="absolute -top-10 -right-10 text-4xl sm:text-5xl animate-ping">✨</div>}
-              {!isMascotPeeking && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setIsMascotPeeking(true); }}
-                  className="absolute -top-3 -right-3 w-7 h-7 bg-white/80 rounded-full flex items-center justify-center text-xs shadow hover:bg-white"
-                >
-                  ⬅️
-                </button>
-              )}
-            </div>
+              </div>
           )}
         </div>
 
@@ -362,3 +403,4 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 };
 
 export default ClassroomView;
+

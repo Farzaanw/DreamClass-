@@ -188,6 +188,47 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     onSaveDesignRef.current = onSaveDesign;
   }, [onSaveDesign]);
 
+  const buildBoardSnapshot = (opts?: { includeDrawing?: boolean }): Whiteboard => {
+    const includeDrawing = !!opts?.includeDrawing;
+    const boardId = currentBoardId || `auto-${concept.id}`;
+    const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
+    const existingDrawing = design.conceptBoards?.[concept.id]?.drawingData;
+    const drawingData = includeDrawing && canvasRef.current
+      ? canvasRef.current.toDataURL('image/jpeg', 0.45)
+      : existingDrawing;
+
+    return {
+      id: boardId,
+      conceptId: concept.id,
+      name: boardName,
+      timestamp: Date.now(),
+      items: [...items],
+      bg: boardBg,
+      bgColor: boardBgColor,
+      viewport: { ...viewport },
+      customIcons: [...customIcons],
+      hiddenDrawerItems: [...hiddenDrawerItems],
+      customDrawerLabels: { ...customDrawerLabels },
+      drawingData
+    };
+  };
+
+  const buildBoardSignature = (board: Whiteboard | undefined) => {
+    if (!board) return '';
+    return JSON.stringify({
+      id: board.id,
+      conceptId: board.conceptId,
+      itemCount: board.items?.length || 0,
+      itemIds: (board.items || []).map(i => i.id),
+      bg: board.bg,
+      bgColor: board.bgColor,
+      viewport: board.viewport,
+      customIconCount: board.customIcons?.length || 0,
+      hiddenCount: board.hiddenDrawerItems?.length || 0,
+      labelKeys: Object.keys(board.customDrawerLabels || {})
+    });
+  };
+
   useEffect(() => {
     if (design.spinnerNames && JSON.stringify(design.spinnerNames) !== JSON.stringify(globalSpinnerNames)) {
       setGlobalSpinnerNames(design.spinnerNames);
@@ -1158,39 +1199,24 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Auto-save whiteboard items and basic state
+  // Auto-save whiteboard items and basic state.
+  // Avoid capturing drawing image here; canvas serialization is expensive and causes UI hitches on concept switching.
   useEffect(() => {
-    if (mode === 'teacher') {
+    if (mode === 'teacher' || mode === 'classroom') {
       const timer = setTimeout(() => {
         // Only auto-save if we have something to save
         if (items.length === 0 && boardBg === 'plain' && viewport.x === 0 && viewport.y === 0 && viewport.zoom === 1) return;
 
-        const boardId = currentBoardId || `auto-${concept.id}`;
-        const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
-
-        const newBoard: Whiteboard = {
-          id: boardId,
-          conceptId: concept.id,
-          name: boardName,
-          timestamp: Date.now(),
-          items: [...items],
-          bg: boardBg,
-          bgColor: boardBgColor,
-          viewport: { ...viewport },
-          customIcons: [...customIcons],
-          hiddenDrawerItems: [...hiddenDrawerItems],
-          // Keep existing drawing data during auto-save
-          drawingData: design.conceptBoards?.[concept.id]?.drawingData
-        };
+        const newBoard = buildBoardSnapshot({ includeDrawing: false });
 
         const existingWhiteboards = design.whiteboards || [];
-        const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
-          ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
+        const updatedWhiteboards = existingWhiteboards.some(b => b.id === newBoard.id)
+          ? existingWhiteboards.map(b => b.id === newBoard.id ? newBoard : b)
           : [...existingWhiteboards, newBoard];
 
-        // Check if data actually changed before saving
+        // Lightweight change detection (avoids deep stringifying huge drawing payloads)
         const currentSavedBoard = design.conceptBoards?.[concept.id];
-        const hasChanged = JSON.stringify(currentSavedBoard) !== JSON.stringify(newBoard);
+        const hasChanged = buildBoardSignature(currentSavedBoard) !== buildBoardSignature(newBoard);
 
         if (hasChanged) {
           onSaveDesignRef.current({
@@ -1199,10 +1225,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
           });
         }
-      }, 2000); // 2 second debounce for auto-save
+      }, 3000); // 3 second debounce for auto-save
       return () => clearTimeout(timer);
     }
-  }, [items, boardBg, boardBgColor, viewport, customIcons, hiddenDrawerItems, currentBoardId, currentBoardName, concept.id, mode, design]);
+  }, [items, boardBg, boardBgColor, viewport, customIcons, hiddenDrawerItems, customDrawerLabels, currentBoardId, currentBoardName, concept.id, mode, design]);
 
   const executeSaveBoard = async (boardId: string, boardName: string, onSuccess?: () => void) => {
     setSaveStatus('saving');
@@ -2153,41 +2179,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     key={c.title}
                     onClick={() => {
                       if (!hasMovedSwitcher.current) {
-                        // Automatically capture the current board's full state (including drawing) before switching
-                        let drawingSnapshot: string | undefined = undefined;
-                        if (canvasRef.current) {
-                          const tempCanvas = document.createElement('canvas');
-                          tempCanvas.width = canvasRef.current.width;
-                          tempCanvas.height = canvasRef.current.height;
-                          const tCtx = tempCanvas.getContext('2d');
-                          if (tCtx) {
-                            tCtx.fillStyle = '#ffffff';
-                            tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                            tCtx.drawImage(canvasRef.current, 0, 0);
-                            drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.5);
-                          }
-                        }
-
-                        const boardId = currentBoardId || `auto-${concept.id}`;
-                        const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
-
-                        const newBoard: Whiteboard = {
-                          id: boardId,
-                          conceptId: concept.id,
-                          name: boardName,
-                          timestamp: Date.now(),
-                          items: [...items],
-                          bg: boardBg,
-                          bgColor: boardBgColor,
-                          drawingData: drawingSnapshot,
-                          viewport: { ...viewport },
-                          customIcons: [...customIcons],
-                          hiddenDrawerItems: [...hiddenDrawerItems],
-                        };
+                        // Persist quickly before switching concepts.
+                        // Keep existing drawingData here to avoid blocking UI with canvas serialization.
+                        const newBoard = buildBoardSnapshot({ includeDrawing: false });
 
                         const existingWhiteboards = design.whiteboards || [];
-                        const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
-                          ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
+                        const updatedWhiteboards = existingWhiteboards.some(b => b.id === newBoard.id)
+                          ? existingWhiteboards.map(b => b.id === newBoard.id ? newBoard : b)
                           : [...existingWhiteboards, newBoard];
 
                         onSaveDesignRef.current({

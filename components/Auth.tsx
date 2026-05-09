@@ -203,6 +203,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    await handleUpdatePassword(e);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F9FF] p-4 sm:p-6 font-['Fredoka'] relative">
       {onBack && (
