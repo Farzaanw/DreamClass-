@@ -11,6 +11,7 @@ import {
 import { User, SubjectId, AppMode, Subject, Concept, MaterialFile, Song, Game } from '../types';
 import CalendarOverlay from './CalendarOverlay';
 import PublicLibrary, { Resource } from './PublicLibrary';
+import { MATERIAL_LIMITS } from '../lib/storage';
 
 const RainbowLogo: React.FC<{ size?: string }> = ({ size = "text-3xl" }) => {
   const letters = "Teachly".split("");
@@ -40,6 +41,7 @@ interface DashboardProps {
   onEditSubject: (id: string, subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
   onDeleteSubject: (id: SubjectId) => void;
   onUpdateMaterials: (materials: MaterialFile[]) => void;
+  onUploadMaterial: (subjectId: string, file: File, type: 'pdf' | 'slides' | 'video', thumbnailUrl?: string) => Promise<MaterialFile>;
   onUpdateSongs: (songs: Song[]) => void;
   onUpdateGames: (games: Game[]) => void;
   onUpdateCalendarData: (calendarData: any) => void;
@@ -102,6 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onEditSubject,
   onDeleteSubject,
   onUpdateMaterials,
+  onUploadMaterial,
   onUpdateSongs,
   onUpdateGames,
   onUpdateCalendarData,
@@ -191,7 +194,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => {
     let url: string | null = null;
-    if (previewMaterial && previewMaterial.content) {
+    if (!previewMaterial) {
+      setPreviewUrl(null);
+      return;
+    }
+    if (previewMaterial.signedUrl) {
+      setPreviewUrl(previewMaterial.signedUrl);
+      return;
+    }
+    if (previewMaterial.content) {
       if (previewMaterial.content.startsWith('data:')) {
         try {
           const parts = previewMaterial.content.split(',');
@@ -199,27 +210,15 @@ const Dashboard: React.FC<DashboardProps> = ({
           const bstr = atob(parts[1]);
           let n = bstr.length;
           const u8arr = new Uint8Array(n);
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-          }
+          while (n--) u8arr[n] = bstr.charCodeAt(n);
           const blob = new Blob([u8arr], { type: mime });
           url = URL.createObjectURL(blob);
           setPreviewUrl(url);
-        } catch (e) {
-          console.error("Manual blob conversion failed:", e);
+        } catch {
           setPreviewUrl(previewMaterial.content);
         }
       } else {
-        fetch(previewMaterial.content)
-          .then(res => res.blob())
-          .then(blob => {
-            url = URL.createObjectURL(blob);
-            setPreviewUrl(url);
-          })
-          .catch(err => {
-            console.error("Failed to generate preview blob:", err);
-            setPreviewUrl(previewMaterial.content || null);
-          });
+        setPreviewUrl(previewMaterial.content);
       }
     } else {
       setPreviewUrl(null);
@@ -315,15 +314,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     setExpandedMaterialSubjects(prev => ({ ...prev, [subjectId]: !prev[subjectId] }));
   };
 
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const generateThumbnail = async (file: File, type: 'pdf' | 'slides' | 'video'): Promise<string | undefined> => {
     return new Promise((resolve) => {
       if (type === 'video') {
@@ -385,17 +375,24 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (name.endsWith('.pdf')) type = 'pdf';
     else if (name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || file.type.startsWith('video/')) type = 'video';
     else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || file.type.includes('presentation')) type = 'slides';
+    const maxSize = type === 'video' ? MATERIAL_LIMITS.video : type === 'slides' ? MATERIAL_LIMITS.slides : MATERIAL_LIMITS.pdf;
+    if (file.size > maxSize) {
+      setToast(`File too large. Max ${type === 'video' ? '100MB' : '25MB'} for ${type}.`);
+      e.target.value = '';
+      setIsProcessing(false);
+      return;
+    }
     const thumbnail = await generateThumbnail(file, type);
-    const contentData = await readFileAsDataURL(file);
-    const newMaterial: MaterialFile = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      type,
-      subjectId: activeSubjectForUpload,
-      timestamp: Date.now(),
-      thumbnailUrl: thumbnail,
-      content: contentData
-    };
+    let newMaterial: MaterialFile;
+    try {
+      newMaterial = await onUploadMaterial(activeSubjectForUpload, file, type, thumbnail);
+    } catch (err) {
+      console.error('Material upload failed', err);
+      setToast('Upload failed. Please try again.');
+      e.target.value = '';
+      setIsProcessing(false);
+      return;
+    }
     const currentMaterials = user.materials || [];
     onUpdateMaterials([...currentMaterials, newMaterial]);
     setToast(`Added "${file.name}"!`);

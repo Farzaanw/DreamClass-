@@ -4,6 +4,7 @@ import { Concept, ClassroomDesign, BoardItem, Whiteboard, MaterialFile, Subject,
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { STICKERS, VC_WORDS, CV_WORDS, REGULAR_SIGHT_WORDS, IRREGULAR_SIGHT_WORDS, CONSONANT_DIGRAPHS, VOWEL_DIGRAPHS } from '../constants';
 import { supabase } from '../lib/supabase';
+import { STORAGE_BUCKETS, buildWhiteboardSnapshotPath, createSignedUrl, uploadFileToStorage } from '../lib/storage';
 
 interface ConceptDashboardProps {
   concept: Concept;
@@ -193,6 +194,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const boardId = currentBoardId || `auto-${concept.id}`;
     const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString()}`;
     const existingDrawing = design.conceptBoards?.[concept.id]?.drawingData;
+    const existingDrawingStoragePath = design.conceptBoards?.[concept.id]?.drawingStoragePath;
+    const existingDrawingSignedUrl = design.conceptBoards?.[concept.id]?.drawingSignedUrl;
     const drawingData = includeDrawing && canvasRef.current
       ? canvasRef.current.toDataURL('image/jpeg', 0.45)
       : existingDrawing;
@@ -209,7 +212,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       customIcons: [...customIcons],
       hiddenDrawerItems: [...hiddenDrawerItems],
       customDrawerLabels: { ...customDrawerLabels },
-      drawingData
+      drawingData,
+      drawingStoragePath: existingDrawingStoragePath,
+      drawingSignedUrl: existingDrawingSignedUrl
     };
   };
 
@@ -469,13 +474,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           if (savedState.hiddenDrawerItems) setHiddenDrawerItems(savedState.hiddenDrawerItems);
           if (savedState.customDrawerLabels) setCustomDrawerLabels(savedState.customDrawerLabels);
 
-          if (savedState.drawingData) {
+          const drawingSrc = savedState.drawingSignedUrl || savedState.drawingData;
+          if (drawingSrc) {
             const img = new Image();
             img.onload = () => {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0);
             };
-            img.src = savedState.drawingData;
+            img.src = drawingSrc;
           } else {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
           }
@@ -498,8 +504,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   useEffect(() => {
     let url: string | null = null;
-    if (activeMaterial && activeMaterial.content) {
-      if (activeMaterial.content.startsWith('data:')) {
+    const resolve = async () => {
+      if (!activeMaterial) {
+        setMaterialUrl(null);
+        return;
+      }
+      if (activeMaterial.signedUrl) {
+        setMaterialUrl(activeMaterial.signedUrl);
+        return;
+      }
+      if (activeMaterial.storagePath) {
+        try {
+          const signed = await createSignedUrl(STORAGE_BUCKETS.materials, activeMaterial.storagePath);
+          setMaterialUrl(signed);
+          return;
+        } catch {
+          // fall through to legacy content
+        }
+      }
+      if (activeMaterial.content?.startsWith('data:')) {
         try {
           const parts = activeMaterial.content.split(',');
           const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
@@ -512,25 +535,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           const blob = new Blob([u8arr], { type: mime });
           url = URL.createObjectURL(blob);
           setMaterialUrl(url);
-        } catch (e) {
-          console.error("Manual blob conversion failed:", e);
+        } catch {
           setMaterialUrl(activeMaterial.content);
         }
+      } else if (activeMaterial.content) {
+        setMaterialUrl(activeMaterial.content);
       } else {
-        fetch(activeMaterial.content)
-          .then(res => res.blob())
-          .then(blob => {
-            url = URL.createObjectURL(blob);
-            setMaterialUrl(url);
-          })
-          .catch(err => {
-            console.error("Failed to generate blob:", err);
-            setMaterialUrl(activeMaterial.content || null);
-          });
+        setMaterialUrl(null);
       }
-    } else {
-      setMaterialUrl(null);
-    }
+    };
+    resolve();
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [activeMaterial]);
 
@@ -608,10 +622,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       const ctx = contextRef.current;
       ctx.globalCompositeOperation = 'source-over';
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      if (board.drawingData) {
+      const drawingSrc = board.drawingSignedUrl || board.drawingData;
+      if (drawingSrc) {
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0);
-        img.src = board.drawingData;
+        img.src = drawingSrc;
       }
     }
     setSelectedItemId(null);
@@ -944,6 +959,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const addItem = (content: string, type: BoardItem['type'] = 'emoji', screenX?: number, screenY?: number, metadata?: any) => {
+    if (items.length >= 400) {
+      alert('Board limit reached (400 items). Remove some items before adding more.');
+      return;
+    }
     if (type === 'spinner') {
       metadata = { ...metadata, names: metadata?.names || globalSpinnerNames };
     }
@@ -1236,6 +1255,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     // Capture the full state including the drawing layer
     // We flatten onto a white background to avoid "black" JPEGs from transparency
     let drawingSnapshot: string | undefined = undefined;
+    let drawingBlob: Blob | null = null;
     if (canvasRef.current) {
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvasRef.current.width;
@@ -1246,9 +1266,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         tCtx.drawImage(canvasRef.current, 0, 0);
         drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.5);
+        drawingBlob = await new Promise((resolve) => tempCanvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.5));
       }
     }
 
+    let drawingStoragePath: string | undefined = undefined;
+    let drawingSignedUrl: string | undefined = undefined;
     const newBoard: Whiteboard = {
       id: boardId,
       conceptId: concept.id,
@@ -1258,6 +1281,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       bg: boardBg,
       bgColor: boardBgColor,
       drawingData: drawingSnapshot,
+      drawingStoragePath,
+      drawingSignedUrl,
       viewport: { ...viewport },
       customIcons: [...customIcons],
       hiddenDrawerItems: [...hiddenDrawerItems],
@@ -1267,6 +1292,28 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     // 1. Update Cloud (Supabase)
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      if (drawingBlob) {
+        try {
+          if (drawingBlob.size > 2 * 1024 * 1024) {
+            console.warn('Whiteboard snapshot exceeded 2MB target; saving without snapshot.');
+            drawingBlob = null;
+          }
+        } catch {
+          // no-op
+        }
+      }
+      if (drawingBlob) {
+        try {
+          drawingStoragePath = buildWhiteboardSnapshotPath(user.id, subjectId, boardId);
+          await uploadFileToStorage(STORAGE_BUCKETS.whiteboards, drawingStoragePath, drawingBlob, 'image/jpeg');
+          drawingSignedUrl = await createSignedUrl(STORAGE_BUCKETS.whiteboards, drawingStoragePath);
+          newBoard.drawingStoragePath = drawingStoragePath;
+          newBoard.drawingSignedUrl = drawingSignedUrl;
+          newBoard.drawingData = undefined;
+        } catch (err) {
+          console.error('Error uploading whiteboard snapshot:', err);
+        }
+      }
       // Exclude values that have their own columns
       const { id, conceptId, name, timestamp, drawingData, ...data } = newBoard;
 
@@ -1279,7 +1326,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           concept_id: concept.id,
           name: boardName,
           data: data,
-          drawing_data: drawingSnapshot,
+          drawing_data: null,
           timestamp: Date.now()
         });
 
@@ -2428,14 +2475,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
                       >
                         <div className="h-28 bg-slate-50 flex items-center justify-center relative overflow-hidden pointer-events-none">
-                          {m.type === 'pdf' && m.content ? (
+                          {(m.type === 'pdf' && (m.signedUrl || m.content)) ? (
                             <div className="absolute inset-0 flex items-center justify-center bg-white">
                               <div className="w-[400px] h-[400px] origin-center" style={{ transform: 'scale(0.35)' }}>
-                                <iframe src={`${m.content}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full pointer-events-none" scrolling="no" title={m.name} />
+                                <iframe src={`${m.signedUrl || m.content}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full pointer-events-none" scrolling="no" title={m.name} />
                               </div>
                             </div>
-                          ) : m.type === 'video' && m.content ? (
-                            <video src={m.content} className="w-full h-full object-cover pointer-events-none" muted />
+                          ) : m.type === 'video' && (m.signedUrl || m.content) ? (
+                            <video src={m.signedUrl || m.content} className="w-full h-full object-cover pointer-events-none" muted />
                           ) : m.thumbnailUrl ? (
                             <img src={m.thumbnailUrl} className="w-full h-full object-cover pointer-events-none" alt="Thumbnail" />
                           ) : (

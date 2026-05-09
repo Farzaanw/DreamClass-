@@ -13,6 +13,15 @@ interface AuthProps {
 
 type AuthView = 'login' | 'signup' | 'reset-request' | 'reset-password' | 'update-password';
 
+const sanitizeEmail = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '');
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
 const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecovering = false, onPasswordUpdated, onBack }) => {
   const [view, setView] = useState<AuthView>(isRecovering ? 'update-password' : initialMode);
   const [username, setUsername] = useState('');
@@ -45,15 +54,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
     setError('');
     setLoading(true);
 
-    if (!username || !email || !password) {
-      setError('Please fill in all fields! 📝');
+    const normalizedEmail = sanitizeEmail(email);
+
+    if (!username || !normalizedEmail || !password) {
+      setError('Please fill in all fields.');
+      setLoading(false);
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.');
       setLoading(false);
       return;
     }
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -66,13 +83,17 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
 
       if (authData.user) {
         // Create the initial profile record
-        await supabase.from('profiles').insert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           id: authData.user.id,
           username: username,
-          email: email.toLowerCase(),
+          email: normalizedEmail,
           hidden_subject_ids: [],
           progress: {}
-        });
+        }, { onConflict: 'id' });
+
+        if (profileError) {
+          console.error('Profile upsert failed after signup:', profileError);
+        }
 
         setSuccess('Account created! Please check your email for verification (if enabled) or log in now. 🎉');
         setView('login');
@@ -80,7 +101,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
         setPassword('');
       }
     } catch (err: any) {
-      setError(err.message || 'Error creating account. Please try again.');
+      console.error('Sign up failed:', err);
+      const details = [err?.message, err?.code, err?.status].filter(Boolean).join(' | ');
+      setError(details || 'Error creating account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -91,15 +114,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
     setError('');
     setLoading(true);
 
-    if (!email || !password) {
-      setError('Please enter your email and password! 🔑');
+    const normalizedEmail = sanitizeEmail(email);
+
+    if (!normalizedEmail || !password) {
+      setError('Please enter your email and password.');
+      setLoading(false);
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.');
       setLoading(false);
       return;
     }
 
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
@@ -131,8 +162,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
     setError('');
     setLoading(true);
     
-    if (!email) {
-      setError('Enter your email to reset! 📧');
+    const normalizedEmail = sanitizeEmail(email);
+
+    if (!normalizedEmail) {
+      setError('Enter your email to reset.');
+      setLoading(false);
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.');
       setLoading(false);
       return;
     }
@@ -142,11 +181,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
       await supabase
         .from('profiles')
         .select('id')
-        .eq('email', email.trim().toLowerCase());
+        .eq('email', normalizedEmail);
 
       // We proceed directly to Supabase Auth. 
       // Supabase is designed to handle this securely without leaking user existence.
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: window.location.origin
       });
 
@@ -491,3 +530,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
 };
 
 export default Auth;
+
+
+

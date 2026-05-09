@@ -11,6 +11,7 @@ import ConceptDashboard from './components/ConceptDashboard';
 import ClassroomDesigner from './components/ClassroomDesigner';
 import PublicLibrary, { Resource } from './components/PublicLibrary';
 import { supabase } from './lib/supabase';
+import { STORAGE_BUCKETS, buildMaterialPath, buildWhiteboardSnapshotPath, createSignedUrl, uploadDataUrlToStorage, uploadFileToStorage } from './lib/storage';
 
 type View = 'landing' | 'auth' | 'mode-selection' | 'dashboard' | 'designer-select' | 'designer' | 'classroom' | 'concept' | 'public-library';
 
@@ -297,6 +298,80 @@ const App: React.FC = () => {
     return Array.from(subjectMap.values()).filter(s => !hidden.includes(s.id));
   }, [currentUser]);
 
+  const resolveMaterialSignedUrl = useCallback(async (material: MaterialFile): Promise<MaterialFile> => {
+    if (material.signedUrl || !material.storagePath) return material;
+    try {
+      const signedUrl = await createSignedUrl(STORAGE_BUCKETS.materials, material.storagePath);
+      return { ...material, signedUrl };
+    } catch {
+      return material;
+    }
+  }, []);
+
+  const migrateLegacyStorageData = useCallback(async (userId: string, profile: any, whiteboards: any[]) => {
+    const schemaVersion = profile?.storage_schema_version || 0;
+    if (schemaVersion >= 1) return;
+
+    let materialsChanged = false;
+    const legacyMaterials: MaterialFile[] = profile?.materials || [];
+    const migratedMaterials: MaterialFile[] = [];
+
+    for (const material of legacyMaterials) {
+      if (material.storagePath) {
+        migratedMaterials.push(material);
+        continue;
+      }
+      if (material.content?.startsWith('data:')) {
+        try {
+          const storagePath = buildMaterialPath(userId, material.id, material.name);
+          await uploadDataUrlToStorage(STORAGE_BUCKETS.materials, storagePath, material.content);
+          migratedMaterials.push({
+            ...material,
+            storagePath,
+            mimeType: material.content.match(/data:(.*?);base64/)?.[1] || 'application/octet-stream',
+            byteSize: Math.floor((material.content.length * 3) / 4),
+            content: undefined
+          });
+          materialsChanged = true;
+        } catch {
+          migratedMaterials.push(material);
+        }
+      } else {
+        migratedMaterials.push(material);
+      }
+    }
+
+    let whiteboardsChanged = false;
+    for (const board of whiteboards || []) {
+      if (board.drawing_data?.startsWith('data:')) {
+        try {
+          const path = buildWhiteboardSnapshotPath(userId, board.subject_id, board.id);
+          await uploadDataUrlToStorage(STORAGE_BUCKETS.whiteboards, path, board.drawing_data);
+          const nextData = { ...(board.data || {}), drawingStoragePath: path };
+          const { error } = await supabase
+            .from('whiteboards')
+            .update({ data: nextData, drawing_data: null })
+            .eq('id', board.id)
+            .eq('user_id', userId);
+          if (!error) whiteboardsChanged = true;
+        } catch {
+          // keep legacy value on failure
+        }
+      }
+    }
+
+    if (materialsChanged || whiteboardsChanged || schemaVersion < 1) {
+      await supabase
+        .from('profiles')
+        .update({
+          materials: migratedMaterials,
+          storage_migrated_at: new Date().toISOString(),
+          storage_schema_version: 1
+        })
+        .eq('id', userId);
+    }
+  }, []);
+
   useEffect(() => {
     // 1. Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -346,13 +421,13 @@ const App: React.FC = () => {
         console.log('Profile missing, creating self-healing profile for:', userId);
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
-          .insert({
+          .upsert({
             id: userId,
             username: metaName,
             email: userEmail,
             hidden_subject_ids: [],
             progress: {}
-          })
+          }, { onConflict: 'id' })
           .select()
           .single();
         
@@ -396,14 +471,18 @@ const App: React.FC = () => {
 
       if (whiteboardsError) throw whiteboardsError;
 
+      await migrateLegacyStorageData(userId, profile, whiteboards || []);
+
       whiteboards?.forEach(w => {
         if (designMap[w.subject_id]) {
+          const drawingStoragePath = w.data?.drawingStoragePath as string | undefined;
           const board: Whiteboard = {
             ...w.data,
             id: w.id,
             conceptId: w.concept_id,
             name: w.name,
             drawingData: w.drawing_data,
+            drawingStoragePath,
             timestamp: w.timestamp
           };
           
@@ -413,6 +492,37 @@ const App: React.FC = () => {
           designMap[w.subject_id].whiteboards!.push(board);
         }
       });
+
+      // Hydrate signed urls for storage-backed assets
+      const hydratedDesignMap = { ...designMap };
+      for (const subjectId of Object.keys(hydratedDesignMap)) {
+        const d = hydratedDesignMap[subjectId];
+        const whiteboardsForSubject = d.whiteboards || [];
+        const resolved = await Promise.all(
+          whiteboardsForSubject.map(async (b) => {
+            if (!b.drawingStoragePath) return b;
+            try {
+              const drawingSignedUrl = await createSignedUrl(STORAGE_BUCKETS.whiteboards, b.drawingStoragePath);
+              return { ...b, drawingSignedUrl };
+            } catch {
+              return b;
+            }
+          })
+        );
+        hydratedDesignMap[subjectId] = {
+          ...d,
+          whiteboards: resolved,
+          conceptBoards: Object.fromEntries(
+            Object.entries(d.conceptBoards || {}).map(([cid, board]) => {
+              const found = resolved.find(r => r.id === board.id) || board;
+              return [cid, found];
+            })
+          )
+        };
+      }
+
+      const baseMaterials: MaterialFile[] = profile?.materials || [];
+      const hydratedMaterials = await Promise.all(baseMaterials.map(resolveMaterialSignedUrl));
 
       // Always set the user, even if data is still thin
       setCurrentUser({
@@ -428,12 +538,14 @@ const App: React.FC = () => {
           concepts: s.concepts
         })),
         hiddenSubjectIds: profile?.hidden_subject_ids || [],
-        classroomDesigns: designMap,
+        classroomDesigns: hydratedDesignMap,
         progress: profile?.progress || {},
         calendarData: profile?.calendar_data,
-        materials: profile?.materials || [],
+        materials: hydratedMaterials,
         songs: profile?.songs || [],
-        games: profile?.games || []
+        games: profile?.games || [],
+        storageMigratedAt: profile?.storage_migrated_at || null,
+        storageSchemaVersion: profile?.storage_schema_version || 0
       });
       setCurrentView('mode-selection');
     } catch (err) {
@@ -560,13 +672,22 @@ const App: React.FC = () => {
     if (currentUser) {
       // Exclude whiteboards from the design_data blob as they live in their own table
       const { whiteboards, ...designData } = design;
+      const conceptBoards = Object.fromEntries(
+        Object.entries(design.conceptBoards || {}).map(([conceptId, board]) => [
+          conceptId,
+          {
+            ...board,
+            drawingData: undefined
+          }
+        ])
+      );
       
       const { error } = await supabase
         .from('classroom_designs')
         .upsert({
           user_id: currentUser.id,
           subject_id: subjectId,
-          design_data: designData
+          design_data: { ...designData, conceptBoards }
         }, { onConflict: 'user_id,subject_id' });
 
       if (error) console.error('Error updating classroom design:', error);
@@ -752,20 +873,45 @@ const App: React.FC = () => {
 
   const handleUpdateMaterials = useCallback(async (materials: MaterialFile[]) => {
     if (!currentUser) return;
+    const hydrated = await Promise.all(materials.map(resolveMaterialSignedUrl));
     
     // 1. Update local state
     setCurrentUser({
       ...currentUser,
-      materials
+      materials: hydrated
     });
 
     // 2. Push to Supabase
     const { error } = await supabase
       .from('profiles')
-      .update({ materials })
+      .update({
+        materials: hydrated.map(({ signedUrl, ...m }) => m),
+        storage_schema_version: 1,
+        storage_migrated_at: currentUser.storageMigratedAt || new Date().toISOString()
+      })
       .eq('id', currentUser.id);
 
     if (error) console.error('Error updating materials in Supabase:', error);
+  }, [currentUser, resolveMaterialSignedUrl]);
+
+  const handleUploadMaterial = useCallback(async (subjectId: string, file: File, type: 'pdf' | 'slides' | 'video', thumbnailUrl?: string): Promise<MaterialFile> => {
+    if (!currentUser) throw new Error('Not authenticated');
+    const materialId = `mat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const storagePath = buildMaterialPath(currentUser.id, materialId, file.name);
+    await uploadFileToStorage(STORAGE_BUCKETS.materials, storagePath, file, file.type || undefined);
+    const signedUrl = await createSignedUrl(STORAGE_BUCKETS.materials, storagePath);
+    return {
+      id: materialId,
+      name: file.name,
+      type,
+      subjectId,
+      timestamp: Date.now(),
+      thumbnailUrl,
+      storagePath,
+      signedUrl,
+      mimeType: file.type || 'application/octet-stream',
+      byteSize: file.size
+    };
   }, [currentUser]);
 
   const handleUpdateSongs = useCallback(async (songs: Song[]) => {
@@ -822,7 +968,7 @@ const App: React.FC = () => {
     if (error) console.error('Error updating calendar data in Supabase:', error);
   }, [currentUser]);
 
-  const handleAddResourceToClassroom = useCallback((resource: Resource, subjectId: string) => {
+  const handleAddResourceToClassroom = useCallback(async (resource: Resource, subjectId: string) => {
     if (!currentUser) return;
     
     const typeMap: Record<string, 'pdf' | 'slides' | 'video'> = {
@@ -839,18 +985,15 @@ const App: React.FC = () => {
       subjectId: subjectId,
       timestamp: Date.now(),
       thumbnailUrl: resource.thumbnail,
-      content: resource.externalUrl || '#'
+      signedUrl: resource.externalUrl || '#'
     };
 
     const currentMaterials = currentUser.materials || [];
-    persistUser({
-      ...currentUser,
-      materials: [...currentMaterials, newMaterial]
-    });
+    await handleUpdateMaterials([...currentMaterials, newMaterial]);
     
     // Using a custom toast would be better, but for now we'll just log it
     console.log(`Successfully added "${resource.title}" to your classroom! 🎉`);
-  }, [currentUser, persistUser]);
+  }, [currentUser, handleUpdateMaterials]);
 
   const navigateToSubject = useCallback((subjectId: SubjectId) => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
@@ -1258,8 +1401,8 @@ const App: React.FC = () => {
               onAddSubject={handleAddSubject} 
               onEditSubject={handleEditSubject} 
               onDeleteSubject={handleDeleteSubject} 
-              onDeleteWhiteboard={handleDeleteWhiteboard}
               onUpdateMaterials={handleUpdateMaterials}
+              onUploadMaterial={handleUploadMaterial}
               onUpdateSongs={handleUpdateSongs}
               onUpdateGames={handleUpdateGames}
               onUpdateCalendarData={handleUpdateCalendarData}
@@ -1311,7 +1454,6 @@ const App: React.FC = () => {
                 }
               }} 
               onSaveDesign={handleSaveDesign} 
-              onDeleteWhiteboard={handleDeleteWhiteboard}
               onSelectConcept={(c) => setSelectedConcept(c)}
               onUpdateMaterials={handleUpdateMaterials}
               onNavigateToMaterials={(subId) => {
@@ -1366,3 +1508,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

@@ -39,7 +39,9 @@ export interface Whiteboard {
   items: BoardItem[];
   bg: 'plain' | 'lined' | 'grid';
   bgColor?: string;
-  drawingData?: string; // DataURL of the canvas layer
+  drawingData?: string; // Legacy inline DataURL (migration source)
+  drawingStoragePath?: string;
+  drawingSignedUrl?: string;
   viewport?: {
     x: number;
     y: number;
@@ -57,7 +59,11 @@ export interface MaterialFile {
   subjectId: string;
   timestamp: number;
   thumbnailUrl?: string;
-  content?: string; // Persistent file data (DataURL)
+  content?: string; // Legacy inline DataURL/external url (migration source)
+  storagePath?: string;
+  signedUrl?: string;
+  mimeType?: string;
+  byteSize?: number;
 }
 
 export interface Song {
@@ -111,6 +117,8 @@ export interface User {
   calendarData?: {
     events: Record<string, any[]>;
   };
+  storageMigratedAt?: string | null;
+  storageSchemaVersion?: number;
 }
 
 export interface Message {
