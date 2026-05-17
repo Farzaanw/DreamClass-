@@ -452,6 +452,19 @@ const App: React.FC = () => {
 
       if (designsError) throw designsError;
 
+      // Clean legacy embedded whiteboards/conceptBoards so deleted boards stop showing
+      const legacyCleanup = (designs || []).map(async (d) => {
+        const designData = d.design_data || {};
+        if (!('whiteboards' in designData) && !('conceptBoards' in designData)) return;
+        const { whiteboards, conceptBoards, ...cleaned } = designData;
+        await supabase
+          .from('classroom_designs')
+          .update({ design_data: cleaned })
+          .eq('user_id', userId)
+          .eq('subject_id', d.subject_id);
+      });
+      await Promise.all(legacyCleanup);
+
       // Map designs to the Record format
       const designMap: Record<string, ClassroomDesign> = {};
       designs?.forEach(d => {

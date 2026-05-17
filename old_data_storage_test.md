@@ -41,6 +41,8 @@ Use this workflow to validate every storage capability enabled in the cloud-stor
 3. Add items until near 400.
 4. Confirm item cap is enforced and additional adds are blocked.
 
+--- LOG OUT: confirm all user-specific data is stored and appears correctly on next login. ---
+
 ## 5) Cross-Account Isolation (Critical)
 1. Log in as `UserB`.
 2. Confirm `UserA` materials/boards are not visible in UI.
@@ -48,7 +50,7 @@ Use this workflow to validate every storage capability enabled in the cloud-stor
 4. Attempt Storage access using `UserA` object paths: must fail.
 5. Attempt upload into `UserA_UID/...` path while logged as `UserB`: must fail.
 
-## 6) Auto-Migration Validation
+## 6) Auto-Migration Validation - Optional during early dev unless legacy users exist
 1. Seed one legacy user record with:
 - material `content` as data URL
 - whiteboard legacy `drawing_data`

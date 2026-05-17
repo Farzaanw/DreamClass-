@@ -162,6 +162,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [materialUrl, setMaterialUrl] = useState<string | null>(null);
   const [materialPos, setMaterialPos] = useState({ x: 50, y: 50 });
   const isDraggingMaterial = useRef(false);
+  const draggingAssetRef = useRef<{ content: string; type: BoardItem['type']; metadata?: any } | null>(null);
+  const draggingMaterialIdRef = useRef<string | null>(null);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -180,6 +182,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   // Group box state
   const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [boxSelectRect, setBoxSelectRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
   const isBoxSelectingRef = useRef(false);
   const boxSelectStartRef = useRef<{ wx: number, wy: number } | null>(null);
@@ -564,6 +567,33 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!selectedGroupId) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+      if (event.key === 'Backspace') {
+        event.preventDefault();
+        deleteGroup(selectedGroupId);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedGroupId, groups]);
+
+  // Click outside a selected group should ungroup it (make items individual again)
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    const handleDocMouseDown = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      if (el && el.closest && el.closest(`[data-group-id="${selectedGroupId}"]`)) return;
+      setGroups(prev => prev.filter(g => g.id !== selectedGroupId));
+      setSelectedGroupId(null);
+    };
+    window.addEventListener('mousedown', handleDocMouseDown);
+    return () => window.removeEventListener('mousedown', handleDocMouseDown);
+  }, [selectedGroupId]);
+
   const handlePlaySong = (song: Song) => {
     if (activeSong?.id === song.id) {
       if (songPlaying) {
@@ -588,8 +618,24 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const saveToUndoStack = () => {
-    const drawingSnapshot = canvasRef.current ? canvasRef.current.toDataURL('image/png') : null;
+    let drawingSnapshot: string | null = null;
+    if (canvasRef.current) {
+      try {
+        drawingSnapshot = canvasRef.current.toDataURL('image/png');
+      } catch {
+        drawingSnapshot = null;
+      }
+    }
     setUndoStack(prev => [...prev, { items: [...items], drawing: drawingSnapshot }].slice(-30));
+  };
+
+  const deleteGroup = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+    saveToUndoStack();
+    setItems(prev => prev.filter(item => !group.itemIds.includes(item.id)));
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setSelectedGroupId(null);
   };
 
   const handleUndo = () => {
@@ -683,6 +729,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       if (target.classList.contains('board-lined') || target.classList.contains('board-grid') || target.tagName === 'CANVAS' || target.classList.contains('bg-white')) {
         setSelectedItemId(null);
         setGroups([]);
+        setSelectedGroupId(null);
       }
     } else {
       if (!contextRef.current) return;
@@ -771,12 +818,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const handleGroupMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
+    setSelectedGroupId(group.id);
     saveToUndoStack();
     const startX = e.clientX, startY = e.clientY;
-    let hasDragged = false;
     const initialPositions = items.filter(it => group.itemIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }));
     const handleMouseMove = (mv: MouseEvent) => {
-      if (Math.abs(mv.clientX - startX) > 3 || Math.abs(mv.clientY - startY) > 3) hasDragged = true;
       const dx = (mv.clientX - startX) / viewport.zoom;
       const dy = (mv.clientY - startY) / viewport.zoom;
       setItems(prev => prev.map(it => {
@@ -788,9 +834,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      if (!hasDragged) {
-        setGroups(prev => prev.filter(g => g.id !== group.id));
-      }
     };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
@@ -798,7 +841,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const handleGroupResizeMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
-    if (group.minimized) return;
     saveToUndoStack();
     const startX = e.clientX;
     const initialItems = items.filter(it => group.itemIds.includes(it.id));
@@ -894,6 +936,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         <button
           draggable
           onDragStart={(e) => handleDragStartAsset(e, content, type as any, metadata)}
+          onDragEnd={() => { draggingAssetRef.current = null; }}
           onClick={() => addItem(content, type as any, undefined, undefined, metadata)}
           className={baseClass}
         >
@@ -982,8 +1025,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const col = index % gridCols;
     const row = Math.floor(index / gridCols);
 
-    const defaultX = (window.innerWidth * 0.4) + (col * spacing);
-    const defaultY = (window.innerHeight * 0.3) + (row * spacing);
+    const mainRect = mainContentRef.current?.getBoundingClientRect();
+    const defaultX = (mainRect?.width || window.innerWidth) * 0.5 + (col * spacing);
+    const defaultY = (mainRect?.height || window.innerHeight) * 0.35 + (row * spacing);
 
     const worldPos = screenToWorld(screenX !== undefined ? screenX : defaultX, screenY !== undefined ? screenY : defaultY);
     const newItem: BoardItem = { id: Math.random().toString(36).substr(2, 9), content, type, x: worldPos.wx, y: worldPos.wy, scale: 1, rotation: 0, metadata };
@@ -1138,6 +1182,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const handleDragStartAsset = (e: React.DragEvent, content: string, type: BoardItem['type'], metadata?: any) => {
+    draggingAssetRef.current = { content, type, metadata };
+    const payload = JSON.stringify({ content, type, metadata: metadata || null });
+    e.dataTransfer.setData('application/json', payload);
+    e.dataTransfer.setData('text/plain', payload);
     e.dataTransfer.setData('content', content);
     e.dataTransfer.setData('type', type);
     if (metadata) e.dataTransfer.setData('metadata', JSON.stringify(metadata));
@@ -1146,11 +1194,51 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const handleDropOnBoard = (e: React.DragEvent) => {
     e.preventDefault();
-    const content = e.dataTransfer.getData('content');
-    const type = e.dataTransfer.getData('type') as BoardItem['type'];
-    const materialId = e.dataTransfer.getData('materialId');
+    const materialId = e.dataTransfer.getData('materialId') || e.dataTransfer.getData('text/material-id') || draggingMaterialIdRef.current;
     const metadataStr = e.dataTransfer.getData('metadata');
-    const metadata = metadataStr ? JSON.parse(metadataStr) : undefined;
+    let metadata = metadataStr ? JSON.parse(metadataStr) : undefined;
+    let content = e.dataTransfer.getData('content');
+    let type = e.dataTransfer.getData('type') as BoardItem['type'];
+
+    if ((!content || !type) && draggingAssetRef.current) {
+      content = content || draggingAssetRef.current.content;
+      type = type || draggingAssetRef.current.type;
+      if (draggingAssetRef.current.metadata) {
+        metadata = { ...(metadata || {}), ...draggingAssetRef.current.metadata };
+      }
+    }
+
+    if (!content || !type) {
+      const json = e.dataTransfer.getData('application/json');
+      if (json) {
+        try {
+          const parsed = JSON.parse(json);
+          content = parsed.content || content;
+          type = parsed.type || type;
+          if (parsed.metadata) {
+            metadata = { ...(metadata || {}), ...parsed.metadata };
+          }
+        } catch {
+          // fall through to text/plain
+        }
+      }
+    }
+
+    if (!content || !type) {
+      const text = e.dataTransfer.getData('text/plain');
+      if (text) {
+        try {
+          const parsedText = JSON.parse(text);
+          content = parsedText.content || content;
+          type = parsedText.type || type;
+          if (parsedText.metadata) {
+            metadata = { ...(metadata || {}), ...parsedText.metadata };
+          }
+        } catch {
+          content = content || text;
+        }
+      }
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const dropX = e.clientX - rect.left;
     const dropY = e.clientY - rect.top;
@@ -1162,15 +1250,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         setActiveMaterial(material);
         setLibraryOpen(false);
       }
+      draggingMaterialIdRef.current = null;
       return;
     }
 
-    if (content) addItem(content, type, dropX, dropY, metadata);
+    if (content && type) addItem(content, type, dropX, dropY, metadata);
+    draggingAssetRef.current = null;
   };
 
   const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
     if (activeTool === 'select' && !isPanningRef.current) {
       e.stopPropagation();
+      // If a group is selected and the clicked item is not part of it, ungroup
+      if (selectedGroupId) {
+        const activeGroup = groups.find(g => g.id === selectedGroupId);
+        if (activeGroup && !activeGroup.itemIds.includes(item.id)) {
+          setGroups(prev => prev.filter(g => g.id !== selectedGroupId));
+          setSelectedGroupId(null);
+        }
+      }
       setSelectedItemId(item.id);
 
       // Bring to front
@@ -1351,7 +1449,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
     // Trigger Success Glow
     setShowSaveGlow(true);
-    setTimeout(() => setShowSaveGlow(false), 2000);
+    setTimeout(() => setShowSaveGlow(false), 450);
 
     if (onSuccess) {
       onSuccess();
@@ -1378,15 +1476,44 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     setIsNewBoardModalOpen(true);
   };
 
+  const resetBoardState = () => {
+    setItems([]);
+    if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    setViewport({ x: 0, y: 0, zoom: 1 });
+    setUndoStack([]);
+    setSelectedItemId(null);
+    setCurrentBoardId(null);
+    setCurrentBoardName(null);
+  };
+
+  const handleNewBoard = () => {
+    const hasChanges = items.length > 0 || boardBg !== 'plain' || boardBgColor !== '#ffffff' || viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1;
+    if (hasChanges || currentBoardId) {
+      const boardId = currentBoardId || `lesson-${Date.now()}`;
+      const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      const snapshot = { ...buildBoardSnapshot({ includeDrawing: false }), id: boardId, name: boardName };
+
+      const existingWhiteboards = design.whiteboards || [];
+      const updatedWhiteboards = existingWhiteboards.some((b: Whiteboard) => b.id === boardId)
+        ? existingWhiteboards.map((b: Whiteboard) => b.id === boardId ? snapshot : b)
+        : [...existingWhiteboards, snapshot];
+
+      const updatedConceptBoards = { ...(design.conceptBoards || {}) };
+      delete updatedConceptBoards[concept.id];
+
+      onSaveDesignRef.current({
+        ...design,
+        whiteboards: updatedWhiteboards,
+        conceptBoards: updatedConceptBoards
+      });
+    }
+
+    resetBoardState();
+  };
+
   const executeClearEverything = (saveFirst: boolean) => {
     const clearAction = () => {
-      setItems([]);
-      if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      setViewport({ x: 0, y: 0, zoom: 1 });
-      setUndoStack([]);
-      setSelectedItemId(null);
-      setCurrentBoardId(null);
-      setCurrentBoardName(null);
+      resetBoardState();
       const updatedConceptBoards = { ...(design.conceptBoards || {}) };
       delete updatedConceptBoards[concept.id];
       onSaveDesign({ ...design, conceptBoards: updatedConceptBoards });
@@ -2192,34 +2319,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           {/* Concept Switcher for Teacher Mode */}
           {mode === 'teacher' && subjectConcepts.length > 1 && (
             <div className="relative ml-4 flex-1 max-w-[1200px] group/switcher">
-              <AnimatePresence>
-                {showSwitcherArrow && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute top-full left-1/2 -translate-x-1/2 mt-4 z-[100] flex flex-col items-center pointer-events-none"
-                  >
-                    <motion.span
-                      animate={{ y: [0, -5, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-3xl drop-shadow-md mb-1"
-                    >
-                      ⬆️
-                    </motion.span>
-                    <div className="bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
-                      Switch Concepts
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
               <div
                 ref={conceptSwitcherRef}
                 onMouseDown={handleSwitcherMouseDown}
                 onMouseMove={handleSwitcherMouseMove}
                 onMouseUp={handleSwitcherStop}
                 onMouseLeave={handleSwitcherStop}
-                className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border-2 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)] overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none transition-all duration-500"
+                className={`flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border-2 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)] overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none transition-all duration-500 ${showSwitcherArrow ? 'ring-4 ring-green-300/70 shadow-[0_0_30px_rgba(34,197,94,0.75)] animate-pulse' : ''}`}
               >
                 {subjectConcepts.map((c) => (
                   <button
@@ -2253,6 +2359,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   </button>
                 ))}
               </div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/switcher:opacity-100 transition-opacity pointer-events-none">
+                <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
+                  Scroll to switch
+                </div>
+              </div>
               {/* Fade indicators */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-50 to-transparent pointer-events-none rounded-l-2xl opacity-0 group-hover/switcher:opacity-100 transition-opacity"></div>
               <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none rounded-r-2xl opacity-0 group-hover/switcher:opacity-100 transition-opacity"></div>
@@ -2261,42 +2372,33 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         </div>
         <div className="flex items-center gap-4">
           {mode === 'teacher' ? (
-            <button
-              onClick={() => {
-                setShowSaveArrow(false);
-                handleSaveBoard(() => onBack());
-              }}
-              className={`relative px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
-                saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
-                  'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
-                }`}
-              disabled={saveStatus === 'saving'}
-            >
-              <span className="text-lg">{saveStatus === 'saved' ? '✅' : '💾'}</span>
-              {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save'}
-
-              {showSaveArrow && (
-                <AnimatePresence>
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute right-full mr-4 top-1 -translate-y-1/2 flex items-center pointer-events-none whitespace-nowrap z-[100]"
-                  >
-                    <div className="bg-green-600 text-white px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl border-2 border-white mr-2">
-                      Save for classroom
-                    </div>
-                    <motion.span
-                      animate={{ x: [0, 5, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-3xl drop-shadow-md"
-                    >
-                      ➡️
-                    </motion.span>
-                  </motion.div>
-                </AnimatePresence>
-              )}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleNewBoard}
+                className="px-4 py-2 bg-slate-100 rounded-xl font-black text-slate-800 text-sm border-b-4 border-slate-200 hover:bg-slate-50 active:translate-y-1 active:border-b-0 transition-all"
+              >
+                ✨ New
+              </button>
+              <button
+                onClick={() => {
+                  setShowSaveArrow(false);
+                  handleSaveBoard();
+                }}
+                className={`relative px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 group/save ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                  saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
+                    'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
+                  } ${showSaveArrow ? 'ring-4 ring-green-300/70 shadow-[0_0_30px_rgba(34,197,94,0.75)] animate-pulse' : ''}`}
+                disabled={saveStatus === 'saving'}
+              >
+                <span className="text-lg">{saveStatus === 'saved' ? '✅' : '💾'}</span>
+                {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save'}
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover/save:opacity-100 transition-opacity pointer-events-none">
+                  <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
+                    Save board
+                  </div>
+                </div>
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-4">
               <button
@@ -2342,6 +2444,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
+        <AnimatePresence>
+          {showSaveGlow && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.25 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="absolute inset-0 z-[120] bg-green-400 pointer-events-none"
+            />
+          )}
+        </AnimatePresence>
         {/* ASSETS DRAWER (LEFT) */}
         <div className="absolute left-0 top-0 bottom-0 z-[70] w-28 bg-slate-50 border-r-2 border-slate-100 flex flex-col shadow-lg">
           {/* Fixed Add Button at Top (Teacher Mode) */}
@@ -2353,33 +2466,16 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   setIsSearchingIcons(true);
                   setShowAddArrow(false);
                 }}
-                className="w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all bg-blue-50 border-2 border-blue-100 text-blue-500 animate-glow-flow hover:scale-105 active:scale-95 shadow-sm"
+                className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all bg-blue-50 border-2 border-blue-100 text-blue-500 hover:scale-105 active:scale-95 shadow-sm group/add ${showAddArrow ? 'ring-4 ring-blue-300/70 shadow-[0_0_30px_rgba(59,130,246,0.75)] animate-pulse' : ''}`}
               >
                 <span className="text-3xl font-black leading-none">➕</span>
                 <span className="text-sm font-bold uppercase tracking-tight text-center leading-none px-1">Add</span>
               </button>
-
-              <AnimatePresence>
-                {showAddArrow && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -20, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute left-full ml-4 z-[100] flex items-center pointer-events-none"
-                  >
-                    <motion.span
-                      animate={{ x: [0, 10, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-4xl drop-shadow-lg"
-                    >
-                      ⬅️
-                    </motion.span>
-                    <div className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white ml-2">
-                      Click to add icons!
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover/add:opacity-100 transition-opacity pointer-events-none">
+                <div className="bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
+                  Add items
+                </div>
+              </div>
             </div>
           )}
 
@@ -2412,7 +2508,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       }
                       if (activeCategoryId === cat.id) setDrawerOpen(false);
                     }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs opacity-100 shadow-lg z-10"
                   >
                     ✕
                   </button>
@@ -2470,8 +2566,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData('materialId', m.id);
+                          e.dataTransfer.setData('text/material-id', m.id);
+                          e.dataTransfer.setData('text/plain', m.id);
                           e.dataTransfer.effectAllowed = 'move';
+                          draggingMaterialIdRef.current = m.id;
                         }}
+                        onDragEnd={() => { draggingMaterialIdRef.current = null; }}
                         className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
                       >
                         <div className="h-28 bg-slate-50 flex items-center justify-center relative overflow-hidden pointer-events-none">
@@ -2522,31 +2622,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               setLibraryOpen(!libraryOpen);
               setShowLibraryArrow(false);
             }}
-            className="absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px]"
+            className={`absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px] group/materials ${showLibraryArrow ? 'ring-4 ring-blue-300/70 shadow-[0_0_30px_rgba(59,130,246,0.75)] animate-pulse' : ''}`}
           >
             {libraryOpen ? '➡️' : '📚'}
-
-            {showLibraryArrow && !libraryOpen && (
-              <AnimatePresence>
-                <motion.div
-                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute right-full mr-4 z-[100] flex items-center pointer-events-none"
-                >
-                  <div className="bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl whitespace-nowrap border-2 border-white mr-2">
-                    Classroom Materials
-                  </div>
-                  <motion.span
-                    animate={{ x: [0, -10, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                    className="text-4xl drop-shadow-lg"
-                  >
-                    ➡️
-                  </motion.span>
-                </motion.div>
-              </AnimatePresence>
-            )}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover/materials:opacity-100 transition-opacity pointer-events-none">
+              <div className="bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl border-2 border-white whitespace-nowrap">
+                Materials
+              </div>
+            </div>
           </button>
         </div>
 
@@ -2608,6 +2691,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div
             className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
+            onDrop={handleDropOnBoard}
+            onDragOver={(e) => e.preventDefault()}
             onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction}
             onWheel={(e) => {
               // Smooth zoom with scroll wheel without needing Ctrl
@@ -3184,80 +3269,31 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 if (!bounds) return null;
                 return (
                   <div
-                    key={group.id}
-                    className="absolute z-[5] pointer-events-auto"
-                    style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: group.minimized ? 40 : bounds.h }}
+                      key={group.id}
+                      data-group-id={group.id}
+                      className="absolute z-[5] pointer-events-auto"
+                      style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: bounds.h }}
                   >
                     <div
-                      className={`w-full h-full border-2 border-dashed border-blue-400 rounded-2xl transition-all ${group.minimized ? 'bg-blue-50/90 backdrop-blur-sm' : 'bg-blue-50/20'}`}
+                      className={`w-full h-full border-2 border-dashed border-blue-400 rounded-2xl transition-all bg-blue-50/20 ${selectedGroupId === group.id ? 'ring-4 ring-blue-400/40' : ''}`}
                       onMouseDown={(e) => handleGroupMouseDown(e, group)}
                     >
-                      <div className="absolute -top-12 left-0 flex gap-1 z-20">
-                        <button
-                          onMouseDown={e => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); setGroups(prev => prev.map(g => g.id === group.id ? { ...g, minimized: !g.minimized } : g)); }}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-500 text-white rounded-md text-xs font-black shadow-md hover:bg-blue-600 transition-all border border-blue-600"
-                          title={group.minimized ? 'Expand' : 'Minimize'}
-                        >
-                          {group.minimized ? '▶' : '▼'}
-                        </button>
-                        <button
-                          onMouseDown={e => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItems(prev => {
-                              const initialItems = prev.filter(it => group.itemIds.includes(it.id));
-                              if (initialItems.length === 0) return prev;
-                              const xs = initialItems.map(it => it.x);
-                              const ys = initialItems.map(it => it.y);
-                              const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                              const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-                              return prev.map(it => {
-                                if (!group.itemIds.includes(it.id)) return it;
-                                return { ...it, scale: it.scale * 1.1, x: centerX + (it.x - centerX) * 1.1, y: centerY + (it.y - centerY) * 1.1 };
-                              });
-                            });
-                          }}
-                          className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-md text-xs font-black shadow-md hover:bg-green-600 transition-all border border-green-600"
-                          title="Increase Size"
-                        >
-                          ➕
-                        </button>
-                        <button
-                          onMouseDown={e => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItems(prev => {
-                              const initialItems = prev.filter(it => group.itemIds.includes(it.id));
-                              if (initialItems.length === 0) return prev;
-                              const xs = initialItems.map(it => it.x);
-                              const ys = initialItems.map(it => it.y);
-                              const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                              const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-                              return prev.map(it => {
-                                if (!group.itemIds.includes(it.id)) return it;
-                                return { ...it, scale: Math.max(0.2, it.scale * 0.9), x: centerX + (it.x - centerX) * 0.9, y: centerY + (it.y - centerY) * 0.9 };
-                              });
-                            });
-                          }}
-                          className="w-8 h-8 flex items-center justify-center bg-yellow-500 text-white rounded-md text-xs font-black shadow-md hover:bg-yellow-600 transition-all border border-yellow-600"
-                          title="Decrease Size"
-                        >
-                          ➖
-                        </button>
-                      </div>
-                      {!group.minimized && (
-                        <div
-                          className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform"
-                          onMouseDown={(e) => handleGroupResizeMouseDown(e, group)}
-                          title="Resize Group"
-                        />
-                      )}
-                      {group.minimized && (
-                        <div className="flex items-center justify-center h-full text-blue-500 font-black text-xs uppercase tracking-widest gap-2">
-                          <span>📦</span> {group.itemIds.length} items grouped
-                        </div>
-                      )}
+                      <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteGroup(group.id);
+                        }}
+                        className="absolute -top-3 -right-3 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl font-black text-lg border-4 border-white z-20 hover:scale-110 transition-transform"
+                        title="Delete Group"
+                      >
+                        🗑️
+                      </button>
+                      <div
+                        className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform"
+                        onMouseDown={(e) => handleGroupResizeMouseDown(e, group)}
+                        title="Resize Group"
+                      />
                     </div>
                   </div>
                 );
