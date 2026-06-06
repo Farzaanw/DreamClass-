@@ -57,7 +57,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   };
 
   const activeMusic = MUSIC_OPTIONS.find(m => m.id === safeDesign.ambientMusic);
-  const previewBoard = subject.concepts.map(c => design.conceptBoards?.[c.id]).find(Boolean);
+  const previewBoard = activeConcepts.map(c => design.conceptBoards?.[c.id]).find(Boolean);
   const previewItems = (previewBoard?.items || []).slice(0, 8);
   const isImageContent = (content: string) => content.startsWith('http') || content.startsWith('data:image');
 
@@ -93,12 +93,12 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
 
   // If there are many concepts, they might cover the corner, so we start in peek mode
   useEffect(() => {
-    if (subject.concepts.length > 8) {
+    if (activeConcepts.length > 8) {
       setIsMascotPeeking(true);
     } else {
       setIsMascotPeeking(false);
     }
-  }, [subject.concepts.length]);
+  }, [activeConcepts.length]);
 
   const handleMascotClick = () => {
     const mascotSoundMap: Record<string, string> = {

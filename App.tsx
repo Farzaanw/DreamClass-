@@ -1036,7 +1036,12 @@ const App: React.FC = () => {
     const subject = allSubjects.find(s => s.id === subjectId) || null;
     setSelectedSubject(subject);
     if (appMode === 'teacher' && subject && subject.concepts.length > 0) {
-      setSelectedConcept(subject.concepts[0]);
+      const activeConcepts = subject.concepts.filter(c => !c.isArchived);
+      if (activeConcepts.length > 0) {
+        setSelectedConcept(activeConcepts[0]);
+      } else {
+        setSelectedConcept(subject.concepts[0]); // fallback if all are archived
+      }
       setCurrentView('concept');
     } else {
       setCurrentView('classroom');

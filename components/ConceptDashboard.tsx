@@ -2297,7 +2297,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const filteredMaterials = materials.filter(m => m.subjectId === subjectId);
-  const subjectConcepts = currentSubject?.concepts || [];
+  const subjectConcepts = (currentSubject?.concepts || []).filter(c => !c.isArchived);
 
   return (
     <div
