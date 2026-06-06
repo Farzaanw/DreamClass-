@@ -81,7 +81,8 @@ export const MASCOTS = [
 
 export const SHELF_OBJECTS = [
   '📚', '🪴', '🌍', '🏆', '🔬', '🎨', '🧸', '🔭', '🧪', '🦴', '🍎', '💎',
-  '🧩', '🖍️', '✂️', '🧮', '🧠', '🛰️', '🧰', '🧵', '🎒', '🦋', '🌟', '🪁'
+  '🧩', '🖍️', '✂️', '🧮', '🧠', '🛰️', '🧰', '🧵', '🎒', '🦋', '🌟', '🪁',
+  '🚗', '🚂', '🥁', '⚽', '🏀', '🎲', '🧱', '🎸', '🪀'
 ];
 
 export const STICKERS = [
@@ -177,6 +178,13 @@ export const STICKERS = [
   { id: 'dice', emoji: '🎲', url: '' },
   { id: 'puzzle', emoji: '🧩', url: '' },
   { id: 'palette', emoji: '🎨', url: '' },
+
+  // TOYS (New)
+  { id: 'teddy', emoji: '🧸', url: '' },
+  { id: 'train', emoji: '🚂', url: '' },
+  { id: 'drum', emoji: '🥁', url: '' },
+  { id: 'blocks', emoji: '🧱', url: '' },
+  { id: 'yoyo', emoji: '🪀', url: '' },
 ];
 
 export interface MusicOption {

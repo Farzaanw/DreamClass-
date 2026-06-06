@@ -8,6 +8,7 @@ export interface Concept {
   icon: string;
   description: string;
   suggestedItems: string[];
+  isArchived?: boolean;
 }
 
 export interface Subject {

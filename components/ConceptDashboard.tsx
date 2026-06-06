@@ -1002,20 +1002,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const addItem = (content: string, type: BoardItem['type'] = 'emoji', screenX?: number, screenY?: number, metadata?: any) => {
-    if (items.length >= 400) {
-      alert('Board limit reached (400 items). Remove some items before adding more.');
+    if (items.length >= 1000) {
+      alert('Board limit reached (1000 items). Remove some items before adding more.');
       return;
     }
+
     if (type === 'spinner') {
       metadata = { ...metadata, names: metadata?.names || globalSpinnerNames };
     }
+
     if (type === 'sticker') {
       const stickerCount = items.filter(it => it.type === 'sticker').length;
-      if (stickerCount >= 8) {
-        alert("You can only place up to 8 stickers at a time!");
+      if (stickerCount >= 30) {
+        alert("You can only place up to 30 stickers at a time!");
         return;
       }
     }
+
     saveToUndoStack();
 
     // Improved non-stacking logic: Use a grid-like sequence for default placement

@@ -42,7 +42,8 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   const lastTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>(0);
 
-  const originalCount = subject.concepts.length;
+  const activeConcepts = subject.concepts.filter(c => !(c as any).isArchived);
+  const originalCount = activeConcepts.length;
 
   const safeDesign = design || {
     ambientMusic: 'none',
@@ -105,6 +106,11 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
       dog: '/sounds/dog.wav',
       monkey: '/sounds/monkey.wav',
       robot: '/sounds/robot.wav',
+      owl: '/sounds/owl.wav',
+      unicorn: '/sounds/magic.wav',
+      dino: '/sounds/roar.wav',
+      bunny: '/sounds/boing.wav',
+      dragon: '/sounds/dragon.wav',
     };
     const soundPath = mascotSoundMap[design.mascot || ''];
     if (soundPath) {
@@ -261,11 +267,11 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ backgroundImage: getWallPattern(), backgroundSize: design.wallTheme === 'dots' ? '40px 40px' : '100px 100%' }}></div>
 
         {/* Stickers Area */}
-        <div className="absolute top-[4%] w-full flex justify-center gap-4 sm:gap-8 flex-wrap px-8 sm:px-20 pointer-events-none z-10 h-[8%] overflow-hidden">
+        <div className="absolute top-[10%] w-full flex justify-center gap-4 sm:gap-8 flex-wrap px-8 sm:px-20 pointer-events-none z-10">
           {design.posterUrls.map((asset, i) => (
-            <div key={i} className="w-10 h-10 sm:w-16 sm:h-16 animate-float-slow flex items-center justify-center pointer-events-auto" style={{ animationDelay: `${i * 0.7}s` }}>
+            <div key={i} className="w-10 h-10 sm:w-12 sm:h-12 animate-float-slow flex items-center justify-center pointer-events-auto" style={{ animationDelay: `${i * 0.7}s` }}>
               {isEmojiSticker(asset) ? (
-                <span className="text-3xl sm:text-5xl drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6">{getEmojiSticker(asset)}</span>
+                <span className="text-3xl sm:text-4xl drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6">{getEmojiSticker(asset)}</span>
               ) : (
                 <img src={asset} alt="Sticker" className="max-w-full max-h-full drop-shadow-lg transition-transform hover:scale-125 hover:rotate-6" />
               )}
@@ -274,7 +280,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
         </div>
 
         {/* Shelves Area */}
-        <div className="absolute top-[28%] left-0 right-0 flex justify-center z-10 pointer-events-none">
+        <div className="absolute top-[35%] left-0 right-0 flex justify-center z-10 pointer-events-none">
           <div className="w-[45%] h-3 bg-black/5 rounded-full flex justify-around items-end px-10 border-b border-black/5 shadow-inner">
              {design.shelves?.map((emoji, idx) => (
                <span key={idx} className="text-2xl sm:text-4xl mb-1 animate-wiggle pointer-events-auto cursor-default hover:scale-125 transition-transform" style={{ animationDelay: `${idx * 0.1}s` }}>{emoji}</span>
@@ -282,22 +288,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           </div>
         </div>
 
-        {/* Saved Board Preview Items */}
-        {previewItems.length > 0 && (
-          <div className="absolute top-[34%] left-0 right-0 z-20 flex justify-center pointer-events-none">
-            <div className="max-w-[90%] flex flex-wrap items-center justify-center gap-2 bg-white/70 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg border border-white/80">
-              {previewItems.map((item, idx) => (
-                <div key={`${item.id}-${idx}`} className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg sm:text-xl">
-                  {isImageContent(item.content) ? (
-                    <img src={item.content} alt="Saved board item" className="w-full h-full object-contain rounded-lg" />
-                  ) : (
-                    <span className="font-black text-slate-700">{item.content}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Concept Cards Carousel */}
         <div 
@@ -312,7 +303,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center hide-scrollbar select-none overscroll-x-contain ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <div className="flex items-center min-w-max py-4 pointer-events-none select-none px-20 m-auto">
-            {subject.concepts.map((concept, idx) => (
+            {activeConcepts.map((concept, idx) => (
               <div 
                 key={`${concept.id}-${idx}`}
                 onClick={(e) => handleCardClick(e, concept)}

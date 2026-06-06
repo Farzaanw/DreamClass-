@@ -794,7 +794,7 @@ const App: React.FC = () => {
     if (designError) console.error('Error initializing subject design:', designError);
   }, [currentUser]);
 
-  const handleEditSubject = useCallback(async (subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }) => {
+  const handleEditSubject = useCallback(async (subjectId: string, updatedData: { name: string, description: string, concepts: Concept[], icon: string }, hardDeletedConceptIds?: string[]) => {
     if (!currentUser) return;
     const existing = allSubjects.find(s => s.id === subjectId);
     if (!existing) return;
@@ -807,11 +807,35 @@ const App: React.FC = () => {
       icon: updatedData.icon
     };
     
+    let updatedClassroomDesigns = { ...currentUser.classroomDesigns };
+    if (hardDeletedConceptIds && hardDeletedConceptIds.length > 0) {
+      const design = updatedClassroomDesigns[subjectId];
+      if (design) {
+        const newConceptBoards = { ...design.conceptBoards };
+        hardDeletedConceptIds.forEach(id => delete newConceptBoards[id]);
+        
+        const newWhiteboards = (design.whiteboards || []).filter(b => !hardDeletedConceptIds.includes(b.conceptId));
+        
+        updatedClassroomDesigns[subjectId] = {
+          ...design,
+          conceptBoards: newConceptBoards,
+          whiteboards: newWhiteboards
+        };
+        
+        await supabase
+          .from('classroom_designs')
+          .update({ design_data: updatedClassroomDesigns[subjectId] })
+          .eq('subject_id', subjectId)
+          .eq('user_id', currentUser.id);
+      }
+    }
+
     // 1. Update local state
     const otherCustom = (currentUser.customSubjects || []).filter(s => s.id !== subjectId);
     setCurrentUser({
       ...currentUser,
-      customSubjects: [...otherCustom, updatedSubject]
+      customSubjects: [...otherCustom, updatedSubject],
+      classroomDesigns: updatedClassroomDesigns
     });
 
     // 2. Push to Supabase

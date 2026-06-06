@@ -48,6 +48,11 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
       dog: '/sounds/dog.wav',
       monkey: '/sounds/monkey.wav',
       robot: '/sounds/robot.wav',
+      owl: '/sounds/owl.mp3',
+      unicorn: '/sounds/unicorn.mp3',
+      dino: '/sounds/rex.wav',
+      bunny: '/sounds/rabbit.mp3',
+      dragon: '/sounds/dragon.wav',
     };
     const soundPath = mascotSoundMap[mascotId];
     if (!soundPath) return;
@@ -127,7 +132,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <span className="bg-black/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm">Click to Change Style</span>
              </div>
-             <div className="absolute top-[35%] left-0 right-0 flex justify-center gap-12 -translate-y-1/2">
+             <div className="absolute top-[45%] left-0 right-0 flex justify-center gap-12 -translate-y-1/2">
                 <div className="w-[80%] h-4 bg-orange-800/20 rounded-full flex justify-around items-end px-8">
                    {localDesign.shelves?.map((emoji, idx) => (
                      <span key={idx} className="text-4xl mb-1 animate-wiggle">{emoji}</span>
@@ -137,8 +142,8 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
             <div className="absolute top-4 left-0 right-0 px-12 flex flex-wrap gap-4 items-start pointer-events-none">
               {localDesign.posterUrls.map((asset, idx) => (
                 isEmojiAsset(asset)
-                  ? <span key={idx} className="w-16 h-16 text-5xl flex items-center justify-center animate-float-preview">{getEmojiFromAsset(asset)}</span>
-                  : <img key={idx} src={asset} className="w-16 h-16 object-contain animate-float-preview" />
+                  ? <span key={idx} className="w-12 h-12 text-4xl flex items-center justify-center animate-float-preview">{getEmojiFromAsset(asset)}</span>
+                  : <img key={idx} src={asset} className="w-12 h-12 object-contain animate-float-preview" />
               ))}
             </div>
           </div>

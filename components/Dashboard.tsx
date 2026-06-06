@@ -38,7 +38,7 @@ interface DashboardProps {
   onNavigateDesigner: () => void;
   onNavigateSubject: (id: SubjectId) => void;
   onAddSubject: (subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
-  onEditSubject: (id: string, subjectData: { name: string, description: string, concepts: Concept[], icon: string }) => void;
+  onEditSubject: (id: string, subjectData: { name: string, description: string, concepts: Concept[], icon: string }, hardDeletedConceptIds?: string[]) => void;
   onDeleteSubject: (id: SubjectId) => void;
   onUpdateMaterials: (materials: MaterialFile[]) => void;
   onUploadMaterial: (subjectId: string, file: File, type: 'pdf' | 'slides' | 'video', thumbnailUrl?: string) => Promise<MaterialFile>;
@@ -133,6 +133,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<{ id: string, name: string } | null>(null);
+  
+  const [conceptToDeleteAction, setConceptToDeleteAction] = useState<{index: number, id: string, title: string, whiteboardCount: number} | null>(null);
+  const [hardDeletedConceptIds, setHardDeletedConceptIds] = useState<string[]>([]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -254,10 +257,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     setNewDesc(subject.description || '');
     setNewIcon(subject.icon || '⭐');
     setConcepts(subject.concepts.map(c => ({
+      id: c.id,
       title: c.title,
       icon: c.icon,
-      description: c.description
+      description: c.description,
+      isArchived: c.isArchived
     })));
+    setHardDeletedConceptIds([]);
     setShowSubjectModal(true);
   };
 
@@ -268,11 +274,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     const formattedConcepts: Concept[] = concepts
       .filter(c => c.title.trim() !== '')
       .map((c, i) => ({
-        id: `concept-${Date.now()}-${i}`,
+        id: (c as any).id || `concept-${Date.now()}-${i}`,
         title: c.title,
         icon: c.icon || '📚',
         description: c.description || `Learning about ${c.title}`,
-        suggestedItems: [c.title, c.icon]
+        suggestedItems: [c.title, c.icon],
+        isArchived: (c as any).isArchived
       }));
 
     if (editingSubjectId) {
@@ -281,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         description: newDesc,
         concepts: formattedConcepts,
         icon: newIcon
-      });
+      }, hardDeletedConceptIds);
     } else {
       onAddSubject({
         name: newName,
@@ -298,8 +305,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     setNewName('');
     setNewDesc('');
     setNewIcon('⭐');
-    setConcepts([{ title: '', icon: '✨', description: '' }]);
+    setConcepts([]);
     setEditingSubjectId(null);
+    setHardDeletedConceptIds([]);
     setShowSubjectModal(false);
   };
 
@@ -562,8 +570,47 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const removeConcept = (index: number) => {
     if (concepts.length > 1) {
-      setConcepts(concepts.filter((_, i) => i !== index));
+      const concept = concepts[index] as any;
+      if (concept.id) {
+        let count = 0;
+        if (editingSubjectId) {
+          const design = user.classroomDesigns?.[editingSubjectId];
+          if (design) {
+            if (design.conceptBoards?.[concept.id]) count += 1;
+            count += (design.whiteboards || []).filter(b => b.conceptId === concept.id).length;
+          }
+        }
+        setConceptToDeleteAction({
+          index,
+          id: concept.id,
+          title: concept.title,
+          whiteboardCount: count
+        });
+      } else {
+        setConcepts(concepts.filter((_, i) => i !== index));
+      }
     }
+  };
+
+  const handleConfirmConceptArchive = () => {
+    if (!conceptToDeleteAction) return;
+    const updated = [...concepts];
+    updated[conceptToDeleteAction.index] = { ...updated[conceptToDeleteAction.index], isArchived: true };
+    setConcepts(updated);
+    setConceptToDeleteAction(null);
+  };
+
+  const handleConfirmConceptHardDelete = () => {
+    if (!conceptToDeleteAction) return;
+    setHardDeletedConceptIds(prev => [...prev, conceptToDeleteAction.id]);
+    setConcepts(concepts.filter((_, i) => i !== conceptToDeleteAction.index));
+    setConceptToDeleteAction(null);
+  };
+
+  const restoreConcept = (index: number) => {
+    const updated = [...concepts];
+    updated[index] = { ...updated[index], isArchived: false };
+    setConcepts(updated);
   };
 
   const getFileIcon = (type: string) => {
@@ -1569,18 +1616,72 @@ const Dashboard: React.FC<DashboardProps> = ({
               <input type="text" placeholder="Subject Name" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={newName} onChange={(e) => setNewName(e.target.value)} required />
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-4"><label className="text-base font-black text-gray-600 tracking-wide">CONCEPTS</label><button type="button" onClick={addConceptField} className="text-blue-600 font-black text-lg flex items-center gap-2"><span className="text-2xl leading-none">+</span><span>Add</span></button></div>
-                {concepts.map((concept, idx) => (
-                  <div key={idx} className="flex gap-3">
-                    <input type="text" className="w-16 px-2 py-4 rounded-2xl border-4 border-blue-50 bg-white text-center text-xl text-black" value={concept.icon} onChange={(e) => updateConcept(idx, 'icon', e.target.value)} />
-                    <input type="text" placeholder="Concept Title" className="flex-1 px-6 py-4 rounded-2xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={concept.title} onChange={(e) => updateConcept(idx, 'title', e.target.value)} required />
-                    {concepts.length > 1 && <button type="button" onClick={() => removeConcept(idx)} className="w-12 bg-red-50 text-red-400 rounded-2xl">✕</button>}
+                {concepts.map((concept, idx) => {
+                  if ((concept as any).isArchived) return null;
+                  return (
+                    <div key={idx} className="flex gap-3">
+                      <input type="text" className="w-16 px-2 py-4 rounded-2xl border-4 border-blue-50 bg-white text-center text-xl text-black" value={concept.icon} onChange={(e) => updateConcept(idx, 'icon', e.target.value)} />
+                      <input type="text" placeholder="Concept Title" className="flex-1 px-6 py-4 rounded-2xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold text-black" value={concept.title} onChange={(e) => updateConcept(idx, 'title', e.target.value)} required />
+                      <button type="button" onClick={() => removeConcept(idx)} className="w-12 bg-red-50 text-red-400 rounded-2xl hover:bg-red-100 transition-colors">✕</button>
+                    </div>
+                  );
+                })}
+                {concepts.some(c => (c as any).isArchived) && (
+                  <div className="mt-8 mb-2 border-t-2 border-slate-100 pt-6 animate-fade-in-up">
+                    <h4 className="text-sm font-black text-slate-400 tracking-widest uppercase flex items-center gap-2 mb-4">
+                      <span>📦</span> Archived Concepts
+                    </h4>
+                    <div className="space-y-4">
+                      {concepts.map((concept, idx) => {
+                        if (!(concept as any).isArchived) return null;
+                        return (
+                          <div key={idx} className="flex gap-3 opacity-60 hover:opacity-100 transition-opacity">
+                            <div className="w-16 flex items-center justify-center bg-slate-100 rounded-2xl border-4 border-slate-50 text-xl">{concept.icon}</div>
+                            <div className="flex-1 flex items-center px-6 py-4 rounded-2xl border-4 border-slate-50 bg-slate-100 text-lg font-bold text-slate-500">
+                              {concept.title}
+                            </div>
+                            <button type="button" onClick={() => restoreConcept(idx)} className="w-auto px-4 bg-emerald-50 text-emerald-500 rounded-2xl font-bold text-sm hover:bg-emerald-100 transition-colors shadow-sm">Restore</button>
+                            <button type="button" onClick={() => {
+                              setConceptToDeleteAction({
+                                index: idx,
+                                id: (concept as any).id,
+                                title: concept.title,
+                                whiteboardCount: user.classroomDesigns?.[editingSubjectId!]?.conceptBoards?.[(concept as any).id] ? 1 : 0 + (user.classroomDesigns?.[editingSubjectId!]?.whiteboards || []).filter(b => b.conceptId === (concept as any).id).length
+                              });
+                            }} className="w-12 bg-rose-50 text-rose-500 rounded-2xl font-bold text-sm hover:bg-rose-100 transition-colors shadow-sm" title="Permanently Delete">🗑️</button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
               <textarea placeholder="Description" className="w-full px-8 py-4 rounded-3xl border-4 border-blue-50 bg-white focus:border-blue-300 focus:outline-none text-lg font-bold min-h-[100px] text-black" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <button type="submit" className="w-full bg-blue-500 text-white font-bold py-5 rounded-[2.5rem] text-2xl shadow-xl border-b-8 border-blue-700">{editingSubjectId ? 'Update Room' : 'Create Room'}</button>
             </form>
           </div>
+
+          {conceptToDeleteAction && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md" onClick={() => setConceptToDeleteAction(null)}>
+              <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-md border-[12px] border-rose-50 flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto mb-4 animate-bounce-gentle">⚠️</div>
+                  <h3 className="text-2xl font-black text-slate-800 mb-2">Delete or Archive?</h3>
+                  <p className="text-slate-500 font-bold mb-4">
+                    Deleting this concept will permanently erase <span className="text-rose-500">{conceptToDeleteAction.whiteboardCount} saved whiteboards</span> associated with it.
+                  </p>
+                  <p className="text-slate-500 font-bold text-sm">
+                    We recommend <span className="text-blue-500">Archiving</span> instead. It hides the concept from students but keeps your data safe!
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button onClick={handleConfirmConceptArchive} className="w-full py-4 bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 border-b-4 border-blue-700 active:border-b-0 active:translate-y-1 transition-all">Archive (Safe)</button>
+                  <button onClick={handleConfirmConceptHardDelete} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black uppercase tracking-widest border-2 border-rose-100 hover:bg-rose-100 transition-all">Permanently Delete</button>
+                  <button onClick={() => setConceptToDeleteAction(null)} className="w-full py-3 bg-slate-50 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-100 transition-all">Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
