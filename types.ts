@@ -1,4 +1,3 @@
-
 export type SubjectId = string;
 export type AppMode = 'classroom' | 'teacher';
 
@@ -56,7 +55,7 @@ export interface Whiteboard {
 export interface MaterialFile {
   id: string;
   name: string;
-  type: 'pdf' | 'slides' | 'video';
+  type: 'pdf' | 'slides' | 'video' | 'image' | 'audio';
   subjectId: string;
   timestamp: number;
   thumbnailUrl?: string;

@@ -46,6 +46,7 @@ interface DashboardProps {
   onUpdateGames: (games: Game[]) => void;
   onUpdateCalendarData: (calendarData: any) => void;
   onAddResourceToClassroom: (resource: Resource, subjectId: string) => void;
+  onViewInSubjectBoard?: (subjectId: string) => void;
   materialsOpenedFromConcept?: boolean;
   onReturnToConceptFromMaterials?: () => void;
   initialView?: 'overview' | 'materials' | 'songs' | 'games';
@@ -109,6 +110,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUpdateGames,
   onUpdateCalendarData,
   onAddResourceToClassroom,
+  onViewInSubjectBoard,
   materialsOpenedFromConcept = false,
   onReturnToConceptFromMaterials,
   initialView = 'overview',
@@ -133,7 +135,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<{ id: string, name: string } | null>(null);
-  
+
+  const [isDeleteMaterialModalOpen, setIsDeleteMaterialModalOpen] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<{ id: string, name: string } | null>(null);
+
   const [conceptToDeleteAction, setConceptToDeleteAction] = useState<{index: number, id: string, title: string, whiteboardCount: number} | null>(null);
   const [hardDeletedConceptIds, setHardDeletedConceptIds] = useState<string[]>([]);
 
@@ -322,52 +327,28 @@ const Dashboard: React.FC<DashboardProps> = ({
     setExpandedMaterialSubjects(prev => ({ ...prev, [subjectId]: !prev[subjectId] }));
   };
 
-  const generateThumbnail = async (file: File, type: 'pdf' | 'slides' | 'video'): Promise<string | undefined> => {
-    return new Promise((resolve) => {
-      if (type === 'video') {
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        video.src = URL.createObjectURL(file);
-        video.muted = true;
-        video.playsInline = true;
-        video.onloadedmetadata = () => { video.currentTime = 0.5; };
-        video.onseeked = () => {
+  // Fast thumbnail generation for images only (non-blocking, scales down in-browser)
+  const generateThumbnail = async (file: File, type: string): Promise<string | undefined> => {
+    if (type === 'image') {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = 160;
-          canvas.height = 120;
+          const maxDim = 300;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > maxDim) { h *= maxDim / w; w = maxDim; } }
+          else { if (h > maxDim) { w *= maxDim / h; h = maxDim; } }
+          canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          URL.revokeObjectURL(video.src);
-          resolve(dataUrl);
+          ctx?.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(img.src);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
         };
-        video.onerror = () => {
-          URL.revokeObjectURL(video.src);
-          resolve(undefined);
-        };
-      } else {
-        const canvas = document.createElement('canvas');
-        canvas.width = 160;
-        canvas.height = 200;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#f8fafc';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = type === 'pdf' ? '#ef4444' : '#f97316';
-          ctx.fillRect(0, 0, canvas.width, 30);
-          ctx.fillStyle = '#e2e8f0';
-          for (let i = 0; i < 5; i++) {
-            ctx.fillRect(20, 50 + i * 20, canvas.width - 40, 10);
-          }
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText(file.name.substring(0, 12), 20, 160);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        } else {
-          resolve(undefined);
-        }
-      }
-    });
+        img.onerror = () => { URL.revokeObjectURL(img.src); resolve(undefined); };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    return undefined; // Skip thumbnails for all other types to speed up uploads
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -378,19 +359,36 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
     const file = files[0];
     setIsProcessing(true);
-    let type: 'pdf' | 'slides' | 'video' = 'pdf';
+    let type: 'pdf' | 'slides' | 'video' | 'image' | 'audio' = 'pdf';
     const name = file.name.toLowerCase();
-    if (name.endsWith('.pdf')) type = 'pdf';
-    else if (name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || file.type.startsWith('video/')) type = 'video';
-    else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || file.type.includes('presentation')) type = 'slides';
-    const maxSize = type === 'video' ? MATERIAL_LIMITS.video : type === 'slides' ? MATERIAL_LIMITS.slides : MATERIAL_LIMITS.pdf;
+    const mime = file.type;
+
+    if (name.endsWith('.pdf') || mime === 'application/pdf') type = 'pdf';
+    else if (mime.startsWith('image/') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif') || name.endsWith('.webp') || name.endsWith('.svg')) type = 'image';
+    else if (mime.startsWith('video/') || name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || name.endsWith('.avi')) type = 'video';
+    else if (mime.startsWith('audio/') || name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.ogg') || name.endsWith('.m4a') || name.endsWith('.flac')) type = 'audio';
+    else if (name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.key') || mime.includes('presentation')) type = 'slides';
+
+    const maxSize = type === 'video' ? MATERIAL_LIMITS.video
+      : type === 'audio' ? MATERIAL_LIMITS.audio
+      : type === 'slides' ? MATERIAL_LIMITS.slides
+      : type === 'pdf' ? MATERIAL_LIMITS.pdf
+      : MATERIAL_LIMITS.image;
+
     if (file.size > maxSize) {
-      setToast(`File too large. Max ${type === 'video' ? '100MB' : '25MB'} for ${type}.`);
+      const sizeLabel = type === 'video' ? '500MB' : type === 'audio' ? '50MB' : type === 'image' ? '25MB' : '50MB';
+      setToast(`File too large. Max ${sizeLabel} for ${type}.`);
       e.target.value = '';
       setIsProcessing(false);
       return;
     }
-    const thumbnail = await generateThumbnail(file, type);
+
+    // Generate thumbnail only for images (fast) — skip for everything else to avoid blocking the upload
+    let thumbnail: string | undefined;
+    if (type === 'image') {
+      thumbnail = await generateThumbnail(file, type);
+    }
+
     let newMaterial: MaterialFile;
     try {
       newMaterial = await onUploadMaterial(activeSubjectForUpload, file, type, thumbnail);
@@ -410,17 +408,23 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleDeleteMaterial = (id: string) => {
-    if (confirm("Delete this material?")) {
-      // Use a fresh copy of materials from the user prop to ensure we're filtering the latest state
-      const currentMaterials = user.materials || [];
-      const updated = currentMaterials.filter(m => m.id !== id);
-      
-      // Ensure we are not mutating the original array
-      onUpdateMaterials([...updated]);
-      
-      setToast("Material deleted. 🗑️");
-      if (previewMaterial?.id === id) setPreviewMaterial(null);
-    }
+    const target = (user.materials || []).find(m => m.id === id);
+    if (!target) return;
+    setMaterialToDelete({ id, name: target.name });
+    setIsDeleteMaterialModalOpen(true);
+  };
+
+  const confirmDeleteMaterial = () => {
+    if (!materialToDelete) return;
+    const currentMaterials = user.materials || [];
+    const updated = currentMaterials.filter(m => m.id !== materialToDelete.id);
+
+    onUpdateMaterials([...updated]);
+
+    setToast("Material deleted. 🗑️");
+    if (previewMaterial?.id === materialToDelete.id) setPreviewMaterial(null);
+    setIsDeleteMaterialModalOpen(false);
+    setMaterialToDelete(null);
   };
 
   // Song Library Logic
@@ -618,6 +622,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       case 'pdf': return '📄';
       case 'slides': return '📊';
       case 'video': return '🎬';
+      case 'image': return '🖼️';
+      case 'audio': return '🎵';
       default: return '📁';
     }
   };
@@ -625,12 +631,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   if (view === 'materials') {
     return (
       <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
-        <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*" onChange={handleFileChange} />
+        <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.wav,.ogg,.m4a,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*,image/*,audio/*" onChange={handleFileChange} />
         {isProcessing && (
           <div className="fixed inset-0 z-[300] bg-white/60 backdrop-blur-md flex items-center justify-center">
              <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 animate-pulse border-4 border-blue-400">
-                <div className="text-6xl animate-spin">⚙️</div>
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight text-center">Processing your file...<br/><span className="text-blue-500">Creating thumbnail...</span></h2>
+                <div className="text-6xl animate-spin">⏳</div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight text-center">Uploading your file...</h2>
              </div>
           </div>
         )}
@@ -715,7 +721,16 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                   {isExpanded && (
                     <div className="mt-8">
-                      <div className="flex justify-end mb-6">
+                      <div className="flex justify-end gap-3 mb-6">
+                        {appMode === 'teacher' && subject.concepts && subject.concepts.length > 0 && (
+                          <button
+                            onClick={() => onViewInSubjectBoard?.(subject.id)}
+                            className="flex items-center justify-center gap-3 bg-white text-blue-600 px-8 py-3.5 rounded-[1.5rem] font-black border-2 border-blue-200 hover:bg-blue-50 hover:border-blue-400 shadow-sm hover:shadow-lg active:translate-y-1 transition-all text-sm group"
+                          >
+                            <span className="text-xl group-hover:scale-110 transition-transform">📋</span>
+                            <span>View in Subject Board</span>
+                          </button>
+                        )}
                         <button onClick={() => triggerFileUpload(subject.id)} className="flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-3.5 rounded-[1.5rem] font-black border-b-6 border-blue-700 shadow-lg hover:scale-105 active:translate-y-1 active:border-b-0 transition-all text-sm group">
                           <span className="text-xl group-hover:rotate-12 transition-transform">+</span><span>Add {subject.title} Files</span>
                         </button>
@@ -772,7 +787,62 @@ const Dashboard: React.FC<DashboardProps> = ({
               buttonText="Add"
             />
           </div>
-        )}      </div>
+        )}
+
+        {isDeleteMaterialModalOpen && materialToDelete && (
+          <div className="fixed inset-0 z-[450] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsDeleteMaterialModalOpen(false);
+                setMaterialToDelete(null);
+              }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-rose-50 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
+                🗑️
+              </div>
+              <div className="text-center mb-1">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete File</h2>
+                <p className="text-slate-500 font-bold text-sm tracking-tight px-2 leading-relaxed">
+                  Are you sure you want to delete this item?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setIsDeleteMaterialModalOpen(false);
+                      setMaterialToDelete(null);
+                    }}
+                    className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteMaterial}
+                    className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+                <div className="bg-rose-50 p-3 rounded-xl">
+                  <span className="text-rose-500 text-xs font-bold uppercase tracking-wider block text-center">This action cannot be undone.</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -1447,6 +1517,60 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <div className="bg-rose-50 p-3 rounded-xl">
                   <span className="text-rose-500 text-xs font-bold uppercase tracking-wider block text-center">Warning: This will also delete all associated classroom designs and whiteboards.</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isDeleteMaterialModalOpen && materialToDelete && (
+          <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsDeleteMaterialModalOpen(false);
+                setMaterialToDelete(null);
+              }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] p-10 border-8 border-rose-50 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-4xl shadow-inner mx-auto animate-bounce-gentle">
+                🗑️
+              </div>
+              <div className="text-center mb-1">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Material?</h2>
+                <p className="text-slate-500 font-bold text-sm tracking-tight px-2 leading-relaxed">
+                  Are you sure you want to delete <span className="text-rose-500">"{materialToDelete.name}"</span>?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setIsDeleteMaterialModalOpen(false);
+                      setMaterialToDelete(null);
+                    }}
+                    className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteMaterial}
+                    className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-600 hover:shadow-lg transition-all shadow-md border-b-6 border-rose-700 active:translate-y-1 active:border-b-0"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+                <div className="bg-rose-50 p-3 rounded-xl">
+                  <span className="text-rose-500 text-xs font-bold uppercase tracking-wider block text-center">This action cannot be undone.</span>
                 </div>
               </div>
             </motion.div>

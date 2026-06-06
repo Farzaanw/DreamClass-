@@ -17,6 +17,7 @@ interface ConceptDashboardProps {
   onSelectConcept?: (concept: Concept) => void;
   onUpdateMaterials?: (materials: MaterialFile[]) => void;
   onNavigateToMaterials?: (subjectId: string) => void;
+  initialOpenMaterialSidebar?: boolean;
   userSongs?: Song[]; // Songs added by the user
   mode: AppMode;
 }
@@ -108,6 +109,8 @@ const getFileIcon = (type: string) => {
     case 'pdf': return '📄';
     case 'slides': return '📊';
     case 'video': return '🎬';
+    case 'image': return '🖼️';
+    case 'audio': return '🎵';
     default: return '📁';
   }
 };
@@ -139,11 +142,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   onSelectConcept,
   onUpdateMaterials,
   onNavigateToMaterials,
+  initialOpenMaterialSidebar = false,
   userSongs = [],
   mode
 }) => {
   const [items, setItems] = useState<BoardItem[]>([]);
-  const [undoStack, setUndoStack] = useState<{ items: BoardItem[], drawing: string | null }[]>([]);
+  // OPTIMIZATION: Removed drawing from undo stack (was serializing 50MB canvas on every action)
+  const [undoStack, setUndoStack] = useState<{ items: BoardItem[] }[]>([]);
 
   const [activeTool, setActiveTool] = useState<'select' | 'marker' | 'highlighter' | 'eraser' | 'boxSelect'>('select');
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0].value);
@@ -154,7 +159,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [boardBg, setBoardBg] = useState<'plain' | 'lined' | 'grid'>('plain');
   const [boardBgColor, setBoardBgColor] = useState<string>('#ffffff');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(initialOpenMaterialSidebar);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [droppedItemId, setDroppedItemId] = useState<string | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<MaterialFile | null>(null);
@@ -162,6 +167,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [materialUrl, setMaterialUrl] = useState<string | null>(null);
   const [materialPos, setMaterialPos] = useState({ x: 50, y: 50 });
   const isDraggingMaterial = useRef(false);
+  const materialUrlCacheRef = useRef<Map<string, string>>(new Map());
   const draggingAssetRef = useRef<{ content: string; type: BoardItem['type']; metadata?: any } | null>(null);
   const draggingMaterialIdRef = useRef<string | null>(null);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
@@ -433,7 +439,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   }, []);
 
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
-  const getCenter = () => ({ x: window.innerWidth / 2 - 3500, y: window.innerHeight / 2 - 3500, zoom: 1 });
+  // OPTIMIZATION: Reduced center offset to match smaller canvas (2000x2000 vs 7000x7000)
+  const getCenter = () => ({ x: window.innerWidth / 2 - 1000, y: window.innerHeight / 2 - 1000, zoom: 1 });
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
   const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-2 m-0.5";
@@ -457,9 +464,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   useEffect(() => {
     if (canvasRef.current) {
       const canvas = canvasRef.current;
-      if (canvas.width !== 7000) canvas.width = 7000;
-      if (canvas.height !== 7000) canvas.height = 7000;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      // OPTIMIZATION: Reduced from 7000x7000 (49MP) to 2000x2000 (4MP) — 12x less memory, smoother drawing
+      const CANVAS_SIZE = 2000;
+      if (canvas.width !== CANVAS_SIZE) canvas.width = CANVAS_SIZE;
+      if (canvas.height !== CANVAS_SIZE) canvas.height = CANVAS_SIZE;
+      // willReadFrequently: false = "we draw, we don't read pixels"
+      // This works on ALL systems (GPU or CPU software rendering).
+      // The old value 'true' forced an expensive CPU-side copy that was never used.
+      const ctx = canvas.getContext('2d', { willReadFrequently: false });
       if (ctx) {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -512,13 +524,22 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         setMaterialUrl(null);
         return;
       }
+      // Check cache first to avoid re-downloading
+      const cacheKey = activeMaterial.id;
+      const cached = materialUrlCacheRef.current.get(cacheKey);
+      if (cached) {
+        setMaterialUrl(cached);
+        return;
+      }
       if (activeMaterial.signedUrl) {
+        materialUrlCacheRef.current.set(cacheKey, activeMaterial.signedUrl);
         setMaterialUrl(activeMaterial.signedUrl);
         return;
       }
       if (activeMaterial.storagePath) {
         try {
           const signed = await createSignedUrl(STORAGE_BUCKETS.materials, activeMaterial.storagePath);
+          materialUrlCacheRef.current.set(cacheKey, signed);
           setMaterialUrl(signed);
           return;
         } catch {
@@ -537,6 +558,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           }
           const blob = new Blob([u8arr], { type: mime });
           url = URL.createObjectURL(blob);
+          materialUrlCacheRef.current.set(cacheKey, url);
           setMaterialUrl(url);
         } catch {
           setMaterialUrl(activeMaterial.content);
@@ -549,7 +571,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     };
     resolve();
     return () => { if (url) URL.revokeObjectURL(url); };
-  }, [activeMaterial]);
+  }, [activeMaterial?.id]);
 
   useEffect(() => {
     if (activeMaterial && !materials.some(m => m.id === activeMaterial.id)) {
@@ -618,15 +640,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const saveToUndoStack = () => {
-    let drawingSnapshot: string | null = null;
-    if (canvasRef.current) {
-      try {
-        drawingSnapshot = canvasRef.current.toDataURL('image/png');
-      } catch {
-        drawingSnapshot = null;
-      }
-    }
-    setUndoStack(prev => [...prev, { items: [...items], drawing: drawingSnapshot }].slice(-30));
+    // OPTIMIZATION: Removed canvas serialization (was causing 50MB+ allocations)
+    setUndoStack(prev => [...prev, { items: items.slice() }].slice(-30));
   };
 
   const deleteGroup = (groupId: string) => {
@@ -642,16 +657,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (undoStack.length === 0) return;
     const previousState = undoStack[undoStack.length - 1];
     setItems(previousState.items);
-    if (contextRef.current && canvasRef.current) {
-      const ctx = contextRef.current;
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      if (previousState.drawing) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0);
-        img.src = previousState.drawing;
-      }
-    }
     setUndoStack(prev => prev.slice(0, -1));
     setSelectedItemId(null);
   };
@@ -786,6 +791,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       setViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
       lastPanPos.current = { x: coords.sx, y: coords.sy };
     } else if (isDrawingRef.current && contextRef.current) {
+      // OPTIMIZATION: Direct drawing path (no rAF throttling — keeps cursor smooth)
       const worldCoords = screenToWorld(coords.sx, coords.sy);
       contextRef.current.lineTo(worldCoords.wx, worldCoords.wy);
       contextRef.current.stroke();
@@ -1353,26 +1359,35 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const executeSaveBoard = async (boardId: string, boardName: string, onSuccess?: () => void) => {
     setSaveStatus('saving');
 
-    // Capture the full state including the drawing layer
-    // We flatten onto a white background to avoid "black" JPEGs from transparency
-    let drawingSnapshot: string | undefined = undefined;
-    let drawingBlob: Blob | null = null;
+    // OPTIMIZATION: Capture drawing blob asynchronously (non-blocking)
+    let drawingSnapshot: string | undefined;
+    let drawingBlobPromise: Promise<Blob | null> = Promise.resolve(null);
     if (canvasRef.current) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvasRef.current.width;
-      tempCanvas.height = canvasRef.current.height;
-      const tCtx = tempCanvas.getContext('2d');
-      if (tCtx) {
-        tCtx.fillStyle = '#ffffff'; // White background
-        tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        tCtx.drawImage(canvasRef.current, 0, 0);
-        drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.5);
-        drawingBlob = await new Promise((resolve) => tempCanvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.5));
-      }
+      drawingBlobPromise = new Promise((resolve) => {
+        // Defer canvas capture to next microtask to unblock the UI immediately
+        setTimeout(async () => {
+          try {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvasRef.current!.width;
+            tempCanvas.height = canvasRef.current!.height;
+            const tCtx = tempCanvas.getContext('2d');
+            if (tCtx) {
+              tCtx.fillStyle = '#ffffff';
+              tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+              tCtx.drawImage(canvasRef.current!, 0, 0);
+              drawingSnapshot = tempCanvas.toDataURL('image/jpeg', 0.35);
+              tempCanvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.35);
+            } else {
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        }, 0);
+      });
     }
 
-    let drawingStoragePath: string | undefined = undefined;
-    let drawingSignedUrl: string | undefined = undefined;
+    // Build board state immediately (no await needed for local data)
     const newBoard: Whiteboard = {
       id: boardId,
       conceptId: concept.id,
@@ -1381,84 +1396,73 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       items: [...items],
       bg: boardBg,
       bgColor: boardBgColor,
-      drawingData: drawingSnapshot,
-      drawingStoragePath,
-      drawingSignedUrl,
       viewport: { ...viewport },
       customIcons: [...customIcons],
       hiddenDrawerItems: [...hiddenDrawerItems],
       customDrawerLabels: { ...customDrawerLabels }
     };
 
-    // 1. Update Cloud (Supabase)
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      if (drawingBlob) {
-        try {
-          if (drawingBlob.size > 2 * 1024 * 1024) {
-            console.warn('Whiteboard snapshot exceeded 2MB target; saving without snapshot.');
-            drawingBlob = null;
-          }
-        } catch {
-          // no-op
-        }
-      }
-      if (drawingBlob) {
-        try {
-          drawingStoragePath = buildWhiteboardSnapshotPath(user.id, subjectId, boardId);
-          await uploadFileToStorage(STORAGE_BUCKETS.whiteboards, drawingStoragePath, drawingBlob, 'image/jpeg');
-          drawingSignedUrl = await createSignedUrl(STORAGE_BUCKETS.whiteboards, drawingStoragePath);
-          newBoard.drawingStoragePath = drawingStoragePath;
-          newBoard.drawingSignedUrl = drawingSignedUrl;
-          newBoard.drawingData = undefined;
-        } catch (err) {
-          console.error('Error uploading whiteboard snapshot:', err);
-        }
-      }
-      // Exclude values that have their own columns
-      const { id, conceptId, name, timestamp, drawingData, ...data } = newBoard;
-
-      const { error } = await supabase
-        .from('whiteboards')
-        .upsert({
-          id: boardId,
-          user_id: user.id,
-          subject_id: subjectId,
-          concept_id: concept.id,
-          name: boardName,
-          data: data,
-          drawing_data: null,
-          timestamp: Date.now()
-        });
-
-      if (error) console.error('Error saving whiteboard to Supabase:', error);
-    }
-
-    // 2. Update local state
+    // OPTIMIZATION: Update local state IMMEDIATELY (optimistic UI)
     const existingWhiteboards = design.whiteboards || [];
     const updatedWhiteboards = existingWhiteboards.some(b => b.id === boardId)
       ? existingWhiteboards.map(b => b.id === boardId ? newBoard : b)
       : [...existingWhiteboards, newBoard];
 
-    const updatedDesign = {
+    onSaveDesign({
       ...design,
       whiteboards: updatedWhiteboards,
       conceptBoards: { ...(design.conceptBoards || {}), [concept.id]: newBoard }
-    };
-
-    onSaveDesign(updatedDesign);
+    });
 
     setSaveStatus('saved');
-
-    // Trigger Success Glow
     setShowSaveGlow(true);
     setTimeout(() => setShowSaveGlow(false), 450);
 
     if (onSuccess) {
       onSuccess();
-    } else {
-      setTimeout(() => setSaveStatus('idle'), 2000);
     }
+    setTimeout(() => setSaveStatus('idle'), 2000);
+
+    // OPTIMIZATION: Fire-and-forget the Supabase upload (does NOT block UI)
+    (async () => {
+      try {
+        const drawingBlob = await drawingBlobPromise;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        let drawingStoragePath: string | undefined;
+        let drawingSignedUrl: string | undefined;
+
+        if (drawingBlob && drawingBlob.size <= 2 * 1024 * 1024) {
+          try {
+            drawingStoragePath = buildWhiteboardSnapshotPath(user.id, subjectId, boardId);
+            await uploadFileToStorage(STORAGE_BUCKETS.whiteboards, drawingStoragePath, drawingBlob, 'image/jpeg');
+            drawingSignedUrl = await createSignedUrl(STORAGE_BUCKETS.whiteboards, drawingStoragePath);
+            newBoard.drawingStoragePath = drawingStoragePath;
+            newBoard.drawingSignedUrl = drawingSignedUrl;
+            newBoard.drawingData = undefined;
+          } catch (err) {
+            console.error('Error uploading whiteboard snapshot:', err);
+          }
+        }
+
+        const { id, conceptId, name, timestamp, drawingData, ...data } = newBoard;
+        await supabase
+          .from('whiteboards')
+          .upsert({
+            id: boardId,
+            user_id: user.id,
+            subject_id: subjectId,
+            concept_id: concept.id,
+            name: boardName,
+            data: data,
+            drawing_data: null,
+            timestamp: Date.now()
+          });
+      } catch (err) {
+        console.error('Background save failed (non-blocking):', err);
+      }
+    })();
   };
 
   const handleSaveBoard = (onSuccess?: () => void) => {
@@ -2669,21 +2673,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {mode === 'teacher' && (
-                      <button
-                        onClick={() => setItemToRemove(activeMaterial)}
-                        className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all"
-                        title="Delete Material"
-                      >
-                        🗑️
-                      </button>
-                    )}
                     <button onClick={() => setActiveMaterial(null)} className="w-10 h-10 bg-white rounded-xl shadow border-2 flex items-center justify-center text-lg hover:bg-rose-50 hover:text-rose-500 transition-all">✕</button>
                   </div>
                 </div>
                 <div className="flex-1 bg-white flex items-center justify-center overflow-hidden">
                   {activeMaterial.type === 'video' ? (
                     materialUrl && <video src={materialUrl} controls className="max-w-full max-h-full" autoPlay />
+                  ) : activeMaterial.type === 'slides' ? (
+                    materialUrl ? (
+                      <iframe
+                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(materialUrl)}`}
+                        className="w-full h-full border-none bg-white"
+                        title={activeMaterial.name}
+                      />
+                    ) : (
+                      <div className="text-center p-12">
+                        <div className="text-6xl mb-4">📊</div>
+                        <p className="text-slate-500 font-black">Loading slides...</p>
+                      </div>
+                    )
                   ) : (
                     materialUrl && <iframe src={materialUrl} className="w-full h-full border-none bg-white" title={activeMaterial.name} />
                   )}
@@ -2705,17 +2713,20 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             }}
             style={{
               touchAction: 'none',
-              backgroundColor: boardBgColor,
-              backgroundImage: boardBg === 'grid'
-                ? 'radial-gradient(#cbd5e1 2px, transparent 2px)'
-                : boardBg === 'lined'
-                  ? 'repeating-linear-gradient(transparent, transparent 48px, #cbd5e1 48px, #cbd5e1 50px)'
-                  : 'none',
-              backgroundSize: boardBg === 'grid' ? `${50 * viewport.zoom}px ${50 * viewport.zoom}px` : `100% ${50 * viewport.zoom}px`,
-              backgroundPosition: `${viewport.x}px ${viewport.y}px`
             }}
           >
-            <div className="absolute top-0 left-0 origin-top-left border border-slate-300 shadow-md" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, width: '7000px', height: '7000px' }}>
+            <div className="absolute top-0 left-0 origin-top-left border-2 border-slate-400 shadow-lg rounded-sm overflow-hidden" style={{
+              transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+              width: '2000px',
+              height: '2000px',
+              backgroundColor: boardBgColor,
+              backgroundImage: boardBg === 'grid'
+                ? `radial-gradient(circle, #cbd5e1 2px, transparent 2px)`
+                : boardBg === 'lined'
+                  ? `repeating-linear-gradient(transparent, transparent 48px, #cbd5e1 48px, #cbd5e1 50px)`
+                  : 'none',
+              backgroundSize: boardBg === 'grid' ? `50px 50px` : `100% 50px`,
+            }}>
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
               {items.filter(item => {
                 const parentGroup = groups.find(g => g.itemIds.includes(item.id));

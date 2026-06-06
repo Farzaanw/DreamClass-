@@ -28,8 +28,7 @@ Teachly is a playful, classroom-first platform for elementary teachers to design
 
 ## Project Structure (High-Level)
 - App entry: `App.tsx`
-- UI components: `components/`
-- Constants and types: `constants.tsx`, `types.ts`
+h- Constants and types: `constants.tsx`, `types.ts`
 - Supabase clients/utilities: `lib/`
 - DB migrations: `supabase/migrations/`
 

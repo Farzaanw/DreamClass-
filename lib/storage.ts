@@ -6,10 +6,11 @@ export const STORAGE_BUCKETS = {
 } as const;
 
 export const MATERIAL_LIMITS = {
-  pdf: 25 * 1024 * 1024,
-  slides: 25 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
-  audio: 25 * 1024 * 1024
+  pdf: 50 * 1024 * 1024,
+  slides: 50 * 1024 * 1024,
+  video: 500 * 1024 * 1024,
+  audio: 50 * 1024 * 1024,
+  image: 25 * 1024 * 1024
 } as const;
 
 export const buildMaterialPath = (userId: string, materialId: string, fileName: string) => {

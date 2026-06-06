@@ -273,6 +273,7 @@ const App: React.FC = () => {
   const [dashboardInitialView, setDashboardInitialView] = useState<'overview' | 'materials' | 'songs' | 'games'>('overview');
   const [dashboardInitialSubjectId, setDashboardInitialSubjectId] = useState<string | null>(null);
   const [materialsOpenedFromConcept, setMaterialsOpenedFromConcept] = useState(false);
+  const [openMaterialSidebarOnConcept, setOpenMaterialSidebarOnConcept] = useState(false);
   const [cursorStyle, setCursorStyle] = useState(() => {
     const saved = localStorage.getItem('teachly_cursor_style');
     return saved ? JSON.parse(saved) : {
@@ -931,7 +932,7 @@ const App: React.FC = () => {
     if (error) console.error('Error updating materials in Supabase:', error);
   }, [currentUser, resolveMaterialSignedUrl]);
 
-  const handleUploadMaterial = useCallback(async (subjectId: string, file: File, type: 'pdf' | 'slides' | 'video', thumbnailUrl?: string): Promise<MaterialFile> => {
+  const handleUploadMaterial = useCallback(async (subjectId: string, file: File, type: 'pdf' | 'slides' | 'video' | 'image' | 'audio', thumbnailUrl?: string): Promise<MaterialFile> => {
     if (!currentUser) throw new Error('Not authenticated');
     const materialId = `mat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const storagePath = buildMaterialPath(currentUser.id, materialId, file.name);
@@ -1047,6 +1048,22 @@ const App: React.FC = () => {
       setCurrentView('classroom');
     }
   }, [allSubjects, appMode]);
+
+  // Navigate to a subject's board with the material sidebar auto-opened
+  const handleViewInSubjectBoard = useCallback((subjectId: string) => {
+    const subject = allSubjects.find(s => s.id === subjectId) || null;
+    if (!subject) return;
+    setSelectedSubject(subject);
+    // Select the first non-archived concept
+    const activeConcepts = subject.concepts.filter(c => !c.isArchived);
+    if (activeConcepts.length > 0) {
+      setSelectedConcept(activeConcepts[0]);
+    } else if (subject.concepts.length > 0) {
+      setSelectedConcept(subject.concepts[0]);
+    }
+    setOpenMaterialSidebarOnConcept(true);
+    setCurrentView('concept');
+  }, [allSubjects]);
 
   const startDesigning = (subjectId: SubjectId) => {
     setDesigningSubjectId(subjectId);
@@ -1456,6 +1473,7 @@ const App: React.FC = () => {
               }}
               initialView={dashboardInitialView}
               initialSubjectId={dashboardInitialSubjectId || undefined}
+              onViewInSubjectBoard={handleViewInSubjectBoard}
               cursorStyle={cursorStyle}
               onCursorStyleChange={setCursorStyle}
             />
@@ -1504,6 +1522,7 @@ const App: React.FC = () => {
                 setMaterialsOpenedFromConcept(true);
                 setCurrentView('dashboard');
               }}
+              initialOpenMaterialSidebar={openMaterialSidebarOnConcept}
               userSongs={currentUser.songs || []}
               mode={appMode!}
             />
