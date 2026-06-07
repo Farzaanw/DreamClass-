@@ -1051,6 +1051,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     setTimeout(() => {
       setDroppedItemId(prev => prev === newItem.id ? null : prev);
     }, 1500);
+
+    // Switch the active tool to 'select' so the cursor returns to the grab/hand style
+    // after the user picks a drawer item, timer, spinner, or any "add" tool.
+    setActiveTool('select');
     // Removed auto-selection to satisfy user request: "Only show the delete button on the icon if the user reclicks on the icon"
   };
 
@@ -2386,7 +2390,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             <div className="flex items-center gap-3">
               <button
                 onClick={handleNewBoard}
-                className="px-4 py-2 bg-slate-100 rounded-xl font-black text-slate-800 text-sm border-b-4 border-slate-200 hover:bg-slate-50 active:translate-y-1 active:border-b-0 transition-all"
+                className="px-8 py-3 bg-slate-100 rounded-xl font-black text-slate-800 text-xl border-b-4 border-slate-200 hover:bg-slate-50 active:translate-y-1 active:border-b-0 transition-all"
               >
                 ✨ New
               </button>
@@ -2395,7 +2399,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   setShowSaveArrow(false);
                   handleSaveBoard();
                 }}
-                className={`relative px-5 py-2 rounded-xl font-black text-sm border-b-4 transition-all shadow-lg flex items-center gap-2 group/save ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                className={`relative px-8 py-3 rounded-xl font-black text-xlcl ed border-b-4 transition-all shadow-lg flex items-center gap-2 group/save ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
                   saveStatus === 'saving' ? 'bg-green-400 text-white border-green-600 cursor-wait' :
                     'bg-green-600 text-white border-green-800 hover:bg-green-500 active:translate-y-1 active:border-b-0'
                   } ${showSaveArrow ? 'ring-4 ring-green-300/70 shadow-[0_0_30px_rgba(34,197,94,0.75)] animate-pulse' : ''}`}
@@ -2414,13 +2418,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             <div className="flex items-center gap-4">
               <button
                 onClick={handleClearEverything}
-                className="px-4 py-1.5 bg-slate-100 rounded-lg font-black text-slate-900 text-xs border-b-2 border-slate-200 active:translate-y-0.5 active:border-b-0 transition-all"
+                className="px-8 py-3 bg-slate-100 rounded-lg font-black text-slate-900 text-xl border-b-2 border-slate-200 active:translate-y-0.5 active:border-b-0 transition-all"
               >
                 ✨ New
               </button>
               <button
                 onClick={handleSaveBoard}
-                className={`px-5 py-1.5 rounded-lg font-black text-xs border-b-2 transition-all shadow-md flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
+                className={`px-8 py-3 rounded-lg font-black text-xl border-b-2 transition-all shadow-md flex items-center gap-2 ${saveStatus === 'saved' ? 'bg-green-500 text-white border-green-700' :
                   saveStatus === 'saving' ? 'bg-blue-400 text-white border-blue-600 cursor-wait' :
                     'bg-blue-500 text-white border-blue-700 active:translate-y-1 active:border-b-0'
                   }`}
@@ -3330,53 +3334,53 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               )}
             </div>
           </div>
-          <div className="h-16 py-2 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-4 z-50">
+          <div className="h-24 py-3 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-5 z-50">
             {mode === 'teacher' && currentBoardName && (
               <div className="flex items-center mr-2">
-                <span className="px-4 py-2 bg-blue-50 text-blue-600 text-sm font-black rounded-xl border-2 border-blue-100 uppercase tracking-wider shadow-sm">
+                <span className="px-5 py-2.5 bg-blue-50 text-blue-600 text-base font-black rounded-xl border-2 border-blue-100 uppercase tracking-wider shadow-sm">
                   Active: {currentBoardName}
                 </span>
               </div>
             )}
-            <div className="flex bg-slate-100 p-2 rounded-full shadow-inner gap-1">
+            <div className="flex bg-slate-100 p-2.5 rounded-full shadow-inner gap-1.5">
               {[{ id: 'select', icon: '🖐️' }, { id: 'marker', icon: '✏️' }, { id: 'highlighter', icon: '🖍️' }, { id: 'eraser', icon: '🧼' }].map(t => (
                 <div key={t.id} className="relative group/tool">
-                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-10 h-10 rounded-full transition-all flex items-center justify-center text-xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
-                    {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
+                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-14 h-14 rounded-full transition-all flex items-center justify-center text-2xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
+                    {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
                   </button>
-                  {showColorPicker === t.id && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${(t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
+                  {showColorPicker === t.id && <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${(t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
                 </div>
               ))}
             </div>
-            <div className="h-8 w-px bg-slate-200" />
-            <div className="flex gap-2">
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-9 h-9 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-base">➕</button>
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-9 h-9 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-base">➖</button>
-              <button onClick={() => setViewport(getCenter())} className="w-9 h-9 rounded-xl bg-slate-50 shadow-md border border-slate-100 flex items-center justify-center text-base">🏠</button>
+            <div className="h-12 w-px bg-slate-200" />
+            <div className="flex gap-2.5">
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➕</button>
+              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➖</button>
+              <button onClick={() => setViewport(getCenter())} className="w-12 h-12 rounded-xl bg-slate-50 shadow-md border border-slate-100 flex items-center justify-center text-xl">🏠</button>
             </div>
-            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-10 h-10 rounded-full flex items-center justify-center text-xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
-            <div className="h-8 w-px bg-slate-200" />
-            <div className="flex gap-2">
+            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
+            <div className="h-12 w-px bg-slate-200" />
+            <div className="flex gap-2.5">
               <button
                 onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
-                className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 border-b-4 border-blue-200 flex items-center justify-center text-2xl hover:bg-blue-100 transition-all active:translate-y-0.5 active:border-b-0"
+                className="w-14 h-14 rounded-full bg-blue-50 text-blue-500 border-b-4 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Timer"
               >
                 ⏱️
               </button>
               <button
                 onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
-                className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 border-b-4 border-purple-200 flex items-center justify-center text-2xl hover:bg-purple-100 transition-all active:translate-y-0.5 active:border-b-0"
+                className="w-14 h-14 rounded-full bg-purple-50 text-purple-500 border-b-4 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Wheel Spinner"
               >
                 🎡
               </button>
               <button
                 onClick={() => { setActiveTool(activeTool === 'boxSelect' ? 'select' : 'boxSelect'); }}
-                className={`w-10 h-10 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${activeTool === 'boxSelect' ? 'bg-blue-500 text-white border-blue-700 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}
+                className={`w-14 h-14 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${activeTool === 'boxSelect' ? 'bg-blue-500 text-white border-blue-700 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}
                 title="Group Select"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 4" /><path d="M14 10l6-6m0 0v5m0-5h-5" strokeDasharray="none" /></svg>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 4" /><path d="M14 10l6-6m0 0v5m0-5h-5" strokeDasharray="none" /></svg>
               </button>
               {/* Trash Button - deletes selected item or group */}
               <button
@@ -3388,14 +3392,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   }
                 }}
                 disabled={!selectedItemId && !selectedGroupId}
-                className={`w-10 h-10 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${
+                className={`w-14 h-14 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${
                   (selectedItemId || selectedGroupId)
                     ? 'bg-rose-50 text-rose-500 border-rose-200 hover:bg-rose-100 hover:scale-105 shadow-sm'
                     : 'bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed'
                 }`}
                 title="Delete Selected (Backspace)"
               >
-                <span className="text-xl">🗑️</span>
+                <span className="text-2xl">🗑️</span>
               </button>
             </div>
           </div>

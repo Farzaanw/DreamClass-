@@ -1102,14 +1102,21 @@ const App: React.FC = () => {
       {currentUser && (cursorStyle.style !== 'arrow' || cursorStyle.color !== 'default' || cursorStyle.size !== 'normal' || cursorStyle.animation !== 'none') && (
         <CursorFollower style={cursorStyle} />
       )}
-      {/* Visual Mode Overlay: Teacher (Blue Tint) vs Classroom (Clear) */}
-      {currentUser && appMode && (
-        <div 
-          className={`pointer-events-none fixed inset-0 z-[9999] transition-colors duration-700 ${
-            appMode === 'teacher' ? 'bg-blue-500/15' : 'bg-transparent'
-          }`}
-          aria-hidden="true"
-        />
+      {/* Teacher Mode Border Indicator: Beating, Glowing Blue Outline */}
+      {currentUser && appMode === 'teacher' && (
+        <>
+          {/* Outer soft blue glow halo - flush to viewport edge */}
+          <div
+            className="pointer-events-none fixed inset-0 z-[9997] rounded-none animate-teacher-border-glow"
+            aria-hidden="true"
+          />
+          {/* Solid, prominent blue outline - close to viewport edge */}
+          <div
+            className="pointer-events-none fixed inset-1 z-[9999] rounded-3xl border-[6px] border-blue-500 animate-teacher-border-pulse"
+            style={{ boxShadow: '0 0 0 2px rgba(59,130,246,0.35), 0 0 24px 4px rgba(59,130,246,0.55)' }}
+            aria-hidden="true"
+          />
+        </>
       )}
 
       {currentView === 'landing' && (
@@ -1562,6 +1569,45 @@ const App: React.FC = () => {
 
         .animate-cursor-glow {
           animation: cursor-glow 1.5s ease-in-out infinite;
+        }
+
+        /* Teacher Mode: Beating, Glowing Blue Border Indicator */
+        @keyframes teacher-border-glow {
+          0%, 100% {
+            box-shadow:
+              0 0 20px 4px rgba(59, 130, 246, 0.45),
+              inset 0 0 20px 4px rgba(59, 130, 246, 0.25),
+              0 0 0 0 rgba(59, 130, 246, 0.0);
+            border-color: rgba(96, 165, 250, 0.85);
+          }
+          50% {
+            box-shadow:
+              0 0 55px 14px rgba(59, 130, 246, 0.85),
+              inset 0 0 55px 14px rgba(59, 130, 246, 0.55),
+              0 0 0 4px rgba(147, 197, 253, 0.4);
+            border-color: rgba(147, 197, 253, 1);
+          }
+        }
+
+        @keyframes teacher-border-beat {
+          0%, 100% {
+            opacity: 0.35;
+            transform: scale(1);
+            box-shadow: 0 0 25px 6px rgba(59, 130, 246, 0.35);
+          }
+          50% {
+            opacity: 0.85;
+            transform: scale(1.005);
+            box-shadow: 0 0 60px 14px rgba(59, 130, 246, 0.7);
+          }
+        }
+
+        .animate-teacher-border-glow {
+          animation: teacher-border-glow 1.6s ease-in-out infinite;
+        }
+
+        .animate-teacher-border-beat {
+          animation: teacher-border-beat 1.6s ease-in-out infinite;
         }
       `}</style>
     </div>
