@@ -591,17 +591,21 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!selectedGroupId) return;
       const active = document.activeElement as HTMLElement | null;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
-      if (event.key === 'Backspace') {
-        event.preventDefault();
-        deleteGroup(selectedGroupId);
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        if (selectedGroupId) {
+          event.preventDefault();
+          deleteGroup(selectedGroupId);
+        } else if (selectedItemId) {
+          event.preventDefault();
+          removeItem(selectedItemId);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedGroupId, groups]);
+  }, [selectedGroupId, selectedItemId, groups]);
 
   // Click outside a selected group should ungroup it (make items individual again)
   useEffect(() => {
@@ -2325,7 +2329,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
           {/* Concept Switcher for Teacher Mode */}
           {mode === 'teacher' && subjectConcepts.length > 1 && (
-            <div className="relative ml-4 flex-1 max-w-[1200px] group/switcher">
+            <div className="relative ml-4 min-w-0 flex-1 max-w-[690px] group/switcher">
               <div
                 ref={conceptSwitcherRef}
                 onMouseDown={handleSwitcherMouseDown}
@@ -2702,7 +2706,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div
             className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
-            onDrop={handleDropOnBoard}
             onDragOver={(e) => e.preventDefault()}
             onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction}
             onWheel={(e) => {
@@ -2734,8 +2737,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               }).map(item => {
                 const inGroup = groups.some(g => g.itemIds.includes(item.id));
                 return (
-                  <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }}>
-                    <div className={`relative p-4 rounded-3xl border-4 transition-all duration-700 ${droppedItemId === item.id ? 'ring-8 ring-blue-400/50 bg-blue-400/20 border-blue-400 scale-105' : selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
+                  <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }} onClick={(e) => { e.stopPropagation(); }}>
+                    <div className={`relative p-4 rounded-3xl border-4 transition-all duration-200 ease-out ${droppedItemId === item.id ? 'ring-8 ring-blue-400/50 bg-blue-400/20 border-blue-400 scale-105' : selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.25)]' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
                       {item.type === 'song' ? (
                         <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border-4 border-pink-100 flex items-center gap-6 min-w-[320px] pointer-events-auto">
                           <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-inner ${activeSong?.id === item.id && songPlaying ? 'bg-pink-100 animate-bounce-gentle' : 'bg-slate-50'}`}>
@@ -3375,6 +3378,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 4" /><path d="M14 10l6-6m0 0v5m0-5h-5" strokeDasharray="none" /></svg>
               </button>
+              {/* Trash Button - deletes selected item or group */}
+              <button
+                onClick={() => {
+                  if (selectedGroupId) {
+                    deleteGroup(selectedGroupId);
+                  } else if (selectedItemId) {
+                    removeItem(selectedItemId);
+                  }
+                }}
+                disabled={!selectedItemId && !selectedGroupId}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${
+                  (selectedItemId || selectedGroupId)
+                    ? 'bg-rose-50 text-rose-500 border-rose-200 hover:bg-rose-100 hover:scale-105 shadow-sm'
+                    : 'bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed'
+                }`}
+                title="Delete Selected (Backspace)"
+              >
+                <span className="text-xl">🗑️</span>
+              </button>
             </div>
           </div>
         </main>
@@ -3849,7 +3871,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               <div className="text-center">
                 <h2 className="text-2xl font-black text-slate-900 mb-2">Delete Lesson?</h2>
                 <p className="text-slate-500 font-bold text-sm tracking-tight px-4 leading-relaxed">
-                  Are you sure you want to delete <span className="text-rose-500">"{boardToDelete.name}"</span>? This cannot be undone.
+                  Are you sure you want to delete?
                 </p>
               </div>
 
