@@ -168,8 +168,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [materialPos, setMaterialPos] = useState({ x: 50, y: 50 });
   const isDraggingMaterial = useRef(false);
   const materialUrlCacheRef = useRef<Map<string, string>>(new Map());
-  const draggingAssetRef = useRef<{ content: string; type: BoardItem['type']; metadata?: any } | null>(null);
-  const draggingMaterialIdRef = useRef<string | null>(null);
+  // REPLACED HTML5 DnD with unified pointer-based drag system
+  const pointerDragRef = useRef<{ content: string; type: BoardItem['type']; metadata?: any } | null>(null);
+  const pointerMaterialIdRef = useRef<string | null>(null);
+  const [pointerGhost, setPointerGhost] = useState<{ x: number; y: number } | null>(null);
+  const pointerCaptureElRef = useRef<Element | null>(null);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -935,6 +938,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     }));
   };
 
+  const pointerDragClickSuppressRef = useRef(false);
+
   const renderDrawerItem = (categoryId: string, itemKey: string, content: string, type: string, label?: string, metadata?: any, isCustom = false, customIndex?: number) => {
     const fullKey = `${categoryId}:${itemKey}`;
     if (hiddenDrawerItems.includes(fullKey)) return null;
@@ -944,10 +949,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     return (
       <div key={fullKey} className="relative group/drawer-item flex flex-col items-center gap-1">
         <button
-          draggable
-          onDragStart={(e) => handleDragStartAsset(e, content, type as any, metadata)}
-          onDragEnd={() => { draggingAssetRef.current = null; }}
-          onClick={() => addItem(content, type as any, undefined, undefined, metadata)}
+          onPointerDown={(e) => handlePointerDragStart(e, content, type as any, metadata)}
           className={baseClass}
         >
           {content}
@@ -1198,81 +1200,135 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     return { width, height, isTopLeft, total: cluster.length };
   };
 
-  const handleDragStartAsset = (e: React.DragEvent, content: string, type: BoardItem['type'], metadata?: any) => {
-    draggingAssetRef.current = { content, type, metadata };
-    const payload = JSON.stringify({ content, type, metadata: metadata || null });
-    e.dataTransfer.setData('application/json', payload);
-    e.dataTransfer.setData('text/plain', payload);
-    e.dataTransfer.setData('content', content);
-    e.dataTransfer.setData('type', type);
-    if (metadata) e.dataTransfer.setData('metadata', JSON.stringify(metadata));
-    e.dataTransfer.effectAllowed = 'move';
+  // UNIFIED POINTER-BASED DRAG SYSTEM (replaces HTML5 DnD)
+  const pointerDragCleanupRef = useRef<(() => void) | null>(null);
+
+  const handlePointerDragStart = (e: React.PointerEvent, content: string, type: BoardItem['type'], metadata?: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Store the drag payload
+    pointerDragRef.current = { content, type, metadata };
+
+    // Track drag distance to distinguish click vs drag
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let totalDistance = 0;
+
+    // Capture pointer for reliable tracking
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    pointerCaptureElRef.current = target;
+
+    // Show ghost
+    const boardRect = mainContentRef.current?.getBoundingClientRect();
+    if (boardRect) {
+      setPointerGhost({ x: e.clientX - boardRect.left, y: e.clientY - boardRect.top });
+    }
+
+    // Document-level move handler
+    const onPointerMove = (pe: PointerEvent) => {
+      const dx = pe.clientX - startX;
+      const dy = pe.clientY - startY;
+      totalDistance = Math.sqrt(dx * dx + dy * dy);
+
+      const br = mainContentRef.current?.getBoundingClientRect();
+      if (br) {
+        setPointerGhost({ x: pe.clientX - br.left, y: pe.clientY - br.top });
+      }
+    };
+
+    // Document-level up handler
+    const onPointerUp = (pe: PointerEvent) => {
+      setPointerGhost(null);
+      pointerDragRef.current = null;
+      pointerCaptureElRef.current = null;
+
+      const boardEl = mainContentRef.current;
+      if (boardEl && content && type) {
+        const br = boardEl.getBoundingClientRect();
+        const margin = 40;
+        const overBoard = pe.clientX >= br.left - margin && pe.clientX <= br.right + margin
+                       && pe.clientY >= br.top - margin && pe.clientY <= br.bottom + margin;
+
+        if (totalDistance > 5 && overBoard) {
+          // Dragged onto the board → place at drop position
+          const dropX = pe.clientX - br.left;
+          const dropY = pe.clientY - br.top;
+          addItem(content, type, dropX, dropY, metadata);
+        } else if (totalDistance <= 5) {
+          // Click without drag → place at default grid position
+          addItem(content, type, undefined, undefined, metadata);
+        }
+      }
+
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    pointerDragCleanupRef.current = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
   };
 
-  const handleDropOnBoard = (e: React.DragEvent) => {
+  const handleMaterialPointerDragStart = (e: React.PointerEvent, materialId: string) => {
     e.preventDefault();
-    const materialId = e.dataTransfer.getData('materialId') || e.dataTransfer.getData('text/material-id') || draggingMaterialIdRef.current;
-    const metadataStr = e.dataTransfer.getData('metadata');
-    let metadata = metadataStr ? JSON.parse(metadataStr) : undefined;
-    let content = e.dataTransfer.getData('content');
-    let type = e.dataTransfer.getData('type') as BoardItem['type'];
+    e.stopPropagation();
 
-    if ((!content || !type) && draggingAssetRef.current) {
-      content = content || draggingAssetRef.current.content;
-      type = type || draggingAssetRef.current.type;
-      if (draggingAssetRef.current.metadata) {
-        metadata = { ...(metadata || {}), ...draggingAssetRef.current.metadata };
-      }
+    pointerMaterialIdRef.current = materialId;
+
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    pointerCaptureElRef.current = target;
+
+    const boardRect = mainContentRef.current?.getBoundingClientRect();
+    if (boardRect) {
+      setPointerGhost({ x: e.clientX - boardRect.left, y: e.clientY - boardRect.top });
     }
 
-    if (!content || !type) {
-      const json = e.dataTransfer.getData('application/json');
-      if (json) {
-        try {
-          const parsed = JSON.parse(json);
-          content = parsed.content || content;
-          type = parsed.type || type;
-          if (parsed.metadata) {
-            metadata = { ...(metadata || {}), ...parsed.metadata };
+    const onPointerMove = (pe: PointerEvent) => {
+      const br = mainContentRef.current?.getBoundingClientRect();
+      if (br) {
+        setPointerGhost({ x: pe.clientX - br.left, y: pe.clientY - br.top });
+      }
+    };
+
+    const onPointerUp = (pe: PointerEvent) => {
+      setPointerGhost(null);
+      pointerMaterialIdRef.current = null;
+      pointerCaptureElRef.current = null;
+
+      const boardEl = mainContentRef.current;
+      if (boardEl) {
+        const br = boardEl.getBoundingClientRect();
+        const inX = pe.clientX >= br.left - 40 && pe.clientX <= br.right + 40;
+        const inY = pe.clientY >= br.top - 40 && pe.clientY <= br.bottom + 40;
+
+        if (inX && inY) {
+          const dropX = pe.clientX - br.left;
+          const dropY = pe.clientY - br.top;
+          const material = materials.find(m => m.id === materialId);
+          if (material) {
+            setMaterialPos({ x: dropX, y: dropY });
+            setActiveMaterial(material);
+            setLibraryOpen(false);
           }
-        } catch {
-          // fall through to text/plain
         }
       }
-    }
 
-    if (!content || !type) {
-      const text = e.dataTransfer.getData('text/plain');
-      if (text) {
-        try {
-          const parsedText = JSON.parse(text);
-          content = parsedText.content || content;
-          type = parsedText.type || type;
-          if (parsedText.metadata) {
-            metadata = { ...(metadata || {}), ...parsedText.metadata };
-          }
-        } catch {
-          content = content || text;
-        }
-      }
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const dropX = e.clientX - rect.left;
-    const dropY = e.clientY - rect.top;
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
 
-    if (materialId) {
-      const material = materials.find(m => m.id === materialId);
-      if (material) {
-        setMaterialPos({ x: dropX, y: dropY });
-        setActiveMaterial(material);
-        setLibraryOpen(false);
-      }
-      draggingMaterialIdRef.current = null;
-      return;
-    }
-
-    if (content && type) addItem(content, type, dropX, dropY, metadata);
-    draggingAssetRef.current = null;
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    pointerDragCleanupRef.current = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
   };
 
   const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
@@ -2578,15 +2634,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                     <div key={m.id} className="relative group">
                       <button
                         onClick={() => { setActiveMaterial(m); setLibraryOpen(false); }}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('materialId', m.id);
-                          e.dataTransfer.setData('text/material-id', m.id);
-                          e.dataTransfer.setData('text/plain', m.id);
-                          e.dataTransfer.effectAllowed = 'move';
-                          draggingMaterialIdRef.current = m.id;
-                        }}
-                        onDragEnd={() => { draggingMaterialIdRef.current = null; }}
+                        onPointerDown={(e) => handleMaterialPointerDragStart(e, m.id)}
                         className="w-full bg-white border-2 rounded-3xl hover:border-blue-400 shadow-sm transition-all flex flex-col overflow-hidden"
                       >
                         <div className="h-28 bg-slate-50 flex items-center justify-center relative overflow-hidden pointer-events-none">
@@ -2652,8 +2700,6 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         <main
           ref={mainContentRef}
           className="flex-1 relative overflow-hidden flex flex-col bg-slate-50"
-          onDrop={handleDropOnBoard}
-          onDragOver={(e) => e.preventDefault()}
         >
           <AnimatePresence>
             {showTransition && (
@@ -2705,6 +2751,19 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+          {/* Drag ghost that follows the pointer */}
+          {pointerGhost && (
+            <div
+              className="fixed z-[200] pointer-events-none select-none text-5xl opacity-80 drop-shadow-2xl scale-125 transition-none"
+              style={{
+                left: pointerGhost.x + (mainContentRef.current?.getBoundingClientRect()?.left || 0),
+                top: pointerGhost.y + (mainContentRef.current?.getBoundingClientRect()?.top || 0),
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {pointerDragRef.current?.content || ''}
             </div>
           )}
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
