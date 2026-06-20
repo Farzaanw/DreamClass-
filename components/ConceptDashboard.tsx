@@ -188,6 +188,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const [isDeleteHistoryModalOpen, setIsDeleteHistoryModalOpen] = useState(false);
   const [boardToDelete, setBoardToDelete] = useState<{ id: string, name: string } | null>(null);
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
+  const [editingBoardName, setEditingBoardName] = useState('');
 
   // Group box state
   const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
@@ -443,12 +445,18 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   const [spinnerInputs, setSpinnerInputs] = useState<Record<string, string>>({});
   // OPTIMIZATION: Reduced center offset to match smaller canvas (2000x2000 vs 7000x7000)
-  const getCenter = () => ({ x: window.innerWidth / 2 - 1000, y: window.innerHeight / 2 - 1000, zoom: 1 });
-  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  // Center the whiteboard within the main content area (accounting for sidebar and bottom bar)
+  const getCenter = () => {
+    const mainEl = mainContentRef.current;
+    const w = mainEl?.clientWidth || window.innerWidth;
+    const h = mainEl?.clientHeight || window.innerHeight;
+    return { x: w / 2 - 1000, y: h / 2 - 1000, zoom: 1 };
+  };
+  const [viewport, setViewport] = useState(getCenter);
 
-  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-5xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-2 m-0.5";
-  const letterBaseClass = stickerBaseClass.replace('text-5xl', 'text-4xl');
-  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-lg py-4 px-3 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer text-center truncate min-h-[64px]";
+  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-4xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-1.5 m-0.5";
+  const letterBaseClass = stickerBaseClass.replace('text-4xl', 'text-3xl');
+  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-sm py-4 px-2 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer text-center truncate min-h-[56px] leading-tight break-all";
   const headerClass = "col-span-4 mt-8 mb-4 text-lg font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
@@ -2323,19 +2331,49 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 onClick={() => restoreBoardState(b)}
                 className="w-full p-4 bg-white border-4 border-slate-100 rounded-3xl text-left hover:border-blue-400 shadow-sm transition-all flex flex-col gap-1 active:scale-95"
               >
-                <div className="flex w-full">
-                  <input
-                    type="text"
-                    value={b.name || ''}
-                    placeholder="Untitled"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => updateHistoryBoardName(b.id, e.target.value)}
-                    className="flex-1 font-black text-slate-800 text-lg bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-blue-400 outline-none transition-colors px-1 -ml-1 placeholder:text-slate-300"
-                  />
+                <div className="flex w-full items-center">
+                  {editingBoardId === b.id ? (
+                    <input
+                      type="text"
+                      value={editingBoardName}
+                      placeholder="Untitled"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setEditingBoardName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation();
+                          updateHistoryBoardName(b.id, editingBoardName);
+                          setEditingBoardId(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        updateHistoryBoardName(b.id, editingBoardName);
+                        setEditingBoardId(null);
+                      }}
+                      className="flex-1 font-black text-slate-800 text-lg bg-transparent border-b-2 border-blue-400 outline-none px-1 -ml-1 placeholder:text-slate-300"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="flex-1 font-black text-slate-800 text-lg px-1 truncate">
+                      {b.name || 'Untitled'}
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-slate-400 font-bold tracking-wider px-1">
                   Created: {new Date(b.timestamp).toLocaleDateString()}, {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingBoardId(b.id);
+                  setEditingBoardName(b.name || '');
+                }}
+                className="absolute -top-2 left-2 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all z-10"
+                title="Edit Name"
+              >
+                ✏️
               </button>
 
               <button
@@ -3441,24 +3479,20 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 4" /><path d="M14 10l6-6m0 0v5m0-5h-5" strokeDasharray="none" /></svg>
               </button>
-              {/* Trash Button - deletes selected item or group */}
+              {/* Clear Board Button - instantly clears the whiteboard (undoable) */}
               <button
                 onClick={() => {
-                  if (selectedGroupId) {
-                    deleteGroup(selectedGroupId);
-                  } else if (selectedItemId) {
-                    removeItem(selectedItemId);
-                  }
+                  saveToUndoStack();
+                  setItems([]);
+                  if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                  setSelectedItemId(null);
+                  setGroups([]);
+                  setSelectedGroupId(null);
                 }}
-                disabled={!selectedItemId && !selectedGroupId}
-                className={`w-14 h-14 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${
-                  (selectedItemId || selectedGroupId)
-                    ? 'bg-rose-50 text-rose-500 border-rose-200 hover:bg-rose-100 hover:scale-105 shadow-sm'
-                    : 'bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed'
-                }`}
-                title="Delete Selected (Backspace)"
+                className="w-14 h-14 rounded-full flex items-center justify-center border-b-4 transition-all active:translate-y-0.5 active:border-b-0 bg-rose-50 text-rose-500 border-rose-200 hover:bg-rose-100 hover:scale-105 shadow-sm"
+                title="Clear entire whiteboard (undoable)"
               >
-                <span className="text-2xl">🗑️</span>
+                <span className="text-2xl">🧹</span>
               </button>
             </div>
           </div>
