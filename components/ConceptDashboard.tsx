@@ -190,6 +190,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const [boardToDelete, setBoardToDelete] = useState<{ id: string, name: string } | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editingBoardName, setEditingBoardName] = useState('');
+  const [editingCategoryLabelId, setEditingCategoryLabelId] = useState<string | null>(null);
+  const [editingCategoryLabelValue, setEditingCategoryLabelValue] = useState('');
+  const [categoryLabelOverrides, setCategoryLabelOverrides] = useState<Record<string, string>>(design.categoryLabelOverrides || {});
 
   // Group box state
   const [groups, setGroups] = useState<{ id: string, itemIds: string[], minimized: boolean }[]>([]);
@@ -2370,7 +2373,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   setEditingBoardId(b.id);
                   setEditingBoardName(b.name || '');
                 }}
-                className="absolute -top-2 left-2 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all z-10"
+                className="absolute -top-2 left-2 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md hover:scale-110 active:scale-90 transition-all z-10"
                 title="Edit Name"
               >
                 ✏️
@@ -2382,7 +2385,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   setBoardToDelete({ id: b.id, name: b.name || 'Untitled Lesson' });
                   setIsDeleteHistoryModalOpen(true);
                 }}
-                className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all z-10"
+                className="absolute -top-2 -right-2 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm font-black border-2 border-white shadow-md hover:scale-110 active:scale-90 transition-all z-10"
                 title="Delete Snapshot"
               >
                 ✕
