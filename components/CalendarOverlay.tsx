@@ -93,6 +93,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0]);
   const dayRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const calendarGhostRef = useRef<HTMLDivElement>(null);
+  const weatherAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const events = calendarData?.events || {};
 

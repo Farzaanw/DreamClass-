@@ -457,9 +457,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
   const [viewport, setViewport] = useState(getCenter);
 
-  const stickerBaseClass = "w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-4xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-1.5 m-0.5";
+  const stickerBaseClass = "touch-none w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-4xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-1.5 m-0.5";
   const letterBaseClass = stickerBaseClass.replace('text-4xl', 'text-3xl');
-  const wordBaseClass = "col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-sm py-4 px-2 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer text-center truncate min-h-[56px] leading-tight break-all";
+  const wordBaseClass = "touch-none col-span-2 bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-bold text-slate-800 text-sm py-4 px-2 flex items-center justify-center hover:scale-105 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer text-center truncate min-h-[56px] leading-tight break-all";
   const headerClass = "col-span-4 mt-8 mb-4 text-lg font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-50 pb-2 flex items-center gap-2";
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
@@ -1239,16 +1239,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       ghostRef.current.style.top = `${e.clientY}px`;
     }
 
-    // Document-level move handler
+    // Document-level move handler (rAF-throttled to avoid layout thrashing)
+    let rafId: number | null = null;
     const onPointerMove = (pe: PointerEvent) => {
       const dx = pe.clientX - startX;
       const dy = pe.clientY - startY;
       totalDistance = Math.sqrt(dx * dx + dy * dy);
 
-      if (ghostRef.current) {
-        ghostRef.current.style.left = `${pe.clientX}px`;
-        ghostRef.current.style.top = `${pe.clientY}px`;
-      }
+      const latestX = pe.clientX;
+      const latestY = pe.clientY;
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (ghostRef.current) {
+          ghostRef.current.style.left = `${latestX}px`;
+          ghostRef.current.style.top = `${latestY}px`;
+        }
+      });
     };
 
     // Document-level up handler
@@ -1278,13 +1285,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         }
       }
 
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointermove', onPointerMove, { passive: false });
     document.addEventListener('pointerup', onPointerUp);
     pointerDragCleanupRef.current = () => {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
@@ -4004,7 +4013,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         )}
       </AnimatePresence>
 
+      {/* Drag ghost element – positioned by handlePointerDragStart */}
+      <div
+        ref={ghostRef}
+        className="drag-ghost"
+        style={{ display: 'none', fontSize: '2.5rem', lineHeight: 1 }}
+      />
+
       <style>{`
+        .drag-ghost { position: fixed; pointer-events: none; touch-action: none; z-index: 9999; transform: translate(-50%, -50%) scale(1.15); background: rgba(255,255,255,0.9); border-radius: 1rem; padding: 0.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.18); border: 2px solid rgba(59,130,246,0.3); transition: none; will-change: left, top; }
         .board-lined { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.25) 2px, transparent 2px); }
         .board-grid { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.2) 2px, transparent 2px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 2px, transparent 2px); }
         .cursor-grab { cursor: grab; }
