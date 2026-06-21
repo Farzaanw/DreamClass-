@@ -171,7 +171,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   // REPLACED HTML5 DnD with unified pointer-based drag system
   const pointerDragRef = useRef<{ content: string; type: BoardItem['type']; metadata?: any } | null>(null);
   const pointerMaterialIdRef = useRef<string | null>(null);
-  const [pointerGhost, setPointerGhost] = useState<{ x: number; y: number } | null>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
   const pointerCaptureElRef = useRef<Element | null>(null);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [currentBoardName, setCurrentBoardName] = useState<string | null>(null);
@@ -1232,9 +1232,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     pointerCaptureElRef.current = target;
 
     // Show ghost
-    const boardRect = mainContentRef.current?.getBoundingClientRect();
-    if (boardRect) {
-      setPointerGhost({ x: e.clientX - boardRect.left, y: e.clientY - boardRect.top });
+    if (ghostRef.current) {
+      ghostRef.current.innerText = content || '';
+      ghostRef.current.style.display = 'block';
+      ghostRef.current.style.left = `${e.clientX}px`;
+      ghostRef.current.style.top = `${e.clientY}px`;
     }
 
     // Document-level move handler
@@ -1243,15 +1245,18 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       const dy = pe.clientY - startY;
       totalDistance = Math.sqrt(dx * dx + dy * dy);
 
-      const br = mainContentRef.current?.getBoundingClientRect();
-      if (br) {
-        setPointerGhost({ x: pe.clientX - br.left, y: pe.clientY - br.top });
+      if (ghostRef.current) {
+        ghostRef.current.style.left = `${pe.clientX}px`;
+        ghostRef.current.style.top = `${pe.clientY}px`;
       }
     };
 
     // Document-level up handler
     const onPointerUp = (pe: PointerEvent) => {
-      setPointerGhost(null);
+      if (ghostRef.current) {
+        ghostRef.current.style.display = 'none';
+        ghostRef.current.innerText = '';
+      }
       pointerDragRef.current = null;
       pointerCaptureElRef.current = null;
 
@@ -1295,20 +1300,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     target.setPointerCapture(e.pointerId);
     pointerCaptureElRef.current = target;
 
-    const boardRect = mainContentRef.current?.getBoundingClientRect();
-    if (boardRect) {
-      setPointerGhost({ x: e.clientX - boardRect.left, y: e.clientY - boardRect.top });
+    if (ghostRef.current) {
+      ghostRef.current.innerText = '📄';
+      ghostRef.current.style.display = 'block';
+      ghostRef.current.style.left = `${e.clientX}px`;
+      ghostRef.current.style.top = `${e.clientY}px`;
     }
 
     const onPointerMove = (pe: PointerEvent) => {
-      const br = mainContentRef.current?.getBoundingClientRect();
-      if (br) {
-        setPointerGhost({ x: pe.clientX - br.left, y: pe.clientY - br.top });
+      if (ghostRef.current) {
+        ghostRef.current.style.left = `${pe.clientX}px`;
+        ghostRef.current.style.top = `${pe.clientY}px`;
       }
     };
 
     const onPointerUp = (pe: PointerEvent) => {
-      setPointerGhost(null);
+      if (ghostRef.current) {
+        ghostRef.current.style.display = 'none';
+        ghostRef.current.innerText = '';
+      }
       pointerMaterialIdRef.current = null;
       pointerCaptureElRef.current = null;
 
@@ -2795,18 +2805,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           )}
           {/* Drag ghost that follows the pointer */}
-          {pointerGhost && (
-            <div
-              className="fixed z-[200] pointer-events-none select-none text-5xl opacity-80 drop-shadow-2xl scale-125 transition-none"
-              style={{
-                left: pointerGhost.x + (mainContentRef.current?.getBoundingClientRect()?.left || 0),
-                top: pointerGhost.y + (mainContentRef.current?.getBoundingClientRect()?.top || 0),
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              {pointerDragRef.current?.content || ''}
-            </div>
-          )}
+          <div
+            ref={ghostRef}
+            className="fixed z-[200] pointer-events-none select-none text-5xl opacity-80 drop-shadow-2xl scale-125 transition-none"
+            style={{
+              display: 'none',
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
           <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div
             className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
