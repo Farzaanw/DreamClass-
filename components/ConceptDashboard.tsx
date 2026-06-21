@@ -1265,7 +1265,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         const br = boardEl.getBoundingClientRect();
         const margin = 40;
         const overBoard = pe.clientX >= br.left - margin && pe.clientX <= br.right + margin
-                       && pe.clientY >= br.top - margin && pe.clientY <= br.bottom + margin;
+          && pe.clientY >= br.top - margin && pe.clientY <= br.bottom + margin;
 
         if (totalDistance > 5 && overBoard) {
           // Dragged onto the board → place at drop position
@@ -2619,7 +2619,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 <span className="text-3xl font-black leading-none">{cat.icon}</span>
                 <span className="text-base font-bold uppercase tracking-tight text-center leading-none px-1 py-0.5 rounded-md transition-all">{cat.label}</span>
 
-                {mode === 'teacher' && !['STICKERS','SONGS', 'GAMES', 'HISTORY'].includes(cat.id) && (
+                {mode === 'teacher' && !['STICKERS', 'SONGS', 'GAMES', 'HISTORY'].includes(cat.id) && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -3396,10 +3396,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                 if (!bounds) return null;
                 return (
                   <div
-                      key={group.id}
-                      data-group-id={group.id}
-                      className="absolute z-[5] pointer-events-auto"
-                      style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: bounds.h }}
+                    key={group.id}
+                    data-group-id={group.id}
+                    className="absolute z-[5] pointer-events-auto"
+                    style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: bounds.h }}
                   >
                     <div
                       className={`w-full h-full border-2 border-dashed border-blue-400 rounded-2xl transition-all bg-blue-50/20 ${selectedGroupId === group.id ? 'ring-4 ring-blue-400/40' : ''}`}

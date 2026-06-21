@@ -71,21 +71,6 @@ const WEATHER_SOUNDS: Record<string, string> = {
   Snowy: 'https://assets.mixkit.co/active_storage/sfx/2533/2533-preview.mp3',
 };
 
-const DraggableTool: React.FC<{ type: string, icon: string | React.ReactNode, label: string, color?: string }> = ({ type, icon, label, color }) => (
-  <div 
-    draggable
-    onDragStart={(e) => {
-      e.dataTransfer.setData('type', type);
-      if (typeof icon === 'string') e.dataTransfer.setData('icon', icon);
-      e.dataTransfer.setData('label', label);
-    }}
-    className={`flex flex-col items-center gap-1 p-3 rounded-2xl bg-white shadow-sm border-2 border-slate-100 cursor-grab active:cursor-grabbing hover:scale-105 transition-all hover:border-blue-200`}
-  >
-    <div className="text-4xl">{icon}</div>
-    <span className="text-sm font-black uppercase tracking-widest text-slate-400">{label}</span>
-  </div>
-);
-
 const CalendarOverlay: React.FC<CalendarOverlayProps> = ({ 
   calendarData, 
   onUpdateCalendarData, 
@@ -99,6 +84,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [isAddingConference, setIsAddingConference] = useState<{ date: string } | null>(null);
   const [isEditingSticky, setIsEditingSticky] = useState<{ date: string, event: CalendarEvent } | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<null | { type: string; icon: string | React.ReactNode; label: string; color?: string; offsetX: number; offsetY: number; x: number; y: number }>(null);
   const [expandedSticky, setExpandedSticky] = useState<CalendarEvent | null>(null);
   const [activeWeatherEffect, setActiveWeatherEffect] = useState<string | null>(null);
   const [celebrationName, setCelebrationName] = useState<string | null>(null);
@@ -106,7 +92,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   const [stickyText, setStickyText] = useState('');
   const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0]);
   const dayRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const weatherAudioRef = useRef<HTMLAudioElement | null>(null);
+  const calendarGhostRef = useRef<HTMLDivElement>(null);
 
   const events = calendarData?.events || {};
 
@@ -175,6 +161,43 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
     }
   };
 
+  const DraggableTool: React.FC<{ type: string, icon: string | React.ReactNode, label: string, color?: string }> = ({ type, icon, label, color }) => {
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+      setDragging({ type, icon, label, color, offsetX, offsetY, x: e.clientX, y: e.clientY });
+      const move = (ev: PointerEvent) => {
+        setDragging(d => d ? { ...d, x: ev.clientX, y: ev.clientY } : null);
+      };
+      const up = (ev: PointerEvent) => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+        const dayEl = target?.closest('[data-date]') as HTMLElement | null;
+        if (dayEl) {
+          const dateStr = dayEl.getAttribute('data-date')!;
+          handleDrop(dateStr, type as any, type === 'weather' ? { icon, text: label } : {});
+        }
+        setDragging(null);
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    };
+  
+    return (
+      <div
+        onPointerDown={handlePointerDown}
+        className={`flex flex-col items-center gap-1 p-3 rounded-2xl bg-white shadow-sm border-2 border-slate-100 cursor-grab active:cursor-grabbing hover:scale-105 transition-all hover:border-blue-200 touch-none`}
+      >
+        <div className="text-4xl">{icon}</div>
+        <span className="text-sm font-black uppercase tracking-widest text-slate-400">{label}</span>
+      </div>
+    );
+  };
+
   const triggerConfetti = (name: string) => {
     setCelebrationName(name);
     
@@ -193,7 +216,6 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   };
 
   const triggerWeatherEffect = (type: string) => {
-    // Stop previous audio if any
     if (weatherAudioRef.current) {
       weatherAudioRef.current.pause();
       weatherAudioRef.current = null;
@@ -209,7 +231,6 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
       weatherAudioRef.current = audio;
     }
 
-    // Standardize duration to 6000ms and ensure audio stops when effect ends
     const duration = 6000;
     setTimeout(() => {
       setActiveWeatherEffect(null);
@@ -238,29 +259,17 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
         <div 
           key={d} 
           ref={el => dayRefs.current[dateStr] = el}
+          data-date={dateStr}
           className={`min-h-[80px] sm:min-h-[110px] p-1.5 sm:p-2 border-2 rounded-2xl transition-all relative group overflow-hidden ${
             dragOverDate === dateStr 
               ? 'border-blue-500 bg-blue-100/50 ring-4 ring-blue-50 shadow-lg scale-[1.02] z-10' 
               : isToday 
                 ? 'border-blue-400 bg-blue-50/50 shadow-inner' 
                 : 'border-slate-100 bg-white hover:border-blue-200 hover:shadow-md'
-          }`}
+          } touch-none`}
           onClick={() => setSelectedDayEvents({ date: dateStr, events: dayEvents })}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOverDate(dateStr);
-          }}
-          onDragLeave={() => setDragOverDate(null)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOverDate(null);
-            const type = e.dataTransfer.getData('type') as any;
-            const icon = e.dataTransfer.getData('icon');
-            const label = e.dataTransfer.getData('label');
-            if (type) {
-              handleDrop(dateStr, type, type === 'weather' ? { icon, text: label } : {});
-            }
-          }}
+          onPointerEnter={() => setDragOverDate(dateStr)}
+          onPointerLeave={() => setDragOverDate(null)}
         >
           <span className={`text-sm sm:text-base font-black ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{d}</span>
           
@@ -303,7 +312,7 @@ const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
