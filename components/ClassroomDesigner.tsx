@@ -112,8 +112,8 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
   }, []);
 
   return (
-    <div className="h-screen w-full bg-[#F0F9FF] flex flex-col font-['Fredoka'] overflow-hidden">
-      <header className="p-4 flex justify-between items-center bg-white border-b-4 border-blue-100 z-50 shadow-sm">
+    <div className="designer-shell h-screen w-full bg-[#F0F9FF] flex flex-col font-['Fredoka'] overflow-hidden">
+      <header className="designer-header p-4 flex justify-between items-center bg-white border-b-4 border-blue-100 z-50 shadow-sm">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="bg-white hover:bg-gray-50 text-gray-500 font-bold px-6 py-3 rounded-2xl border-b-4 border-gray-200 active:translate-y-1 transition-all">⬅️ Exit</button>
           <button onClick={handleUndo} disabled={history.length === 0} className={`font-bold px-6 py-3 rounded-2xl border-b-4 transition-all ${history.length === 0 ? 'bg-gray-100 text-gray-300 border-gray-200' : 'bg-white text-orange-500 border-orange-200'}`}>↩️ Undo</button>
@@ -125,8 +125,8 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
         <button onClick={() => onSave(localDesign)} className="bg-green-400 text-white font-bold px-8 py-3 rounded-2xl border-b-4 border-green-600 active:translate-y-1 transition-all shadow-lg">✅ Save</button>
       </header>
 
-      <div className="flex-1 relative flex items-center justify-center p-6 overflow-hidden">
-        <div className="relative w-full max-w-5xl aspect-video rounded-[3rem] shadow-2xl overflow-hidden border-[12px] border-white bg-white">
+      <div className="designer-stage flex-1 relative flex items-center justify-center p-6 overflow-hidden">
+        <div className="designer-preview relative w-full max-w-5xl aspect-video rounded-[3rem] shadow-2xl overflow-hidden border-[12px] border-white bg-white">
           <div onClick={() => setActiveTarget('wall')} className="absolute top-0 w-full h-2/3 cursor-pointer group" style={{ backgroundColor: localDesign.wallColor }}>
              <div className="absolute inset-0" style={{ backgroundImage: getWallPattern(), backgroundSize: localDesign.wallTheme === 'dots' ? '40px 40px' : '100px 100%' }}></div>
              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -168,7 +168,7 @@ const ClassroomDesigner: React.FC<ClassroomDesignerProps> = ({ subjectTitle, des
           </div>
         </div>
 
-        <div className="absolute right-12 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-50">
+        <div className="designer-tools absolute right-12 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-50">
            {['stickers', 'shelves', 'mascot'].map((target) => (
              <button key={target} onClick={() => setActiveTarget(target as any)} className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center text-3xl hover:scale-110 active:translate-y-1 transition-all border-b-4 border-slate-200">
                {target === 'stickers' ? '🌈' : target === 'shelves' ? '📦' : '🐶'}

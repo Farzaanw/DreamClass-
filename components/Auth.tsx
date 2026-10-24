@@ -22,6 +22,24 @@ const sanitizeEmail = (value: string) =>
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const getAuthErrorMessage = (error: unknown, action: 'sign up' | 'log in') => {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : '';
+
+  if (/failed to fetch|fetch failed|networkerror|load failed/i.test(message)) {
+    return 'Unable to reach the account service. Check your connection and confirm the Supabase project URL is active.';
+  }
+
+  if (action === 'log in' && /invalid login credentials/i.test(message)) {
+    return 'Incorrect email or password. Please try again! ❌';
+  }
+
+  return message || `Could not ${action}. Please try again.`;
+};
+
 const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecovering = false, onPasswordUpdated, onBack }) => {
   const [view, setView] = useState<AuthView>(isRecovering ? 'update-password' : initialMode);
   const [username, setUsername] = useState('');
@@ -102,8 +120,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
       }
     } catch (err: any) {
       console.error('Sign up failed:', err);
-      const details = [err?.message, err?.code, err?.status].filter(Boolean).join(' | ');
-      setError(details || 'Error creating account. Please try again.');
+      setError(getAuthErrorMessage(err, 'sign up'));
     } finally {
       setLoading(false);
     }
@@ -151,7 +168,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
         });
       }
     } catch (err: any) {
-      setError('Incorrect email or password. Please try again! ❌');
+      setError(getAuthErrorMessage(err, 'log in'));
     } finally {
       setLoading(false);
     }
@@ -330,9 +347,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-wait text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
             >
-              Log In 🚀
+              {loading ? 'Logging in…' : 'Log In 🚀'}
             </button>
           </form>
         )}
@@ -380,9 +398,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, initialMode = 'login', isRecoverin
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-wait text-white font-bold py-4 sm:py-5 rounded-2xl sm:rounded-3xl text-xl sm:text-2xl shadow-xl border-b-8 border-blue-700 transition-all hover:scale-[1.02] active:translate-y-1 active:border-b-0 mt-4 sm:mt-6"
             >
-              Create Account ✨
+              {loading ? 'Creating account…' : 'Create Account ✨'}
             </button>
           </form>
         )}

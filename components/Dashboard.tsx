@@ -630,7 +630,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   if (view === 'materials') {
     return (
-      <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
+      <div className="dashboard-page p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh]">
         <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.ppt,.pptx,.key,.mp4,.webm,.mov,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.wav,.ogg,.m4a,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/*,image/*,audio/*" onChange={handleFileChange} />
         {isProcessing && (
           <div className="fixed inset-0 z-[300] bg-white/60 backdrop-blur-md flex items-center justify-center">
@@ -848,7 +848,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   if (view === 'songs') {
     return (
-      <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh] animate-fade-in">
+      <div className="dashboard-page p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh] animate-fade-in">
         {toast && (
           <div className="fixed top-24 right-8 z-[200] bg-white border-4 border-pink-400 px-8 py-4 rounded-[2rem] shadow-2xl font-black text-pink-600 animate-bounce-gentle flex items-center gap-3">
              <span className="text-2xl">🎵</span> {toast}
@@ -1139,7 +1139,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   if (view === 'games') {
     return (
-      <div className="p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh] animate-fade-in">
+      <div className="dashboard-page p-8 max-w-6xl mx-auto font-['Fredoka'] relative min-h-[80vh] animate-fade-in">
         {toast && (
           <div className="fixed top-24 right-8 z-[200] bg-white border-4 border-emerald-400 px-8 py-4 rounded-[2rem] shadow-2xl font-black text-emerald-600 animate-bounce-gentle flex items-center gap-3">
              <span className="text-2xl">🎮</span> {toast}
@@ -1302,7 +1302,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto font-['Fredoka']">
+    <div className="dashboard-page p-8 max-w-6xl mx-auto font-['Fredoka']">
       <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
         <div className="flex items-center gap-8">
           <button onClick={onBackToMode} title="Return to Mode Select" className="group flex items-center gap-3 hover:scale-105 transition-transform">

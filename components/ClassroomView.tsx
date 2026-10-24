@@ -232,9 +232,9 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
   }, [originalCount]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden flex flex-col font-['Fredoka']">
+    <div className="classroom-view-shell relative h-screen w-full overflow-hidden flex flex-col font-['Fredoka']">
       {/* Header */}
-      <div className="bg-white/95 backdrop-blur-md p-3 sm:p-5 flex justify-between items-center z-[100] border-b-4 border-black/5 shadow-md">
+      <div className="classroom-view-header bg-white/95 backdrop-blur-md p-3 sm:p-5 flex justify-between items-center z-[100] border-b-4 border-black/5 shadow-md">
         <div className="flex items-center gap-4 sm:gap-6">
           <button onClick={onBack} className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-[1.5rem] bg-white border-2 border-gray-100 flex items-center justify-center hover:bg-gray-50 shadow-sm active:translate-y-1">
             <span className="text-xl sm:text-3xl">⬅️</span>
@@ -302,7 +302,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({ subject, design, onBack, 
           onTouchEnd={handleMouseUp}
           className={`absolute top-[44%] bottom-[16%] left-0 right-0 z-30 overflow-x-auto overflow-y-hidden flex items-center hide-scrollbar select-none overscroll-x-contain ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
-          <div className="flex items-center min-w-max py-4 pointer-events-none select-none px-20 m-auto">
+          <div className="classroom-card-track flex items-center min-w-max py-4 pointer-events-none select-none px-20 m-auto">
             {activeConcepts.map((concept, idx) => (
               <div 
                 key={`${concept.id}-${idx}`}

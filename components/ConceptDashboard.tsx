@@ -225,7 +225,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       items: [...items],
       bg: boardBg,
       bgColor: boardBgColor,
-      viewport: { ...viewport },
+      viewport: { ...viewportRef.current },
       customIcons: [...customIcons],
       hiddenDrawerItems: [...hiddenDrawerItems],
       customDrawerLabels: { ...customDrawerLabels },
@@ -313,15 +313,17 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const startX = useRef(0);
   const scrollLeft = useRef(0);
 
-  const handleSwitcherMouseDown = (e: React.MouseEvent) => {
+  const handleSwitcherMouseDown = (e: React.PointerEvent) => {
     if (!conceptSwitcherRef.current) return;
+    if (e.pointerType === 'touch') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     isDraggingSwitcher.current = true;
     hasMovedSwitcher.current = false;
     startX.current = e.pageX - conceptSwitcherRef.current.offsetLeft;
     scrollLeft.current = conceptSwitcherRef.current.scrollLeft;
   };
 
-  const handleSwitcherMouseMove = (e: React.MouseEvent) => {
+  const handleSwitcherMouseMove = (e: React.PointerEvent) => {
     if (!isDraggingSwitcher.current || !conceptSwitcherRef.current) return;
     const x = e.pageX - conceptSwitcherRef.current.offsetLeft;
     const walk = (x - startX.current) * 2;
@@ -450,12 +452,71 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   // OPTIMIZATION: Reduced center offset to match smaller canvas (2000x2000 vs 7000x7000)
   // Center the whiteboard within the main content area (accounting for sidebar and bottom bar)
   const getCenter = () => {
-    const mainEl = mainContentRef.current;
-    const w = mainEl?.clientWidth || window.innerWidth;
-    const h = mainEl?.clientHeight || window.innerHeight;
+    const boardEl = mainContentRef.current?.querySelector<HTMLElement>('.wb-board');
+    const w = boardEl?.clientWidth || mainContentRef.current?.clientWidth || window.innerWidth;
+    const h = boardEl?.clientHeight || mainContentRef.current?.clientHeight || window.innerHeight;
     return { x: w / 2 - 1000, y: h / 2 - 1000, zoom: 1 };
   };
+  const getBoardViewCenter = () => {
+    const boardEl = mainContentRef.current?.querySelector<HTMLElement>('.wb-board');
+    return {
+      sx: (boardEl?.clientWidth || mainContentRef.current?.clientWidth || window.innerWidth) / 2,
+      sy: (boardEl?.clientHeight || mainContentRef.current?.clientHeight || window.innerHeight) / 2,
+    };
+  };
   const [viewport, setViewport] = useState(getCenter);
+  const viewportRef = useRef(viewport);
+  const boardPlaneRef = useRef<HTMLDivElement>(null);
+  const zoomBadgeRef = useRef<HTMLDivElement>(null);
+  const viewportCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitViewportState = () => {
+    if (viewportCommitTimerRef.current !== null) {
+      clearTimeout(viewportCommitTimerRef.current);
+      viewportCommitTimerRef.current = null;
+    }
+    const currentViewport = viewportRef.current;
+    setViewport(prev => prev.x === currentViewport.x && prev.y === currentViewport.y && prev.zoom === currentViewport.zoom ? prev : currentViewport);
+  };
+  const updateViewport = (nextViewport: { x: number; y: number; zoom: number }, commit = true) => {
+    viewportRef.current = nextViewport;
+    if (boardPlaneRef.current) {
+      boardPlaneRef.current.style.transform = `translate(${nextViewport.x}px, ${nextViewport.y}px) scale(${nextViewport.zoom})`;
+    }
+    if (zoomBadgeRef.current) zoomBadgeRef.current.textContent = `${Math.round(nextViewport.zoom * 100)}%`;
+    if (commit) {
+      if (viewportCommitTimerRef.current !== null) {
+        clearTimeout(viewportCommitTimerRef.current);
+        viewportCommitTimerRef.current = null;
+      }
+      setViewport(nextViewport);
+    }
+  };
+  const boardViewSizeRef = useRef<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const boardEl = mainContentRef.current?.querySelector<HTMLElement>('.wb-board');
+    if (!boardEl || typeof ResizeObserver === 'undefined') return;
+
+    boardViewSizeRef.current = { width: boardEl.clientWidth, height: boardEl.clientHeight };
+    const observer = new ResizeObserver(() => {
+      const previousSize = boardViewSizeRef.current;
+      const nextSize = { width: boardEl.clientWidth, height: boardEl.clientHeight };
+      boardViewSizeRef.current = nextSize;
+      if (!previousSize || previousSize.width === 0 || previousSize.height === 0) return;
+      if (previousSize.width === nextSize.width && previousSize.height === nextSize.height) return;
+
+      const previousViewport = viewportRef.current;
+      const centerWorldX = (previousSize.width / 2 - previousViewport.x) / previousViewport.zoom;
+      const centerWorldY = (previousSize.height / 2 - previousViewport.y) / previousViewport.zoom;
+      updateViewport({
+        ...previousViewport,
+        x: nextSize.width / 2 - centerWorldX * previousViewport.zoom,
+        y: nextSize.height / 2 - centerWorldY * previousViewport.zoom,
+      });
+    });
+    observer.observe(boardEl);
+    return () => observer.disconnect();
+  }, []);
 
   const stickerBaseClass = "touch-none w-full aspect-square bg-white rounded-2xl shadow-sm border-2 border-slate-100 font-black text-slate-900 text-4xl flex items-center justify-center hover:scale-110 hover:border-blue-500 hover:ring-4 hover:ring-blue-400/30 hover:shadow-xl active:scale-95 active:ring-[6px] active:ring-blue-500/60 active:border-blue-600 active:bg-blue-50 active:shadow-[0_0_24px_rgba(59,130,246,0.45)] transition-all cursor-pointer overflow-hidden p-1.5 m-0.5";
   const letterBaseClass = stickerBaseClass.replace('text-4xl', 'text-3xl');
@@ -464,6 +525,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const isPanningRef = useRef(false);
   const lastPanPos = useRef({ x: 0, y: 0 });
   const lastTouchDistance = useRef<number | null>(null);
+  const activeBoardPointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStartedPointerIdsRef = useRef(new Set<number>());
+  const activeBoardDragCancelRef = useRef<(() => void) | null>(null);
+  const pendingPanDeltaRef = useRef({ x: 0, y: 0 });
+  const panFrameRef = useRef<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -496,7 +562,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           setItems(savedState.items || []);
           setBoardBg(savedState.bg || 'plain');
           setBoardBgColor(savedState.bgColor || '#ffffff');
-          if (savedState.viewport) setViewport(savedState.viewport);
+          if (savedState.viewport) updateViewport(savedState.viewport);
           setCurrentBoardId(savedState.id);
           setCurrentBoardName(savedState.name);
           if (savedState.customIcons) setCustomIcons(savedState.customIcons);
@@ -518,7 +584,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           setItems([]);
           setBoardBg('plain');
           setBoardBgColor('#ffffff');
-          setViewport(getCenter());
+          updateViewport(getCenter());
           setCurrentBoardId(null);
           setCurrentBoardName(null);
           setCustomIcons([]);
@@ -684,7 +750,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     setItems(board.items || []);
     setBoardBg(board.bg || 'plain');
     setBoardBgColor(board.bgColor || '#ffffff');
-    if (board.viewport) setViewport(board.viewport);
+    if (board.viewport) updateViewport(board.viewport);
     setCurrentBoardId(board.id);
     setCurrentBoardName(board.name);
     if (contextRef.current && canvasRef.current) {
@@ -712,7 +778,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     // Reset active whiteboard space to default blank
     setItems([]);
     if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    setViewport({ x: 0, y: 0, zoom: 1 });
+    updateViewport({ x: 0, y: 0, zoom: 1 });
     setUndoStack([]);
     setSelectedItemId(null);
     setCurrentBoardId(null);
@@ -722,23 +788,36 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const screenToWorld = (sx: number, sy: number) => ({
-    wx: (sx - viewport.x) / viewport.zoom,
-    wy: (sy - viewport.y) / viewport.zoom
+    wx: (sx - viewportRef.current.x) / viewportRef.current.zoom,
+    wy: (sy - viewportRef.current.y) / viewportRef.current.zoom
   });
 
-  const startInteraction = (getEvent: any) => {
+  const startInteraction = (getEvent: React.PointerEvent<HTMLDivElement>) => {
+    if (pinchStartedPointerIdsRef.current.delete(getEvent.pointerId)) return;
     if (isDraggingMaterial.current) return;
-    const nativeEvent = getEvent.nativeEvent || getEvent;
+    if (getEvent.pointerType === 'mouse' && getEvent.button !== 0) return;
+    getEvent.preventDefault();
+    try {
+      getEvent.currentTarget.setPointerCapture(getEvent.pointerId);
+    } catch { /* Pointer may already have been captured by the browser. */ }
 
-    if (nativeEvent.type === 'touchstart' && nativeEvent.touches && nativeEvent.touches.length === 2) {
-      const touch1 = nativeEvent.touches[0];
-      const touch2 = nativeEvent.touches[1];
-      lastTouchDistance.current = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-      return; // Handled by pinch-to-zoom
+    const nativeEvent = getEvent.nativeEvent;
+    const coords = getScreenCoordinates(nativeEvent);
+    activeBoardPointersRef.current.set(getEvent.pointerId, { x: coords.sx, y: coords.sy });
+
+    if (activeBoardPointersRef.current.size > 1) {
+      if (isDrawingRef.current) contextRef.current?.closePath();
+      isDrawingRef.current = false;
+      isPanningRef.current = false;
+      isBoxSelectingRef.current = false;
+      setBoxSelectRect(null);
+      boxSelectStartRef.current = null;
+      const points = [...activeBoardPointersRef.current.values()];
+      lastTouchDistance.current = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+      return;
     }
     lastTouchDistance.current = null;
 
-    const coords = getScreenCoordinates(nativeEvent);
     if (activeTool === 'boxSelect') {
       const worldCoords = screenToWorld(coords.sx, coords.sy);
       boxSelectStartRef.current = worldCoords;
@@ -761,14 +840,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       const ctx = contextRef.current;
       if (activeTool === 'marker') {
         ctx.strokeStyle = markerColor;
-        ctx.lineWidth = 6 / viewport.zoom;
+        ctx.lineWidth = 6 / viewportRef.current.zoom;
         ctx.globalCompositeOperation = 'source-over';
       } else if (activeTool === 'highlighter') {
         ctx.strokeStyle = highlighterColor;
-        ctx.lineWidth = 25 / viewport.zoom;
+        ctx.lineWidth = 25 / viewportRef.current.zoom;
         ctx.globalCompositeOperation = 'source-over';
       } else if (activeTool === 'eraser') {
-        ctx.lineWidth = 50 / viewport.zoom;
+        ctx.lineWidth = 50 / viewportRef.current.zoom;
         ctx.globalCompositeOperation = 'destination-out';
       }
       ctx.beginPath();
@@ -777,47 +856,101 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     }
   };
 
-  const performInteraction = (getEvent: any) => {
-    const nativeEvent = getEvent.nativeEvent || getEvent;
+  const handleBoardPointerDownCapture = (getEvent: React.PointerEvent<HTMLDivElement>) => {
+    if (getEvent.pointerType !== 'touch') return;
+    if ((getEvent.target as HTMLElement).closest('button, input, textarea, select, video, iframe')) return;
 
-    if (nativeEvent.type === 'touchmove' && nativeEvent.touches && nativeEvent.touches.length === 2) {
-      const touch1 = nativeEvent.touches[0];
-      const touch2 = nativeEvent.touches[1];
-      const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-      if (lastTouchDistance.current !== null) {
-        const factor = dist / lastTouchDistance.current;
-        const cx = (touch1.clientX + touch2.clientX) / 2;
-        const cy = (touch1.clientY + touch2.clientY) / 2;
-        const rect = getEvent.currentTarget.getBoundingClientRect();
-        handleZoomAt({ sx: cx - rect.left, sy: cy - rect.top }, factor);
-      }
-      lastTouchDistance.current = dist;
-      return;
+    const coords = getScreenCoordinates(getEvent.nativeEvent);
+    const pointers = activeBoardPointersRef.current;
+    const alreadyTracked = pointers.has(getEvent.pointerId);
+    pointers.set(getEvent.pointerId, { x: coords.sx, y: coords.sy });
+    if (!alreadyTracked && pointers.size > 1) {
+      activeBoardDragCancelRef.current?.();
+      startInteraction(getEvent);
+      pinchStartedPointerIdsRef.current.add(getEvent.pointerId);
     }
+  };
 
-    if (nativeEvent.type === 'mousemove' && !(nativeEvent.buttons & 1)) {
-      if (isDrawingRef.current) stopInteraction();
-      return;
-    }
+  const performInteraction = (getEvent: React.PointerEvent<HTMLDivElement>) => {
+    const nativeEvent = getEvent.nativeEvent;
     const coords = getScreenCoordinates(nativeEvent);
+    if (!activeBoardPointersRef.current.has(getEvent.pointerId)) return;
+    activeBoardPointersRef.current.set(getEvent.pointerId, { x: coords.sx, y: coords.sy });
+
+    if (activeBoardPointersRef.current.size > 1) {
+      const points = [...activeBoardPointersRef.current.values()];
+      const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+      if (lastTouchDistance.current !== null && distance > 0) {
+        handleZoomAt({ sx: (points[0].x + points[1].x) / 2, sy: (points[0].y + points[1].y) / 2 }, distance / lastTouchDistance.current, false);
+      }
+      lastTouchDistance.current = distance;
+      return;
+    }
+
+    if (nativeEvent.pointerType === 'mouse' && !(nativeEvent.buttons & 1) && isDrawingRef.current) {
+      stopInteraction(getEvent);
+      return;
+    }
     if (isBoxSelectingRef.current && boxSelectStartRef.current) {
       const worldCoords = screenToWorld(coords.sx, coords.sy);
       setBoxSelectRect({ x1: boxSelectStartRef.current.wx, y1: boxSelectStartRef.current.wy, x2: worldCoords.wx, y2: worldCoords.wy });
     } else if (isPanningRef.current) {
       const dx = coords.sx - lastPanPos.current.x;
       const dy = coords.sy - lastPanPos.current.y;
-      setViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+      pendingPanDeltaRef.current.x += dx;
+      pendingPanDeltaRef.current.y += dy;
+      if (panFrameRef.current === null) {
+        panFrameRef.current = requestAnimationFrame(() => {
+          const delta = pendingPanDeltaRef.current;
+          pendingPanDeltaRef.current = { x: 0, y: 0 };
+          panFrameRef.current = null;
+          const current = viewportRef.current;
+          updateViewport({ ...current, x: current.x + delta.x, y: current.y + delta.y }, false);
+        });
+      }
       lastPanPos.current = { x: coords.sx, y: coords.sy };
     } else if (isDrawingRef.current && contextRef.current) {
-      // OPTIMIZATION: Direct drawing path (no rAF throttling — keeps cursor smooth)
-      const worldCoords = screenToWorld(coords.sx, coords.sy);
-      contextRef.current.lineTo(worldCoords.wx, worldCoords.wy);
-      contextRef.current.stroke();
+      const context = contextRef.current;
+      const samples = nativeEvent.getCoalescedEvents?.() || [nativeEvent];
+      for (const sample of samples) {
+        const sampleCoords = getScreenCoordinates(sample);
+        const worldCoords = screenToWorld(sampleCoords.sx, sampleCoords.sy);
+        context.lineTo(worldCoords.wx, worldCoords.wy);
+      }
+      context.stroke();
     }
   };
 
-  const stopInteraction = () => {
+  const stopInteraction = (getEvent?: React.PointerEvent<HTMLDivElement>) => {
+    if (getEvent) {
+      activeBoardPointersRef.current.delete(getEvent.pointerId);
+      pinchStartedPointerIdsRef.current.delete(getEvent.pointerId);
+    }
+    if (activeBoardPointersRef.current.size > 0) {
+      lastTouchDistance.current = null;
+      isDrawingRef.current = false;
+      contextRef.current?.closePath();
+      isBoxSelectingRef.current = false;
+      boxSelectStartRef.current = null;
+      setBoxSelectRect(null);
+      const remainingPointer = activeBoardPointersRef.current.values().next().value;
+      if (remainingPointer && activeTool === 'select') {
+        isPanningRef.current = true;
+        lastPanPos.current = remainingPointer;
+      }
+      return;
+    }
     lastTouchDistance.current = null;
+    if (panFrameRef.current !== null) {
+      cancelAnimationFrame(panFrameRef.current);
+      panFrameRef.current = null;
+    }
+    const pendingPan = pendingPanDeltaRef.current;
+    if (pendingPan.x || pendingPan.y) {
+      pendingPanDeltaRef.current = { x: 0, y: 0 };
+      const current = viewportRef.current;
+      updateViewport({ ...current, x: current.x + pendingPan.x, y: current.y + pendingPan.y }, false);
+    }
     if (isBoxSelectingRef.current && boxSelectRect) {
       const x1 = Math.min(boxSelectRect.x1, boxSelectRect.x2);
       const y1 = Math.min(boxSelectRect.y1, boxSelectRect.y2);
@@ -838,33 +971,66 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (isDrawingRef.current && contextRef.current) contextRef.current.closePath();
     isPanningRef.current = false;
     isDrawingRef.current = false;
+    commitViewportState();
   };
 
-  const handleGroupMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
+  const handleGroupMouseDown = (e: React.PointerEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     setSelectedGroupId(group.id);
     saveToUndoStack();
     const startX = e.clientX, startY = e.clientY;
     const initialPositions = items.filter(it => group.itemIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }));
-    const handleMouseMove = (mv: MouseEvent) => {
-      const dx = (mv.clientX - startX) / viewport.zoom;
-      const dy = (mv.clientY - startY) / viewport.zoom;
+    const initialPositionById = new Map<string, { id: string; x: number; y: number }>(
+      initialPositions.map(position => [position.id, position])
+    );
+    let latestX = startX;
+    let latestY = startY;
+    let moveFrame: number | null = null;
+    const applyPositions = (clientX: number, clientY: number) => {
+      const dx = (clientX - startX) / viewportRef.current.zoom;
+      const dy = (clientY - startY) / viewportRef.current.zoom;
       setItems(prev => prev.map(it => {
-        const init = initialPositions.find(p => p.id === it.id);
+        const init = initialPositionById.get(it.id);
         if (init) return { ...it, x: init.x + dx, y: init.y + dy };
         return it;
       }));
     };
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    const handleMouseMove = (mv: PointerEvent) => {
+      if (mv.pointerId !== e.pointerId) return;
+      latestX = mv.clientX;
+      latestY = mv.clientY;
+      if (moveFrame === null) {
+        moveFrame = requestAnimationFrame(() => {
+          moveFrame = null;
+          applyPositions(latestX, latestY);
+        });
+      }
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    const cleanupGroupDrag = (clientX = latestX, clientY = latestY) => {
+      if (moveFrame !== null) cancelAnimationFrame(moveFrame);
+      moveFrame = null;
+      applyPositions(clientX, clientY);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
+      activeBoardDragCancelRef.current = null;
+    };
+    const handleMouseUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      cleanupGroupDrag(upEvent.clientX, upEvent.clientY);
+    };
+    activeBoardDragCancelRef.current = () => cleanupGroupDrag();
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
   };
 
-  const handleGroupResizeMouseDown = (e: React.MouseEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
+  const handleGroupResizeMouseDown = (e: React.PointerEvent, group: { id: string, itemIds: string[], minimized: boolean }) => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     saveToUndoStack();
     const startX = e.clientX;
     const initialItems = items.filter(it => group.itemIds.includes(it.id));
@@ -877,10 +1043,15 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
 
     const initialData = initialItems.map(it => ({ id: it.id, scale: it.scale, x: it.x, y: it.y }));
-    const handleMouseMove = (mv: MouseEvent) => {
-      const scaleFactor = Math.max(0.2, 1 + (startX - mv.clientX) / (100 * viewport.zoom));
+    const initialDataById = new Map<string, { id: string; scale: number; x: number; y: number }>(
+      initialData.map(item => [item.id, item])
+    );
+    let latestX = startX;
+    let moveFrame: number | null = null;
+    const applyScale = (clientX: number) => {
+      const scaleFactor = Math.max(0.2, 1 + (startX - clientX) / (100 * viewportRef.current.zoom));
       setItems(prev => prev.map(it => {
-        const init = initialData.find(p => p.id === it.id);
+        const init = initialDataById.get(it.id);
         if (init) {
           const newX = centerX + (init.x - centerX) * scaleFactor;
           const newY = centerY + (init.y - centerY) * scaleFactor;
@@ -889,12 +1060,33 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         return it;
       }));
     };
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    const handleMouseMove = (mv: PointerEvent) => {
+      if (mv.pointerId !== e.pointerId) return;
+      latestX = mv.clientX;
+      if (moveFrame === null) {
+        moveFrame = requestAnimationFrame(() => {
+          moveFrame = null;
+          applyScale(latestX);
+        });
+      }
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    const cleanupGroupResize = (clientX = latestX) => {
+      if (moveFrame !== null) cancelAnimationFrame(moveFrame);
+      moveFrame = null;
+      applyScale(clientX);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
+      activeBoardDragCancelRef.current = null;
+    };
+    const handleMouseUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      cleanupGroupResize(upEvent.clientX);
+    };
+    activeBoardDragCancelRef.current = () => cleanupGroupResize();
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
   };
 
   const getGroupBounds = (group: { id: string, itemIds: string[] }) => {
@@ -911,12 +1103,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     };
   };
 
-  const handleZoomAt = (screenCoords: { sx: number, sy: number }, factor: number) => {
-    setViewport(prev => {
-      const newZoom = Math.min(Math.max(prev.zoom * factor, 0.1), 5);
-      const worldPos = { x: (screenCoords.sx - prev.x) / prev.zoom, y: (screenCoords.sy - prev.y) / prev.zoom };
-      return { zoom: newZoom, x: screenCoords.sx - worldPos.x * newZoom, y: screenCoords.sy - worldPos.y * newZoom };
-    });
+  const handleZoomAt = (screenCoords: { sx: number, sy: number }, factor: number, commit = true) => {
+    const prev = viewportRef.current;
+    const newZoom = Math.min(Math.max(prev.zoom * factor, 0.1), 5);
+    const worldPos = { x: (screenCoords.sx - prev.x) / prev.zoom, y: (screenCoords.sy - prev.y) / prev.zoom };
+    updateViewport({ zoom: newZoom, x: screenCoords.sx - worldPos.x * newZoom, y: screenCoords.sy - worldPos.y * newZoom }, commit);
   };
 
   const hideItem = (categoryId: string, itemKey: string) => {
@@ -1021,7 +1212,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const getScreenCoordinates = (event: any) => {
     const rect = canvasRef.current?.closest('main')?.getBoundingClientRect() || { left: 0, top: 0 };
     if (event.touches && event.touches.length > 0) return { sx: event.touches[0].clientX - rect.left, sy: event.touches[0].clientY - rect.top };
-    return { sx: (event.clientX || event.pageX) - rect.left, sy: (event.clientY || event.pageY) - rect.top };
+    return { sx: (event.clientX ?? event.pageX) - rect.left, sy: (event.clientY ?? event.pageY) - rect.top };
   };
 
   const addItem = (content: string, type: BoardItem['type'] = 'emoji', screenX?: number, screenY?: number, metadata?: any) => {
@@ -1051,9 +1242,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const col = index % gridCols;
     const row = Math.floor(index / gridCols);
 
-    const mainRect = mainContentRef.current?.getBoundingClientRect();
-    const defaultX = (mainRect?.width || window.innerWidth) * 0.5 + (col * spacing);
-    const defaultY = (mainRect?.height || window.innerHeight) * 0.35 + (row * spacing);
+    const boardRect = mainContentRef.current?.querySelector<HTMLElement>('.wb-board')?.getBoundingClientRect();
+    const defaultX = (boardRect?.width || window.innerWidth) * 0.5 + (col * spacing);
+    const defaultY = (boardRect?.height || window.innerHeight) * 0.35 + (row * spacing);
 
     const worldPos = screenToWorld(screenX !== undefined ? screenX : defaultX, screenY !== undefined ? screenY : defaultY);
     const newItem: BoardItem = { id: Math.random().toString(36).substr(2, 9), content, type, x: worldPos.wx, y: worldPos.wy, scale: 1, rotation: 0, metadata };
@@ -1109,8 +1300,11 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     });
   };
 
-  const handleClockHandMouseDown = (e: React.MouseEvent, itemId: string, type: 'hour' | 'minute') => {
+  const handleClockHandMouseDown = (e: React.PointerEvent, itemId: string, type: 'hour' | 'minute') => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     const clockElement = e.currentTarget.closest('.clock-container');
     if (!clockElement) return;
 
@@ -1118,7 +1312,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMouseMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== e.pointerId) return;
       const dx = moveEvent.clientX - centerX;
       const dy = moveEvent.clientY - centerY;
       let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
@@ -1133,18 +1328,29 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       }
     };
 
-    const handleMouseUp = () => {
+    const finishClockDrag = () => {
       saveToUndoStack();
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
+      activeBoardDragCancelRef.current = null;
+    };
+    const handleMouseUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      finishClockDrag();
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    activeBoardDragCancelRef.current = finishClockDrag;
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
   };
 
-  const handleThermometerMouseDown = (e: React.MouseEvent, itemId: string) => {
+  const handleThermometerMouseDown = (e: React.PointerEvent, itemId: string) => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     const thermoElement = e.currentTarget.closest('.thermometer-container');
     if (!thermoElement) return;
 
@@ -1160,18 +1366,27 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
     updateTemp(e.clientY);
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMouseMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== e.pointerId) return;
       updateTemp(moveEvent.clientY);
     };
 
-    const handleMouseUp = () => {
+    const finishThermometerDrag = () => {
       saveToUndoStack();
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
+      activeBoardDragCancelRef.current = null;
+    };
+    const handleMouseUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      finishThermometerDrag();
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    activeBoardDragCancelRef.current = finishThermometerDrag;
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
   };
 
   const getCubeClusterInfo = (cube: BoardItem) => {
@@ -1214,7 +1429,14 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   // UNIFIED POINTER-BASED DRAG SYSTEM (replaces HTML5 DnD)
   const pointerDragCleanupRef = useRef<(() => void) | null>(null);
 
+  useEffect(() => () => {
+    if (pointerDragCleanupRef.current) pointerDragCleanupRef.current();
+    if (panFrameRef.current !== null) cancelAnimationFrame(panFrameRef.current);
+    if (viewportCommitTimerRef.current !== null) clearTimeout(viewportCommitTimerRef.current);
+  }, []);
+
   const handlePointerDragStart = (e: React.PointerEvent, content: string, type: BoardItem['type'], metadata?: any) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -1225,6 +1447,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     const startX = e.clientX;
     const startY = e.clientY;
     let totalDistance = 0;
+    let latestX = startX;
+    let latestY = startY;
 
     // Capture pointer for reliable tracking
     const target = e.currentTarget as HTMLElement;
@@ -1235,31 +1459,33 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (ghostRef.current) {
       ghostRef.current.innerText = content || '';
       ghostRef.current.style.display = 'block';
-      ghostRef.current.style.left = `${e.clientX}px`;
-      ghostRef.current.style.top = `${e.clientY}px`;
+      ghostRef.current.style.left = '0px';
+      ghostRef.current.style.top = '0px';
+      ghostRef.current.style.transform = `translate3d(${startX}px, ${startY}px, 0) translate(-50%, -50%) scale(1.15)`;
     }
 
     // Document-level move handler (rAF-throttled to avoid layout thrashing)
     let rafId: number | null = null;
     const onPointerMove = (pe: PointerEvent) => {
+      if (pe.pointerId !== e.pointerId) return;
       const dx = pe.clientX - startX;
       const dy = pe.clientY - startY;
       totalDistance = Math.sqrt(dx * dx + dy * dy);
 
-      const latestX = pe.clientX;
-      const latestY = pe.clientY;
+      latestX = pe.clientX;
+      latestY = pe.clientY;
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
         if (ghostRef.current) {
-          ghostRef.current.style.left = `${latestX}px`;
-          ghostRef.current.style.top = `${latestY}px`;
+          ghostRef.current.style.transform = `translate3d(${latestX}px, ${latestY}px, 0) translate(-50%, -50%) scale(1.15)`;
         }
       });
     };
 
     // Document-level up handler
     const onPointerUp = (pe: PointerEvent) => {
+      if (pe.pointerId !== e.pointerId) return;
       if (ghostRef.current) {
         ghostRef.current.style.display = 'none';
         ghostRef.current.innerText = '';
@@ -1267,8 +1493,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       pointerDragRef.current = null;
       pointerCaptureElRef.current = null;
 
-      const boardEl = mainContentRef.current;
-      if (boardEl && content && type) {
+      const boardEl = mainContentRef.current?.querySelector<HTMLElement>('.wb-board');
+      if (pe.type !== 'pointercancel' && boardEl && content && type) {
         const br = boardEl.getBoundingClientRect();
         const margin = 40;
         const overBoard = pe.clientX >= br.left - margin && pe.clientX <= br.right + margin
@@ -1288,18 +1514,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
+      pointerDragCleanupRef.current = null;
     };
 
     document.addEventListener('pointermove', onPointerMove, { passive: false });
     document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointercancel', onPointerUp);
     pointerDragCleanupRef.current = () => {
       if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
     };
   };
 
   const handleMaterialPointerDragStart = (e: React.PointerEvent, materialId: string) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -1312,18 +1543,28 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     if (ghostRef.current) {
       ghostRef.current.innerText = '📄';
       ghostRef.current.style.display = 'block';
-      ghostRef.current.style.left = `${e.clientX}px`;
-      ghostRef.current.style.top = `${e.clientY}px`;
+      ghostRef.current.style.left = '0px';
+      ghostRef.current.style.top = '0px';
+      ghostRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%) scale(1.15)`;
     }
 
+    let latestX = e.clientX;
+    let latestY = e.clientY;
+    let rafId: number | null = null;
     const onPointerMove = (pe: PointerEvent) => {
-      if (ghostRef.current) {
-        ghostRef.current.style.left = `${pe.clientX}px`;
-        ghostRef.current.style.top = `${pe.clientY}px`;
-      }
+      if (pe.pointerId !== e.pointerId) return;
+      latestX = pe.clientX;
+      latestY = pe.clientY;
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (!ghostRef.current) return;
+        ghostRef.current.style.transform = `translate3d(${latestX}px, ${latestY}px, 0) translate(-50%, -50%) scale(1.15)`;
+      });
     };
 
     const onPointerUp = (pe: PointerEvent) => {
+      if (pe.pointerId !== e.pointerId) return;
       if (ghostRef.current) {
         ghostRef.current.style.display = 'none';
         ghostRef.current.innerText = '';
@@ -1331,8 +1572,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       pointerMaterialIdRef.current = null;
       pointerCaptureElRef.current = null;
 
-      const boardEl = mainContentRef.current;
-      if (boardEl) {
+      const boardEl = mainContentRef.current?.querySelector<HTMLElement>('.wb-board');
+      if (pe.type !== 'pointercancel' && boardEl) {
         const br = boardEl.getBoundingClientRect();
         const inX = pe.clientX >= br.left - 40 && pe.clientX <= br.right + 40;
         const inY = pe.clientY >= br.top - 40 && pe.clientY <= br.bottom + 40;
@@ -1351,19 +1592,36 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
+      pointerDragCleanupRef.current = null;
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     };
 
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointercancel', onPointerUp);
     pointerDragCleanupRef.current = () => {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerUp);
     };
   };
 
-  const handleItemMouseDown = (e: React.MouseEvent, item: BoardItem) => {
-    if (activeTool === 'select' && !isPanningRef.current) {
+  const handleItemMouseDown = (e: React.PointerEvent, item: BoardItem) => {
+    if ((e.target as HTMLElement).closest('button, input, textarea, select, video, iframe')) {
       e.stopPropagation();
+      return;
+    }
+    if (activeBoardPointersRef.current.size > 1) {
+      e.stopPropagation();
+      return;
+    }
+    if (activeTool === 'select' && !isPanningRef.current) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
       // If a group is selected and the clicked item is not part of it, ungroup
       if (selectedGroupId) {
         const activeGroup = groups.find(g => g.id === selectedGroupId);
@@ -1383,9 +1641,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
       saveToUndoStack();
       const startX = e.clientX, startY = e.clientY, initialX = item.x, initialY = item.y;
-      const handleMouseMove = (mv: MouseEvent) => {
-        let newX = initialX + (mv.clientX - startX) / viewport.zoom;
-        let newY = initialY + (mv.clientY - startY) / viewport.zoom;
+      let latestX = startX;
+      let latestY = startY;
+      let moveFrame: number | null = null;
+      const applyPosition = (clientX: number, clientY: number) => {
+        let newX = initialX + (clientX - startX) / viewportRef.current.zoom;
+        let newY = initialY + (clientY - startY) / viewportRef.current.zoom;
 
         if (item.content === 'unit-cube') {
           const gridSize = 40;
@@ -1395,28 +1656,77 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
         setItems(prev => prev.map(it => it.id === item.id ? { ...it, x: newX, y: newY } : it));
       };
-      const handleMouseUp = () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+      const handleMouseMove = (mv: PointerEvent) => {
+        if (mv.pointerId !== e.pointerId) return;
+        latestX = mv.clientX;
+        latestY = mv.clientY;
+        if (moveFrame === null) {
+          moveFrame = requestAnimationFrame(() => {
+            moveFrame = null;
+            applyPosition(latestX, latestY);
+          });
+        }
       };
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      const cleanupItemDrag = (clientX = latestX, clientY = latestY) => {
+        if (moveFrame !== null) cancelAnimationFrame(moveFrame);
+        moveFrame = null;
+        applyPosition(clientX, clientY);
+        window.removeEventListener('pointermove', handleMouseMove);
+        window.removeEventListener('pointerup', handleMouseUp);
+        window.removeEventListener('pointercancel', handleMouseUp);
+        activeBoardDragCancelRef.current = null;
+      };
+      const handleMouseUp = (upEvent: PointerEvent) => {
+        if (upEvent.pointerId !== e.pointerId) return;
+        cleanupItemDrag(upEvent.clientX, upEvent.clientY);
+      };
+      activeBoardDragCancelRef.current = () => cleanupItemDrag();
+      window.addEventListener('pointermove', handleMouseMove);
+      window.addEventListener('pointerup', handleMouseUp);
+      window.addEventListener('pointercancel', handleMouseUp);
     }
   };
 
-  const handleResizeMouseDown = (e: React.MouseEvent, item: BoardItem) => {
+  const handleResizeMouseDown = (e: React.PointerEvent, item: BoardItem) => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     saveToUndoStack();
     const startX = e.clientX, initialScale = item.scale;
-    const handleMouseMove = (mv: MouseEvent) => {
-      setItems(prev => prev.map(it => it.id === item.id ? { ...it, scale: Math.max(0.2, initialScale * (1 + (mv.clientX - startX) / (100 * viewport.zoom))) } : it));
+    let latestX = startX;
+    let moveFrame: number | null = null;
+    const applyScale = (clientX: number) => {
+      const scale = Math.max(0.2, initialScale * (1 + (clientX - startX) / (100 * viewportRef.current.zoom)));
+      setItems(prev => prev.map(it => it.id === item.id ? { ...it, scale } : it));
     };
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    const handleMouseMove = (mv: PointerEvent) => {
+      if (mv.pointerId !== e.pointerId) return;
+      latestX = mv.clientX;
+      if (moveFrame === null) {
+        moveFrame = requestAnimationFrame(() => {
+          moveFrame = null;
+          applyScale(latestX);
+        });
+      }
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    const cleanupResize = (clientX = latestX) => {
+      if (moveFrame !== null) cancelAnimationFrame(moveFrame);
+      moveFrame = null;
+      applyScale(clientX);
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
+      activeBoardDragCancelRef.current = null;
+    };
+    const handleMouseUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      cleanupResize(upEvent.clientX);
+    };
+    activeBoardDragCancelRef.current = () => cleanupResize();
+    window.addEventListener('pointermove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
   };
 
   // Auto-save whiteboard items and basic state.
@@ -1580,7 +1890,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   const resetBoardState = () => {
     setItems([]);
     if (contextRef.current && canvasRef.current) contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    setViewport({ x: 0, y: 0, zoom: 1 });
+    updateViewport({ x: 0, y: 0, zoom: 1 });
     setUndoStack([]);
     setSelectedItemId(null);
     setCurrentBoardId(null);
@@ -1588,7 +1898,8 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
   };
 
   const handleNewBoard = () => {
-    const hasChanges = items.length > 0 || boardBg !== 'plain' || boardBgColor !== '#ffffff' || viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1;
+    const currentViewport = viewportRef.current;
+    const hasChanges = items.length > 0 || boardBg !== 'plain' || boardBgColor !== '#ffffff' || currentViewport.x !== 0 || currentViewport.y !== 0 || currentViewport.zoom !== 1;
     if (hasChanges || currentBoardId) {
       const boardId = currentBoardId || `lesson-${Date.now()}`;
       const boardName = currentBoardName || `Lesson ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -1628,13 +1939,25 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
     }
   };
 
-  const handleMaterialMouseDown = (e: React.MouseEvent) => {
+  const handleMaterialMouseDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     isDraggingMaterial.current = true;
     const startX = e.clientX, startY = e.clientY, initialX = materialPos.x, initialY = materialPos.y;
-    const onMouseMove = (mv: MouseEvent) => setMaterialPos({ x: initialX + (mv.clientX - startX), y: initialY + (mv.clientY - startY) });
-    const onMouseUp = () => { isDraggingMaterial.current = false; window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== e.pointerId) return;
+      setMaterialPos({ x: initialX + (moveEvent.clientX - startX), y: initialY + (moveEvent.clientY - startY) });
+    };
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== e.pointerId) return;
+      isDraggingMaterial.current = false;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
   };
 
   const renderAssetList = (categoryId: string, items: any[], renderFn: (item: any) => React.ReactNode) => {
@@ -2429,7 +2752,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
   return (
     <div
-      className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']"
+      className="wb-app-shell h-screen flex flex-col bg-[#F8FAFC] overflow-hidden font-['Fredoka']"
       onClick={() => {
         setShowAddArrow(false);
         setShowLibraryArrow(false);
@@ -2437,10 +2760,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         setSelectedItemId(null);
       }}
     >
-      <header className="h-20 py-21 bg-white border-b-2 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
-        <div className="flex items-center gap-6 flex-1">
+      <header className="wb-header h-20 py-3 bg-white border-b-2 border-slate-100 px-6 flex items-center justify-between z-50 shadow-sm">
+        <div className="wb-header-main flex items-center gap-6 flex-1">
           <button onClick={onBack} className="text-xl p-1.5 hover:bg-slate-100 rounded-full transition-colors">⬅️</button>
-          <div className="flex flex-col min-w-[150px]">
+          <div className="wb-header-identity flex flex-col min-w-[150px]">
             <div className="flex items-center gap-3">
               <h1 className="font-black text-slate-900 text-base tracking-tight leading-tight truncate max-w-[250px]">{concept.title}</h1>
             </div>
@@ -2449,13 +2772,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
           {/* Concept Switcher for Teacher Mode */}
           {mode === 'teacher' && subjectConcepts.length > 1 && (
-            <div className="relative ml-4 min-w-0 flex-1 max-w-[690px] group/switcher">
+            <div className="wb-concept-switcher relative ml-4 min-w-0 flex-1 max-w-[690px] group/switcher">
               <div
                 ref={conceptSwitcherRef}
-                onMouseDown={handleSwitcherMouseDown}
-                onMouseMove={handleSwitcherMouseMove}
-                onMouseUp={handleSwitcherStop}
-                onMouseLeave={handleSwitcherStop}
+                onPointerDown={handleSwitcherMouseDown}
+                onPointerMove={handleSwitcherMouseMove}
+                onPointerUp={handleSwitcherStop}
+                onPointerCancel={handleSwitcherStop}
                 className={`flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border-2 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)] overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing select-none transition-all duration-500 ${showSwitcherArrow ? 'ring-4 ring-green-300/70 shadow-[0_0_30px_rgba(34,197,94,0.75)] animate-pulse' : ''}`}
               >
                 {subjectConcepts.map((c) => (
@@ -2501,9 +2824,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="wb-header-actions flex items-center gap-4">
           {mode === 'teacher' ? (
-            <div className="flex items-center gap-3">
+            <div className="wb-teacher-actions flex items-center gap-3">
               <button
                 onClick={handleNewBoard}
                 className="px-8 py-3 bg-slate-100 rounded-xl font-black text-slate-800 text-xl border-b-4 border-slate-200 hover:bg-slate-50 active:translate-y-1 active:border-b-0 transition-all"
@@ -2531,7 +2854,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-4">
+            <div className="wb-classroom-actions flex items-center gap-4">
               <button
                 onClick={handleClearEverything}
                 className="px-8 py-3 bg-slate-100 rounded-lg font-black text-slate-900 text-xl border-b-2 border-slate-200 active:translate-y-0.5 active:border-b-0 transition-all"
@@ -2548,7 +2871,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               >
                 {saveStatus === 'saved' ? '✅ Saved!' : saveStatus === 'saving' ? '⏳ Saving...' : '💾 Save'}
               </button>
-              <div className="flex gap-2 ml-4 bg-slate-100 p-1.5 rounded-xl">
+              <div className="wb-board-paper-controls flex gap-2 ml-4 bg-slate-100 p-1.5 rounded-xl">
                 {(['plain', 'lined', 'grid'] as const).map(b => (
                   <button
                     key={b}
@@ -2574,7 +2897,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="wb-stage flex-1 flex overflow-hidden relative">
         <AnimatePresence>
           {showSaveGlow && (
             <motion.div
@@ -2587,10 +2910,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           )}
         </AnimatePresence>
         {/* ASSETS DRAWER (LEFT) */}
-        <div className="absolute left-0 top-0 bottom-0 z-[70] w-28 bg-slate-50 border-r-2 border-slate-100 flex flex-col shadow-lg">
+        <div className="wb-assets-rail absolute left-0 top-0 bottom-0 z-[70] w-28 bg-slate-50 border-r-2 border-slate-100 flex flex-col shadow-lg">
           {/* Fixed Add Button at Top (Teacher Mode) */}
           {mode === 'teacher' && (
-            <div className="p-4 flex flex-col items-center border-b-2 border-slate-100 relative z-[80]">
+            <div className="wb-assets-add p-4 flex flex-col items-center border-b-2 border-slate-100 relative z-[80]">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2611,7 +2934,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           )}
 
           {/* Scrollable Categories */}
-          <div className="flex-1 overflow-y-auto py-4 flex flex-col items-center gap-3 custom-scrollbar">
+          <div className="wb-assets-categories flex-1 overflow-y-auto py-4 flex flex-col items-center gap-3 custom-scrollbar">
             {categories.filter(cat => cat.id !== 'ADD_MATERIAL' && !hiddenDrawerItems.includes(cat.id)).map((cat) => (
               <button
                 key={cat.id}
@@ -2649,23 +2972,23 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
           </div>
         </div>
 
-        <div className={`absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`wb-assets-drawer absolute left-28 top-0 bottom-0 z-[60] bg-white border-r-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${drawerOpen ? 'translate-x-0 wb-drawer-open' : '-translate-x-full'}`}>
           <div className="px-6 py-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
             <h3 className="font-black text-slate-400 text-base tracking-[0.2em] uppercase truncate">
               {categories.find(c => c.id === activeCategoryId)?.label || (activeCategoryId === 'SONGS' ? 'Songs' : 'Games')} Library
             </h3>
             <button onClick={() => setDrawerOpen(false)} className="text-slate-300 hover:text-rose-500 transition-colors">✕</button>
           </div>
-          <div className="flex-1 overflow-y-auto p-8 grid grid-cols-4 gap-5 content-start custom-scrollbar">
+          <div className="wb-assets-drawer-content flex-1 overflow-y-auto p-8 grid grid-cols-4 gap-5 content-start custom-scrollbar">
             {renderCategoryContent()}
           </div>
-          <button onClick={() => setDrawerOpen(!drawerOpen)} className="absolute left-full top-1/2 -translate-y-1/2 bg-white border-r-4 border-slate-100 p-4 rounded-r-3xl shadow-xl font-black text-xl hover:translate-x-1 transition-all flex items-center justify-center min-w-[56px] border-b-4 border-slate-200">
+          <button onClick={() => setDrawerOpen(!drawerOpen)} className="wb-drawer-toggle absolute left-full top-1/2 -translate-y-1/2 bg-white border-r-4 border-slate-100 p-4 rounded-r-3xl shadow-xl font-black text-xl hover:translate-x-1 transition-all flex items-center justify-center min-w-[56px] border-b-4 border-slate-200">
             {drawerOpen ? '⬅️' : '📦'}
           </button>
         </div>
 
         {/* MATERIAL LIBRARY (RIGHT) */}
-        <div className={`absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className={`wb-material-drawer absolute right-0 top-0 bottom-0 z-[65] bg-white border-l-4 border-slate-100 shadow-2xl transition-transform duration-300 w-80 flex flex-col ${libraryOpen ? 'translate-x-0 wb-library-open' : 'translate-x-full'}`}>
           <div className="p-4 border-b flex justify-between items-center bg-blue-50"><h3 className="font-black text-blue-500 text-base tracking-widest uppercase flex items-center gap-2"><span className="text-xl">📚</span> Materials</h3><button onClick={() => setLibraryOpen(false)} className="text-slate-300 hover:text-rose-500 font-black">✕</button></div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {!filteredMaterials.length ? (
@@ -2745,7 +3068,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               setLibraryOpen(!libraryOpen);
               setShowLibraryArrow(false);
             }}
-            className={`absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px] group/materials ${showLibraryArrow ? 'ring-4 ring-blue-300/70 shadow-[0_0_30px_rgba(59,130,246,0.75)] animate-pulse' : ''}`}
+            className={`wb-material-toggle absolute right-full top-1/2 -translate-y-1/2 bg-blue-500 text-white border-l-4 border-blue-700 p-4 rounded-l-3xl shadow-xl font-black text-xl hover:-translate-x-1 transition-all flex items-center justify-center min-w-[56px] group/materials ${showLibraryArrow ? 'ring-4 ring-blue-300/70 shadow-[0_0_30px_rgba(59,130,246,0.75)] animate-pulse' : ''}`}
           >
             {libraryOpen ? '➡️' : '📚'}
             <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover/materials:opacity-100 transition-opacity pointer-events-none">
@@ -2759,7 +3082,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
         {/* WHITEBOARD MAIN AREA */}
         <main
           ref={mainContentRef}
-          className="flex-1 relative overflow-hidden flex flex-col bg-slate-50"
+          className="wb-main-content flex-1 relative overflow-hidden flex flex-col bg-slate-50"
         >
           <AnimatePresence>
             {showTransition && (
@@ -2777,9 +3100,9 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
             )}
           </AnimatePresence>
           {activeMaterial && (
-            <div className="absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}>
+            <div className="wb-material-preview absolute z-[90] pointer-events-auto shadow-2xl transition-opacity animate-material-enter" style={{ left: materialPos.x, top: materialPos.y, width: 'min(900px, 92vw)', height: 'min(750px, 85vh)' }}>
               <div className="bg-white w-full h-full rounded-[2.5rem] border-8 border-white flex flex-col overflow-hidden shadow-2xl ring-4 ring-black/5">
-                <div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onMouseDown={handleMaterialMouseDown}>
+                <div className="flex items-center justify-between p-4 bg-slate-50 cursor-move border-b-2" onPointerDown={handleMaterialMouseDown}>
                   <div className="flex items-center gap-3">
                     <div className="text-2xl">{getFileIcon(activeMaterial.type)}</div>
                     <div>
@@ -2813,32 +3136,26 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               </div>
             </div>
           )}
-          {/* Drag ghost that follows the pointer */}
+          <div ref={zoomBadgeRef} className="wb-zoom-badge absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
           <div
-            ref={ghostRef}
-            className="fixed z-[200] pointer-events-none select-none text-5xl opacity-80 drop-shadow-2xl scale-125 transition-none"
-            style={{
-              display: 'none',
-              transform: 'translate(-50%, -50%)',
-            }}
-          />
-          <div className="absolute top-4 right-4 z-[70] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full font-black text-slate-900 text-base shadow-lg border-2 border-slate-100 select-none">{Math.round(viewport.zoom * 100)}%</div>
-          <div
-            className={`flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
+            className={`wb-board flex-1 relative touch-none select-none overflow-hidden ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'boxSelect' ? 'cursor-crosshair' : 'cursor-crosshair'}`}
             onDragOver={(e) => e.preventDefault()}
-            onMouseDown={startInteraction} onMouseMove={performInteraction} onMouseUp={stopInteraction} onMouseLeave={stopInteraction} onTouchStart={startInteraction} onTouchMove={performInteraction} onTouchEnd={stopInteraction}
+            onPointerDownCapture={handleBoardPointerDownCapture}
+            onPointerDown={startInteraction} onPointerMove={performInteraction} onPointerUp={stopInteraction} onPointerCancel={stopInteraction}
             onWheel={(e) => {
               // Smooth zoom with scroll wheel without needing Ctrl
               const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
               const rect = e.currentTarget.getBoundingClientRect();
-              handleZoomAt({ sx: e.clientX - rect.left, sy: e.clientY - rect.top }, zoomFactor);
+              handleZoomAt({ sx: e.clientX - rect.left, sy: e.clientY - rect.top }, zoomFactor, false);
+              if (viewportCommitTimerRef.current !== null) clearTimeout(viewportCommitTimerRef.current);
+              viewportCommitTimerRef.current = setTimeout(commitViewportState, 120);
             }}
             style={{
               touchAction: 'none',
             }}
           >
-            <div className="absolute top-0 left-0 origin-top-left border-2 border-slate-400 shadow-lg rounded-sm overflow-hidden" style={{
-              transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+            <div ref={boardPlaneRef} className="wb-board-plane absolute top-0 left-0 origin-top-left border-2 border-slate-400 shadow-lg rounded-sm overflow-hidden" style={{
+              transform: `translate(${viewportRef.current.x}px, ${viewportRef.current.y}px) scale(${viewportRef.current.zoom})`,
               width: '2000px',
               height: '2000px',
               backgroundColor: boardBgColor,
@@ -2856,7 +3173,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               }).map(item => {
                 const inGroup = groups.some(g => g.itemIds.includes(item.id));
                 return (
-                  <div key={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onMouseDown={(e) => { e.stopPropagation(); handleItemMouseDown(e, item); }} onClick={(e) => { e.stopPropagation(); }}>
+                  <div key={item.id} data-board-item-id={item.id} className={`absolute z-10 select-none group ${inGroup ? 'pointer-events-none' : 'pointer-events-auto'}`} style={{ left: item.x, top: item.y, transform: `translate(-50%, -50%) scale(${item.scale})` }} onPointerDown={(e) => handleItemMouseDown(e, item)} onClick={(e) => { e.stopPropagation(); }}>
                     <div className={`relative p-4 rounded-3xl border-4 transition-all duration-200 ease-out ${droppedItemId === item.id ? 'ring-8 ring-blue-400/50 bg-blue-400/20 border-blue-400 scale-105' : selectedItemId === item.id ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.25)]' : 'border-transparent'} ${activeTool === 'select' ? 'hover:border-blue-400' : ''}`}>
                       {item.type === 'song' ? (
                         <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border-4 border-pink-100 flex items-center gap-6 min-w-[320px] pointer-events-auto">
@@ -2868,7 +3185,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">{item.metadata?.artist || 'Artist'}</div>
                           </div>
                           <button
-                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePlaySong({ id: item.id, url: item.content, title: item.metadata.title, icon: item.metadata.icon, category: '' });
@@ -2898,7 +3215,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                         <div className="w-64 h-64 bg-white rounded-full border-8 border-slate-800 relative shadow-2xl flex items-center justify-center pointer-events-auto clock-container">
                           {/* Remove Button */}
                           <button
-                            onMouseDown={e => e.stopPropagation()}
+                            onPointerDown={e => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                             className="absolute -top-4 -right-4 w-8 h-8 bg-white rounded-full shadow-lg border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all z-50"
                           >
@@ -2936,13 +3253,13 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           })}
                           {/* Hour Hand */}
                           <div
-                            onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'hour')}
+                            onPointerDown={(e) => handleClockHandMouseDown(e, item.id, 'hour')}
                             className="absolute w-4 h-20 bg-slate-800 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-600 z-20"
                             style={{ transform: `rotate(${(item.metadata?.hour || 0) * 30 + (item.metadata?.minute || 0) * 0.5}deg)` }}
                           />
                           {/* Minute Hand */}
                           <div
-                            onMouseDown={(e) => handleClockHandMouseDown(e, item.id, 'minute')}
+                            onPointerDown={(e) => handleClockHandMouseDown(e, item.id, 'minute')}
                             className="absolute w-2.5 h-28 bg-slate-500 rounded-full origin-bottom bottom-1/2 transition-transform duration-75 cursor-pointer hover:bg-blue-400 z-20"
                             style={{ transform: `rotate(${(item.metadata?.minute || 0) * 6}deg)` }}
                           />
@@ -2973,7 +3290,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           </div>
                           <div className={`absolute ${item.metadata?.vertical ? 'top-2 right-2' : 'bottom-2 right-2'} flex gap-2`}>
                             <button
-                              onMouseDown={e => e.stopPropagation()}
+                              onPointerDown={e => e.stopPropagation()}
                               onClick={() => updateItemMetadata(item.id, { vertical: !item.metadata?.vertical })}
                               className="bg-white/80 backdrop-blur p-2 rounded-xl shadow-sm border border-slate-200 text-xs hover:bg-white transition-all"
                             >
@@ -2999,7 +3316,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       ) : item.type === 'shape' && item.content === 'thermometer' ? (
                         <div className="w-16 h-64 bg-slate-100 rounded-full border-4 border-slate-300 relative shadow-xl flex flex-col items-center py-4 pointer-events-auto thermometer-container">
                           <div
-                            onMouseDown={(e) => handleThermometerMouseDown(e, item.id)}
+                            onPointerDown={(e) => handleThermometerMouseDown(e, item.id)}
                             className="w-6 flex-1 bg-white rounded-full relative overflow-hidden border-2 border-slate-200 cursor-ns-resize thermo-tube"
                           >
                             <div
@@ -3037,7 +3354,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             </div>
                           </div>
                           {selectedItemId === item.id && (
-                            <div className="absolute -right-12 top-0 bottom-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-slate-100" onMouseDown={e => e.stopPropagation()}>
+                            <div className="absolute -right-12 top-0 bottom-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-slate-100" onPointerDown={e => e.stopPropagation()}>
                               <input
                                 type="range"
                                 min="0"
@@ -3103,7 +3420,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           <div className="flex justify-between w-full items-center">
                             <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Classroom Timer ⏱️</div>
                             <button
-                              onMouseDown={e => e.stopPropagation()}
+                              onPointerDown={e => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                               className="text-slate-300 hover:text-rose-500 transition-colors"
                             >
@@ -3114,7 +3431,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             {Math.floor((item.metadata?.timeLeft || 0) / 60)}:{String((item.metadata?.timeLeft || 0) % 60).padStart(2, '0')}
                           </div>
 
-                          <div className="flex gap-4 w-full" onMouseDown={e => e.stopPropagation()}>
+                          <div className="flex gap-4 w-full" onPointerDown={e => e.stopPropagation()}>
                             <button
                               onClick={() => {
                                 const isRunning = !item.metadata?.isRunning;
@@ -3134,7 +3451,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                             </button>
                           </div>
 
-                          <div className="flex items-center gap-3 w-full bg-slate-50 p-3 rounded-2xl" onMouseDown={e => e.stopPropagation()}>
+                          <div className="flex items-center gap-3 w-full bg-slate-50 p-3 rounded-2xl" onPointerDown={e => e.stopPropagation()}>
                             <span className="text-xs font-black text-slate-400 uppercase">Set:</span>
                             {[1, 2, 5, 10].map(m => (
                               <button
@@ -3161,7 +3478,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           <div className="flex justify-between w-full items-center">
                             <div className="text-sm font-black text-slate-400 uppercase tracking-widest">Wheel Spinner 🎡</div>
                             <button
-                              onMouseDown={e => e.stopPropagation()}
+                              onPointerDown={e => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                               className="text-slate-300 hover:text-rose-500 transition-colors"
                             >
@@ -3268,7 +3585,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
 
                             {/* Center Button - Dark Circular */}
                             <button
-                              onMouseDown={e => e.stopPropagation()}
+                              onPointerDown={e => e.stopPropagation()}
                               onClick={() => {
                                 if ((item.metadata?.names || []).length < 2) return;
                                 const extraSpins = 6 + Math.random() * 4;
@@ -3304,7 +3621,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                           </div>
 
                           {/* Name Input */}
-                          <div className="w-full space-y-3" onMouseDown={e => e.stopPropagation()}>
+                          <div className="w-full space-y-3" onPointerDown={e => e.stopPropagation()}>
                             <div className="flex gap-2">
                               <input
                                 type="text"
@@ -3359,7 +3676,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0, opacity: 0 }}
                                 className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-8 rounded-[3rem] text-center shadow-2xl border-4 border-purple-200"
-                                onMouseDown={e => e.stopPropagation()}
+                                onPointerDown={e => e.stopPropagation()}
                               >
                                 <motion.div
                                   animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.2, 1] }}
@@ -3387,12 +3704,12 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       )}
                       {activeTool === 'select' && selectedItemId === item.id && (
                         <><button
-                          onMouseDown={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                          onPointerDown={(e) => { e.stopPropagation(); removeItem(item.id); }}
                           className="absolute -top-3 -right-3 w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl font-black text-xl border-4 border-white z-[100] cursor-pointer hover:scale-110 transition-transform"
                         >
                           🗑️
                         </button>
-                          <div className="absolute -bottom-3 -right-3 w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-nwse-resize" onMouseDown={(e) => handleResizeMouseDown(e, item)} /></>
+                          <div className="absolute -bottom-3 -right-3 w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-nwse-resize" onPointerDown={(e) => handleResizeMouseDown(e, item)} /></>
                       )}
                     </div>
                   </div>
@@ -3412,10 +3729,10 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                   >
                     <div
                       className={`w-full h-full border-2 border-dashed border-blue-400 rounded-2xl transition-all bg-blue-50/20 ${selectedGroupId === group.id ? 'ring-4 ring-blue-400/40' : ''}`}
-                      onMouseDown={(e) => handleGroupMouseDown(e, group)}
+                      onPointerDown={(e) => handleGroupMouseDown(e, group)}
                     >
                       <button
-                        onMouseDown={e => e.stopPropagation()}
+                        onPointerDown={e => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteGroup(group.id);
@@ -3427,7 +3744,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
                       </button>
                       <div
                         className="absolute -bottom-3 -left-3 w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl cursor-sw-resize z-20 hover:scale-110 transition-transform"
-                        onMouseDown={(e) => handleGroupResizeMouseDown(e, group)}
+                        onPointerDown={(e) => handleGroupResizeMouseDown(e, group)}
                         title="Resize Group"
                       />
                     </div>
@@ -3449,42 +3766,42 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
               )}
             </div>
           </div>
-          <div className="h-24 py-3 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-5 z-50">
+          <div className="wb-toolbar h-24 py-3 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 flex items-center justify-center gap-5 z-50">
             {mode === 'teacher' && currentBoardName && (
-              <div className="flex items-center mr-2">
+              <div className="wb-active-board flex items-center mr-2">
                 <span className="px-5 py-2.5 bg-blue-50 text-blue-600 text-base font-black rounded-xl border-2 border-blue-100 uppercase tracking-wider shadow-sm">
                   Active: {currentBoardName}
                 </span>
               </div>
             )}
-            <div className="flex bg-slate-100 p-2.5 rounded-full shadow-inner gap-1.5">
+            <div className="wb-tool-group flex bg-slate-100 p-2.5 rounded-full shadow-inner gap-1.5">
               {[{ id: 'select', icon: '🖐️' }, { id: 'marker', icon: '✏️' }, { id: 'highlighter', icon: '🖍️' }, { id: 'eraser', icon: '🧼' }].map(t => (
                 <div key={t.id} className="relative group/tool">
-                  <button onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-14 h-14 rounded-full transition-all flex items-center justify-center text-2xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
+                  <button aria-label={`${t.id.charAt(0).toUpperCase()}${t.id.slice(1)} tool`} aria-pressed={activeTool === t.id} title={`${t.id.charAt(0).toUpperCase()}${t.id.slice(1)} tool`} onClick={() => { if ((activeTool === t.id) && (t.id === 'marker' || t.id === 'highlighter')) setShowColorPicker(showColorPicker === t.id ? null : t.id as any); else { setActiveTool(t.id as any); setShowColorPicker(null); } }} className={`w-14 h-14 rounded-full transition-all flex items-center justify-center text-2xl relative ${activeTool === t.id ? 'bg-white shadow-xl text-blue-500 scale-110 ring-2 ring-blue-100' : 'opacity-40'}`}>
                     {t.icon}{(t.id === 'marker' || t.id === 'highlighter') && <div className="absolute -bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: t.id === 'marker' ? markerColor : highlighterColor }} />}
                   </button>
-                  {showColorPicker === t.id && <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${(t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
+                  {showColorPicker === t.id && <div className="wb-color-picker absolute bottom-24 left-1/2 -translate-x-1/2 bg-white p-3 rounded-2xl shadow-2xl border-2 border-slate-100 z-[80] animate-fade-in flex gap-2">{(t.id === 'marker' ? MARKER_COLORS : HIGHLIGHTER_COLORS).map(c => <button key={c.value} aria-label={`Use ${c.name} ${t.id}`} onClick={() => { if (t.id === 'marker') setMarkerColor(c.value); else setHighlightColor(c.value); setShowColorPicker(null); }} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-125 ${(t.id === 'marker' ? markerColor : highlighterColor) === c.value ? 'border-blue-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c.value }} />)}</div>}
                 </div>
               ))}
             </div>
-            <div className="h-12 w-px bg-slate-200" />
-            <div className="flex gap-2.5">
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 1.25)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➕</button>
-              <button onClick={() => handleZoomAt({ sx: window.innerWidth / 2, sy: window.innerHeight / 2 }, 0.8)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➖</button>
-              <button onClick={() => setViewport(getCenter())} className="w-12 h-12 rounded-xl bg-slate-50 shadow-md border border-slate-100 flex items-center justify-center text-xl">🏠</button>
+            <div className="wb-tool-separator h-12 w-px bg-slate-200" />
+            <div className="wb-zoom-controls flex gap-2.5">
+              <button aria-label="Zoom in" title="Zoom in" onClick={() => handleZoomAt(getBoardViewCenter(), 1.25)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➕</button>
+              <button aria-label="Zoom out" title="Zoom out" onClick={() => handleZoomAt(getBoardViewCenter(), 0.8)} className="w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 flex items-center justify-center text-xl">➖</button>
+              <button aria-label="Center whiteboard" title="Center whiteboard" onClick={() => updateViewport(getCenter())} className="w-12 h-12 rounded-xl bg-slate-50 shadow-md border border-slate-100 flex items-center justify-center text-xl">🏠</button>
             </div>
-            <button onClick={handleUndo} disabled={undoStack.length === 0} className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
-            <div className="h-12 w-px bg-slate-200" />
-            <div className="flex gap-2.5">
+            <button aria-label="Undo last change" title="Undo last change" onClick={handleUndo} disabled={undoStack.length === 0} className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 ${undoStack.length > 0 ? 'bg-amber-100 text-amber-600 border-amber-300' : 'bg-slate-50 text-slate-200 border-slate-100'}`}>↩️</button>
+            <div className="wb-tool-separator h-12 w-px bg-slate-200" />
+            <div className="wb-add-controls flex gap-2.5">
               <button
-                onClick={() => addItem('timer', 'timer', window.innerWidth / 2, window.innerHeight / 2, { timeLeft: 60, initialTime: 60, isRunning: false })}
+                onClick={() => addItem('timer', 'timer', undefined, undefined, { timeLeft: 60, initialTime: 60, isRunning: false })}
                 className="w-14 h-14 rounded-full bg-blue-50 text-blue-500 border-b-4 border-blue-200 flex items-center justify-center text-3xl hover:bg-blue-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Timer"
               >
                 ⏱️
               </button>
               <button
-                onClick={() => addItem('spinner', 'spinner', window.innerWidth / 2, window.innerHeight / 2, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
+                onClick={() => addItem('spinner', 'spinner', undefined, undefined, { names: globalSpinnerNames, rotation: 0, isSpinning: false })}
                 className="w-14 h-14 rounded-full bg-purple-50 text-purple-500 border-b-4 border-purple-200 flex items-center justify-center text-3xl hover:bg-purple-100 transition-all active:translate-y-0.5 active:border-b-0"
                 title="Add Wheel Spinner"
               >
@@ -4021,7 +4338,7 @@ const ConceptDashboard: React.FC<ConceptDashboardProps> = ({
       />
 
       <style>{`
-        .drag-ghost { position: fixed; pointer-events: none; touch-action: none; z-index: 9999; transform: translate(-50%, -50%) scale(1.15); background: rgba(255,255,255,0.9); border-radius: 1rem; padding: 0.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.18); border: 2px solid rgba(59,130,246,0.3); transition: none; will-change: left, top; }
+        .drag-ghost { position: fixed; pointer-events: none; touch-action: none; z-index: 9999; transform: translate(-50%, -50%) scale(1.15); background: rgba(255,255,255,0.9); border-radius: 1rem; padding: 0.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.18); border: 2px solid rgba(59,130,246,0.3); transition: none; will-change: transform; }
         .board-lined { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.25) 2px, transparent 2px); }
         .board-grid { background-color: white; background-image: linear-gradient(rgba(59, 130, 246, 0.2) 2px, transparent 2px), linear-gradient(90deg, rgba(59, 130, 246, 0.2) 2px, transparent 2px); }
         .cursor-grab { cursor: grab; }
